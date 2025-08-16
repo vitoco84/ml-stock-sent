@@ -1,3 +1,5 @@
+from typing import List, Tuple
+
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
@@ -15,9 +17,9 @@ def plot_price_series(df: pd.DataFrame, output_dir: str, filename: str) -> None:
     plt.show()
     plt.close()
 
-def plot_correlation_heatmap(df: pd.DataFrame, output_dir: str, filename: str):
-    plt.figure(figsize=(8, 5))
-    sns.heatmap(df[["open", "high", "low", "close", "volume"]].corr(), annot=True, cmap="coolwarm")
+def plot_correlation_heatmap(df: pd.DataFrame, col: List[str], output_dir: str, filename: str, figsize: Tuple = (8, 5)):
+    plt.figure(figsize=figsize)
+    sns.heatmap(df[col].corr(), annot=True, cmap="coolwarm")
     plt.title("OHLCV Correlation Heatmap")
     plt.tight_layout()
     plt.savefig(f"{output_dir}/{filename}")

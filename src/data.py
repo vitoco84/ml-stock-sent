@@ -2,8 +2,11 @@ from typing import Tuple
 
 import pandas as pd
 
+from src.logger import get_logger
 from src.utils import load_csv
 
+
+logger = get_logger(__name__)
 
 def _rename_columns(df: pd.DataFrame) -> None:
     """Rename the columns of the dataframe to lower case."""
@@ -30,6 +33,17 @@ def load_news(path: str) -> pd.DataFrame:
     df["headline"] = df["headline"].astype(str).str.strip()
     df["date"] = pd.to_datetime(df["date"])
     return df.sort_values("date").reset_index(drop=True)
+
+def load_prices_sentiment(path: str) -> pd.DataFrame:
+    """Loads Combined Sentiment with Prices Dataset."""
+    try:
+        df = load_csv(path)
+        df["date"] = pd.to_datetime(df["date"])
+        df.sort_values("date").reset_index(drop=True)
+    except FileNotFoundError:
+        logger.warning("Sentiment dataset not found, run sentiment notebook first.")
+        df = pd.DataFrame()
+    return df
 
 def merge_price_news(price: pd.DataFrame, news: pd.DataFrame) -> pd.DataFrame:
     """Merge price and news data."""

@@ -9,7 +9,6 @@ def get_logger(name: str = __name__, level: int = logging.INFO) -> logging.Logge
 
     Log Levels: INFO, DEBUGm WARNING, ERROR, CRITICAL
     """
-
     logger = logging.getLogger(name)
     logger.setLevel(level)
 

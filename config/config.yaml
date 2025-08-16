@@ -3,10 +3,17 @@ general:
   created: "2025-08-16"
 
 data:
-  price_csv: "../data/raw/djia_table.csv"
-  news_csv: "../data/raw/djia_combined_news.csv"
   fig_dir: "../data/figures"
+  processed_dir: "../data/processed"
+  raw_dir: "../data/raw"
+  name_news: "djia_combined_news.csv"
+  name_prices: "djia_table.csv"
+  name_prices_sentiment: "prices_with_sentiment_table.csv"
+  name_features_full: "features_full_table.csv"
 
 runtime:
   n_jobs: 24
   seed: 42
+
+sentiment:
+  model: "yiyanghkust/finbert-tone"
