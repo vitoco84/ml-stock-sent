@@ -1,0 +1,12 @@
+general:
+  name: "ml-stock-ml"
+  created: "2025-08-16"
+
+data:
+  price_csv: "../data/raw/djia_table.csv"
+  news_csv: "../data/raw/djia_combined_news.csv"
+  fig_dir: "../data/figures"
+
+runtime:
+  n_jobs: 24
+  seed: 42
