@@ -1,8 +1,12 @@
 import os
 from abc import ABC, abstractmethod
+from typing import Any, Dict, List
 
 import joblib
 import numpy as np
+import optuna
+
+from src.logger import get_logger
 
 
 class Base(ABC):
@@ -13,6 +17,7 @@ class Base(ABC):
     def __init__(self, horizon: int = 30, random_state: int = 42, **kwargs):
         self.horizon = horizon
         self.random_state = random_state
+        self.logger = get_logger(self.__class__.__name__)
 
     @abstractmethod
     def fit(self, X_train: np.ndarray, y_train: np.ndarray) -> "Base":
@@ -20,6 +25,10 @@ class Base(ABC):
 
     @abstractmethod
     def predict(self, X_test: np.ndarray) -> np.ndarray:
+        raise NotImplementedError
+
+    @abstractmethod
+    def suggest_hyperparameters(self, trial: optuna.Trial) -> Dict[str, Any]:
         raise NotImplementedError
 
     def save(self, path: str) -> None:

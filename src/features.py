@@ -50,4 +50,6 @@ def create_features_and_target(df: pd.DataFrame, forecast_horizon: int = 30) -> 
     df['q_mean'] = df['quarter'].map(df.groupby('quarter')['log_return'].mean())
     df['q_std'] = df['quarter'].map(df.groupby('quarter')['log_return'].std())
     df['q_skew'] = df['quarter'].map(df.groupby('quarter')['log_return'].skew())
-    return df
+
+    max_lag = 51
+    return df.iloc[max_lag:].copy()

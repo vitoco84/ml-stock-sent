@@ -51,19 +51,33 @@ def merge_price_news(price: pd.DataFrame, news: pd.DataFrame) -> pd.DataFrame:
             .sort_values("date")
             .reset_index(drop=True))
 
-def time_series_split(df: pd.DataFrame, train_ratio: float = 0.7, val_ratio: float = 0.1, horizon: int = 30) \
-        -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """Split dataframe into train, test, validation and forecast sets. """
+def time_series_split(df: pd.DataFrame, train_ratio: float = 0.8, val_ratio: float = 0.1, horizon: int = 30
+                      ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Chronologically split DataFrame into train, val, test, and forecast sets. """
     df = df.sort_values("date").reset_index(drop=True)
-    total_len = len(df)
-
     forecast = df.tail(horizon).copy()
 
-    train_end = int(train_ratio * total_len)
-    val_end = int((train_ratio + val_ratio) * total_len)
+    usable = df[df["target"].notna()].copy()
 
-    train = df.iloc[:train_end]
-    val = df.iloc[train_end:val_end]
-    test = df.iloc[val_end:]
+    total = len(usable)
+    train_end = int(total * train_ratio)
+    val_end = int(total * (train_ratio + val_ratio))
+
+    train = usable.iloc[:train_end].copy()
+    val = usable.iloc[train_end:val_end].copy()
+    test = usable.iloc[val_end:].copy()
 
     return train, val, test, forecast
+
+def split_train_test(df: pd.DataFrame, horizon: int = 30, test_ratio: float = 0.8):
+    df = df.sort_values("date").reset_index(drop=True)
+    forecast = df.tail(horizon).copy()
+    usable = df[df["target"].notna()].copy()
+
+    split_ix = int(len(usable) * test_ratio)
+
+    train = usable.iloc[:split_ix].copy()
+    test = usable.iloc[split_ix:].copy()
+
+    return train, test, forecast
+
