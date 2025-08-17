@@ -1,8 +1,0 @@
-[tool.poetry.dependencies]
-python = "^3.12"
-numpy = "2.3.2"
-torch = "2.5.1"
-torchvision = "0.20.1"
-torchaudio = "2.5.1"
-pywin32 = { version = "311", markers = "sys_platform == 'win32'" }
-pywinpty = { version = "3.0.0", markers = "sys_platform == 'win32'" }
