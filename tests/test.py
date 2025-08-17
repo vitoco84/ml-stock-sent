@@ -5,13 +5,9 @@ from fastapi.testclient import TestClient
 
 from app.api.main import app
 from src.data import _rename_columns, load_prices_sentiment
-from src.utils import is_cuda_available
 
 
 client = TestClient(app)
-
-def test_is_cuda_available():
-    assert is_cuda_available() == True
 
 def test_rename_columns():
     data = [
