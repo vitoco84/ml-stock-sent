@@ -73,6 +73,7 @@ def test_news_history(client):
     assert "news" in data
     assert isinstance(data["news"], list)
 
+@pytest.mark.integration
 def test_predict_raw_from_file():
     payload_path = Path(__file__).parent / "payload_predict.json"
     with open(payload_path, "r", encoding="utf-8") as f:
