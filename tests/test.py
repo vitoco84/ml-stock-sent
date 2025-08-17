@@ -50,7 +50,7 @@ def test_price_history():
 
 def test_predict_raw_from_file():
     with TestClient(app) as client:
-        with open("test/payload_predict.json", "r", encoding="utf-8") as f:
+        with open("tests/payload_predict.json", "r", encoding="utf-8") as f:
             payload = json.load(f)
 
         response = client.post("/predict-raw", json=payload)
