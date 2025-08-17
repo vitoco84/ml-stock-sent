@@ -29,7 +29,6 @@ jobs:
       - name: Run tests with coverage
         run: |
           pytest --cov=src tests/ -m "not integration"
-          coverage xml
 
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@v2
