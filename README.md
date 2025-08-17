@@ -7,6 +7,7 @@
 * Upgrade pip: `python.exe -m pip install --upgrade pip`
 * Install libraries: `pip install -r requirements.txt`
 * Freeze libraries: `pip freeze > requirements.txt`
+* Poetry: `poetry install`
 * Check Nvidia Cuda Version: `nvidia-smi` -> 12.9
     * CUDA 12.1: `pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121`
 
