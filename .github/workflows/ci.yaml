@@ -28,7 +28,7 @@ jobs:
 
       - name: Run tests with coverage
         run: |
-          pytest --cov=src tests/
+          pytest --cov=src tests/ -m "not integration"
           coverage xml
 
       - name: SonarCloud Scan

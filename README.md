@@ -128,5 +128,7 @@ curl -X POST http://localhost:8000/predict-raw \
 # Ollama Integration for News Generation and Testing
 
 * Generating Fake News with Ollama
+* List: `ollama list`
 * Install model local: `ollama pull llama3`
+* Run: `ollama run llama3`
 * OLLAMA_URL = `http://localhost:11434/api/generate`
