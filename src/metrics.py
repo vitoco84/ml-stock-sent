@@ -10,7 +10,9 @@ def _smape(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     return float(np.mean(2.0 * np.abs(y_pred - y_true) / denom))
 
 def _mase(y_true: np.ndarray, y_pred: np.ndarray, y_insample: np.ndarray) -> float:
-    """Mean Absolute Scaled Error."""
+    """Mean Absolute Scaled Error.
+    y_insample: Historical target values (before forecast window) used to compute MASE.
+    """
     naive = np.mean(np.abs(np.diff(y_insample)))
     naive = np.maximum(naive, 1e-8)
     return float(np.mean(np.abs(y_true - y_pred)) / naive)

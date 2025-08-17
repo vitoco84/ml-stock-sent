@@ -1,6 +1,7 @@
 from typing import Tuple
 
 import pandas as pd
+import yfinance as yf
 
 from src.logger import get_logger
 from src.utils import load_csv
@@ -39,7 +40,7 @@ def load_prices_sentiment(path: str) -> pd.DataFrame:
     try:
         df = load_csv(path)
         df["date"] = pd.to_datetime(df["date"])
-        df.sort_values("date").reset_index(drop=True)
+        df = df.sort_values("date").reset_index(drop=True)
     except FileNotFoundError:
         logger.warning("Sentiment dataset not found, run sentiment notebook first.")
         df = pd.DataFrame()
@@ -55,9 +56,8 @@ def time_series_split(df: pd.DataFrame, train_ratio: float = 0.8, val_ratio: flo
                       ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Chronologically split DataFrame into train, val, test, and forecast sets. """
     df = df.sort_values("date").reset_index(drop=True)
-    forecast = df.tail(horizon).copy()
-
     usable = df[df["target"].notna()].copy()
+    forecast = df.tail(horizon).copy()
 
     total = len(usable)
     train_end = int(total * train_ratio)
@@ -69,15 +69,26 @@ def time_series_split(df: pd.DataFrame, train_ratio: float = 0.8, val_ratio: flo
 
     return train, val, test, forecast
 
-def split_train_test(df: pd.DataFrame, horizon: int = 30, test_ratio: float = 0.8):
-    df = df.sort_values("date").reset_index(drop=True)
-    forecast = df.tail(horizon).copy()
-    usable = df[df["target"].notna()].copy()
+def get_price_history(symbol: str, end_date: str, days: int = 90) -> pd.DataFrame:
+    end = pd.to_datetime(end_date)
+    start = end - pd.Timedelta(days=days * 1.5)
 
-    split_ix = int(len(usable) * test_ratio)
+    df = yf.download(symbol, start=start.strftime("%Y-%m-%d"), end=end.strftime("%Y-%m-%d"), auto_adjust=False)
 
-    train = usable.iloc[:split_ix].copy()
-    test = usable.iloc[split_ix:].copy()
+    if df.empty:
+        raise ValueError(f"No data returned for symbol {symbol}")
 
-    return train, test, forecast
+    df = df.reset_index()
 
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = [col[0].lower() for col in df.columns]
+    else:
+        df.columns = [col.lower() for col in df.columns]
+
+    df.columns = [col.lower().replace(" ", "_") for col in df.columns]
+
+    missing = [col for col in ["date", "open", "high", "low", "close", "adj_close", "volume"] if col not in df.columns]
+    if missing:
+        raise ValueError(f"Missing expected columns: {missing}")
+
+    return df[["date", "open", "high", "low", "close", "adj_close", "volume"]]

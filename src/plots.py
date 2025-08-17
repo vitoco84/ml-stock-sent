@@ -12,6 +12,7 @@ def plot_price_series(df: pd.DataFrame, output_dir: str, filename: str) -> None:
     plt.title("Closing Price Over Time")
     plt.xlabel("Date")
     plt.ylabel("Adj Close")
+    plt.grid(True)
     plt.tight_layout()
     plt.savefig(f"{output_dir}/{filename}")
     plt.show()
@@ -28,10 +29,10 @@ def plot_correlation_heatmap(df: pd.DataFrame, col: List[str], output_dir: str, 
 
 def plot_moving_averages(df: pd.DataFrame, output_dir: str, filename: str):
     df = df.copy()
-    df["sma_10"] = df["close"].rolling(window=10).mean()
-    df["ema_10"] = df["close"].ewm(span=10).mean()
+    df["sma_10"] = df["adj_close"].rolling(window=10).mean()
+    df["ema_10"] = df["adj_close"].ewm(span=10).mean()
     plt.figure(figsize=(10, 4))
-    plt.plot(df["date"], df["close"], label="Close")
+    plt.plot(df["date"], df["adj_close"], label="Adj Close")
     plt.plot(df["date"], df["sma_10"], label="SMA 10")
     plt.plot(df["date"], df["ema_10"], label="EMA 10")
     plt.title("Moving Averages")
@@ -41,9 +42,9 @@ def plot_moving_averages(df: pd.DataFrame, output_dir: str, filename: str):
     plt.show()
     plt.close()
 
-def plot_log_return_distribution(df: pd.DataFrame, output_dir: str, filename: str):
+def plot_log_return_distribution(df: pd.DataFrame, output_dir: str, filename: str, bins: int = 50, log_scale: bool = False):
     plt.figure(figsize=(6, 4))
-    sns.histplot(df["log_return"], bins=50, kde=True)
+    sns.histplot(df["log_return"], bins=bins, kde=True, log_scale=log_scale)
     plt.title("Log-Returns Distribution")
     plt.tight_layout()
     plt.savefig(f"{output_dir}/{filename}")
@@ -63,7 +64,7 @@ def plot_rolling_volatility(df: pd.DataFrame, output_dir: str, filename: str):
 
 def plot_autocorrelation(df: pd.DataFrame, output_dir: str, filename: str, lags=30):
     _, ax = plt.subplots(figsize=(8, 3))
-    plot_acf(df["log_return"], lags=lags, ax=ax)
+    plot_acf(df["log_return"], lags=lags, zero=False, ax=ax)
     plt.title("ACF: Log Returns")
     plt.tight_layout()
     plt.savefig(f"{output_dir}/{filename}")
@@ -71,7 +72,7 @@ def plot_autocorrelation(df: pd.DataFrame, output_dir: str, filename: str, lags=
     plt.close()
 
 def plot_ohlc_pairplot(df: pd.DataFrame, output_dir: str, filename: str):
-    sns.pairplot(df[["open", "high", "low", "close"]])
+    sns.pairplot(df[["open", "high", "low", "close"]].sample(n=1000, random_state=42))
     plt.suptitle("Pairplot: OHLC", y=1.02)
     plt.savefig(f"{output_dir}/{filename}")
     plt.show()

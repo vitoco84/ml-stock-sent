@@ -5,7 +5,8 @@ import joblib
 import mlflow
 import numpy as np
 import optuna
-from sklearn.base import TransformerMixin
+import wandb
+from sklearn.base import clone, TransformerMixin
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.preprocessing import StandardScaler
 
@@ -20,7 +21,7 @@ class ModelTrainer:
             model: Base,
             name: str,
             config: Dict[str, Any],
-            output_path: str = "data/models",
+            output_path: str = "../data/models",
             preprocessor: Optional[TransformerMixin] = None
     ):
         self.model = model
@@ -29,11 +30,13 @@ class ModelTrainer:
         self.output_path = Path(output_path)
         self.preprocessor = preprocessor or StandardScaler()
         self.logger = get_logger(self.__class__.__name__)
+        self.logger.info(f"Initialized ModelTrainer for model: {name}")
 
     def fit(self, X_train, y_train, X_val=None, y_val=None):
         self.logger.info("Starting model training...")
-        X_train_scaled = self.preprocessor.fit_transform(X_train)
-        X_val_scaled = self.preprocessor.transform(X_val) if X_val is not None else None
+        scaler: StandardScaler | object = clone(self.preprocessor)
+        X_train_scaled = scaler.fit_transform(X_train)
+        X_val_scaled = scaler.transform(X_val) if X_val is not None else None
         if hasattr(self.model, "train"):
             self.model.train(X_train_scaled, y_train, X_val_scaled, y_val)
         else:
@@ -49,27 +52,37 @@ class ModelTrainer:
         X_scaled = self.preprocessor.transform(X)
         return self.model.predict(X_scaled)
 
-    def save(self):
+    def save(self) -> Path:
         self.output_path.mkdir(parents=True, exist_ok=True)
+        model_path = self.output_path / f"{self.name}.pkl"
         joblib.dump({
             "model": self.model,
             "preprocessor": self.preprocessor
-        }, str(self.output_path / f"{self.name}.pkl"))
+        }, str(model_path))
+        return model_path
 
     @classmethod
     def load(cls, path: str):
         obj = joblib.load(path)
         return obj["model"], obj["preprocessor"]
 
-    def track_mlflow(self, metrics: Dict[str, float], log_model: bool = True):
-        self.logger.info("Tracking run with MLflow.")
-        mlflow.set_experiment("stock_forecasting")
-        with mlflow.start_run(run_name=self.name):
-            mlflow.log_params(self.config)
-            mlflow.log_metrics(metrics)
-            model_path = self.output_path / f"{self.name}.pkl"
-            if model_path.exists() and log_model:
-                mlflow.log_artifact(str(model_path))
+    def track_wandb(self, metrics: Dict[str, float], model_path: Path = None):
+        wandb.init(
+            project="stock_forecasting",
+            name=self.name,
+            config={
+                "model_name": self.name,
+                "optimization_metric": self.config.get("optimization_metric", "rmse")
+            },
+            mode="offline"
+        )
+        if model_path and model_path.exists():
+            artifact = wandb.Artifact(name=f"{self.name}_model", type="model")
+            artifact.add_file(str(model_path))
+            wandb.log(metrics)
+            wandb.log_artifact(artifact)
+
+        wandb.finish()
 
     def objective(self, trial: optuna.Trial, X, y, n_splits: int = 3):
         params = self.model.suggest_hyperparameters(trial)
@@ -89,7 +102,10 @@ class ModelTrainer:
 
             model.fit(X_train_scaled, y_train)
             preds = model.predict(X_val_scaled)
-            score = metrics(y_val, preds)["rmse"]
+            # score = metrics(y_val, preds)["rmse"]
+
+            metric_dict = metrics(y_val, preds)
+            score = metric_dict[self.config.get("optimization_metric", "rmse")]
             val_scores.append(score)
 
         return np.mean(val_scores)

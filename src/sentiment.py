@@ -7,6 +7,7 @@ from tqdm import tqdm
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 from src.config import Config
+from src.logger import get_logger
 
 
 class FinBERT:
@@ -23,6 +24,8 @@ class FinBERT:
         self.classifier = AutoModelForSequenceClassification.from_pretrained(model_name, use_safetensors=True).to(
             device)
         self.embedder = self.classifier.base_model
+        self.logger = get_logger(self.__class__.__name__)
+        self.logger.info(f"Loading FinBERT model: {model_name} on device: {self.device}")
 
     def _prepare_inputs(self, texts: Union[str, List[str]]) -> Dict[str, torch.Tensor]:
         inputs = self.tokenizer(
@@ -54,10 +57,17 @@ class FinBERT:
         sentiment_scores = []
         embeddings = []
 
+        self.logger.info(f"Starting FinBERT transform on {len(texts)} texts with batch size {batch_size}")
+
         for i in tqdm(range(0, len(texts), batch_size), desc="FinBERT Batch Processing"):
             batch = texts[i:i + batch_size]
-            sentiment_scores += self._get_sentiment_scores(batch)
-            embeddings.append(self._get_embeddings(batch))
+            try:
+                sentiment_scores += self._get_sentiment_scores(batch)
+                embeddings.append(self._get_embeddings(batch))
+            except Exception as e:
+                self.logger.error(f"Batch {i}-{i + batch_size} failed: {e}")
+
+        self.logger.info("FinBERT embedding and sentiment extraction complete.")
 
         sentiment_df = pd.DataFrame(sentiment_scores)
         emb_dim = embeddings[0].shape[1]
@@ -82,6 +92,7 @@ class FinBERT:
         return (
             df.groupby("date")
             .agg(agg_dict)
+            .fillna(0)
             .rename(columns={text_column: "headline_count"})
             .reset_index()
         )

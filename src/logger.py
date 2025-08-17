@@ -7,7 +7,7 @@ def get_logger(name: str = __name__, level: int = logging.INFO) -> logging.Logge
     How to use:
     logging.info("This is an INFO message")
 
-    Log Levels: INFO, DEBUGm WARNING, ERROR, CRITICAL
+    Log Levels: INFO, DEBUG WARNING, ERROR, CRITICAL
     """
     logger = logging.getLogger(name)
     logger.setLevel(level)

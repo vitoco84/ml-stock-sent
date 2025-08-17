@@ -6,7 +6,7 @@
 * Install libraries: `pip install -r requirements.txt`
 * Freeze libraries: `pip freeze > requirements.txt`
 * Check Nvidia Cuda Version: `nvidia-smi` -> 12.9
-  * CUDA 12.1: `pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121`
+    * CUDA 12.1: `pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121`
 
 ## Pipeline
 
@@ -21,7 +21,96 @@
 
 * [DJIA News Kaggle Dataset](https://www.kaggle.com/datasets/aaron7sun/stocknews)
 * [FinBERT NLP Model](https://huggingface.co/ProsusAI/finbert)
+* [Stock Finance Data](https://finance.yahoo.com/)
+  * [DJIA Example](https://finance.yahoo.com/quote/%5EDJI/history/)
 
 ## Tests
 
 * Run PyTests from Terminal with: `pytest`
+
+## FastAPI
+
+* Run: `uvicorn app.api.main:app --reload`
+* Swagger: `http://localhost:8000/docs`
+
+### Endpoints
+
+##### GET /
+
+```json
+{
+  "message": "API is up and running!"
+}
+```
+
+##### GET /price-history
+
+* Params:
+    * symbol: Ticker e.g.: AAPL, ^DJI
+    * end_date: End date in YYYY-MM-DD
+    * days: Lookback period
+
+```json
+{
+  "price": [
+    {
+      "date": "2025-06-01",
+      "open": 180.0,
+      "high": 182.5,
+      "low": 178.2,
+      "close": 181.7,
+      "adj_close": 181.7,
+      "volume": 10000000
+    },
+    "..."
+  ]
+}
+```
+
+##### POST /predict-raw
+
+* Request Body
+
+```json
+{
+  "price": [
+    {
+      "date": "2020-01-01",
+      "open": 100,
+      "high": 105,
+      "low": 99,
+      "close": 104,
+      "adj_close": 104,
+      "volume": 1000000
+    }
+  ],
+  "news": [
+    {
+      "date": "2020-01-01",
+      "rank": "top1",
+      "headline": "Apple stock surges today"
+    },
+    {
+      "date": "2020-01-01",
+      "rank": "top2",
+      "headline": "Tech sector continues growth"
+    }
+  ]
+}
+```
+
+```bash
+curl -X POST http://localhost:8000/predict-raw \
+ -H "Content-Type: application/json" \
+ -d @tests/payload.json
+```
+
+* Response
+
+```json
+{
+  "log_return": 0.0053,
+  "current_price": 104.0,
+  "predicted_price": 104.55
+}
+```

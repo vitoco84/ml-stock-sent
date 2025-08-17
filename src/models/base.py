@@ -17,6 +17,7 @@ class Base(ABC):
     def __init__(self, horizon: int = 30, random_state: int = 42, **kwargs):
         self.horizon = horizon
         self.random_state = random_state
+        self.kwargs = kwargs
         self.logger = get_logger(self.__class__.__name__)
 
     @abstractmethod

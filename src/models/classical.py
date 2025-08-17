@@ -2,6 +2,7 @@ from typing import Any, Dict
 
 import numpy as np
 from sklearn.linear_model import ElasticNet
+from sklearn.multioutput import MultiOutputRegressor
 
 from src.models.base import Base
 
@@ -14,13 +15,26 @@ class LinearElasticNet(Base):
 
     name = "linear_elasticnet"
 
-    def __init__(self, horizon: int = 30, alpha: float = 0.1, l1_ratio: float = 0.2, random_state: int = 42, **kwargs):
+    def __init__(
+            self,
+            horizon: int = 30,
+            alpha: float = 0.1,
+            l1_ratio: float = 0.2,
+            random_state: int = 42,
+            multioutput: bool = False,
+            **kwargs
+    ):
         super().__init__(horizon, random_state, **kwargs)
 
-        # For Multi Target
-        # base = ElasticNet(alpha=alpha, l1_ratio=l1_ratio, random_state=random_state, max_iter=2000)
-        # self.model = MultiOutputRegressor(base)
-        self.model = ElasticNet(alpha=alpha, l1_ratio=l1_ratio, random_state=random_state, max_iter=2000)
+        base = ElasticNet(
+            alpha=alpha,
+            l1_ratio=l1_ratio,
+            random_state=random_state,
+            max_iter=2000,
+            **kwargs
+        )
+
+        self.model = MultiOutputRegressor(base) if multioutput else base
 
     def fit(self, X_train: np.ndarray, y_train: np.ndarray) -> "LinearElasticNet":
         self.logger.info("Starting model training...")

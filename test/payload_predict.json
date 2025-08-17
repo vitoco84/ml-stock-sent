@@ -1,0 +1,1043 @@
+{
+  "price": [
+    {
+      "date": "2025-04-02",
+      "open": 41736.078125,
+      "high": 42382.26953125,
+      "low": 41629.69921875,
+      "close": 42225.3203125,
+      "adj_close": 42225.3203125,
+      "volume": 492050000
+    },
+    {
+      "date": "2025-04-03",
+      "open": 40986.51953125,
+      "high": 41173.62109375,
+      "low": 40513.109375,
+      "close": 40545.9296875,
+      "adj_close": 40545.9296875,
+      "volume": 941940000
+    },
+    {
+      "date": "2025-04-04",
+      "open": 40097.8984375,
+      "high": 40097.8984375,
+      "low": 38264.87109375,
+      "close": 38314.859375,
+      "adj_close": 38314.859375,
+      "volume": 1290100000
+    },
+    {
+      "date": "2025-04-07",
+      "open": 37879.6484375,
+      "high": 39207.01953125,
+      "low": 36611.78125,
+      "close": 37965.6015625,
+      "adj_close": 37965.6015625,
+      "volume": 1363960000
+    },
+    {
+      "date": "2025-04-08",
+      "open": 38827.1015625,
+      "high": 39426.6015625,
+      "low": 37103.859375,
+      "close": 37645.58984375,
+      "adj_close": 37645.58984375,
+      "volume": 1051220000
+    },
+    {
+      "date": "2025-04-09",
+      "open": 37387.91015625,
+      "high": 40778.69921875,
+      "low": 37275.69140625,
+      "close": 40608.44921875,
+      "adj_close": 40608.44921875,
+      "volume": 1412960000
+    },
+    {
+      "date": "2025-04-10",
+      "open": 39996.9296875,
+      "high": 39996.9296875,
+      "low": 38427.69921875,
+      "close": 39593.66015625,
+      "adj_close": 39593.66015625,
+      "volume": 1023490000
+    },
+    {
+      "date": "2025-04-11",
+      "open": 39493.421875,
+      "high": 40404.26953125,
+      "low": 39255.2109375,
+      "close": 40212.7109375,
+      "adj_close": 40212.7109375,
+      "volume": 742800000
+    },
+    {
+      "date": "2025-04-14",
+      "open": 40546.1484375,
+      "high": 40778.2890625,
+      "low": 40159.01953125,
+      "close": 40524.7890625,
+      "adj_close": 40524.7890625,
+      "volume": 667010000
+    },
+    {
+      "date": "2025-04-15",
+      "open": 40527.8203125,
+      "high": 40791.1796875,
+      "low": 40346.94140625,
+      "close": 40368.9609375,
+      "adj_close": 40368.9609375,
+      "volume": 529800000
+    },
+    {
+      "date": "2025-04-16",
+      "open": 40179.48828125,
+      "high": 40416.80078125,
+      "low": 39394.75,
+      "close": 39669.390625,
+      "adj_close": 39669.390625,
+      "volume": 737550000
+    },
+    {
+      "date": "2025-04-17",
+      "open": 39745.578125,
+      "high": 39745.578125,
+      "low": 38950.30859375,
+      "close": 39142.23046875,
+      "adj_close": 39142.23046875,
+      "volume": 657400000
+    },
+    {
+      "date": "2025-04-21",
+      "open": 38906.0390625,
+      "high": 38906.0390625,
+      "low": 37830.66015625,
+      "close": 38170.41015625,
+      "adj_close": 38170.41015625,
+      "volume": 604790000
+    },
+    {
+      "date": "2025-04-22",
+      "open": 38516.23046875,
+      "high": 39272.03125,
+      "low": 38516.23046875,
+      "close": 39186.98046875,
+      "adj_close": 39186.98046875,
+      "volume": 582330000
+    },
+    {
+      "date": "2025-04-23",
+      "open": 39815.01171875,
+      "high": 40376.109375,
+      "low": 39487.140625,
+      "close": 39606.5703125,
+      "adj_close": 39606.5703125,
+      "volume": 642550000
+    },
+    {
+      "date": "2025-04-24",
+      "open": 39531.05078125,
+      "high": 40157.91015625,
+      "low": 39371.87109375,
+      "close": 40093.3984375,
+      "adj_close": 40093.3984375,
+      "volume": 558120000
+    },
+    {
+      "date": "2025-04-25",
+      "open": 40045.73046875,
+      "high": 40137.30859375,
+      "low": 39718.6796875,
+      "close": 40113.5,
+      "adj_close": 40113.5,
+      "volume": 559040000
+    },
+    {
+      "date": "2025-04-28",
+      "open": 40171.73828125,
+      "high": 40414.1796875,
+      "low": 39869.1015625,
+      "close": 40227.58984375,
+      "adj_close": 40227.58984375,
+      "volume": 475930000
+    },
+    {
+      "date": "2025-04-29",
+      "open": 40233.98046875,
+      "high": 40630.48828125,
+      "low": 40222.1796875,
+      "close": 40527.62109375,
+      "adj_close": 40527.62109375,
+      "volume": 434830000
+    },
+    {
+      "date": "2025-04-30",
+      "open": 40290.41015625,
+      "high": 40777.16015625,
+      "low": 39745.62890625,
+      "close": 40669.359375,
+      "adj_close": 40669.359375,
+      "volume": 599760000
+    },
+    {
+      "date": "2025-05-01",
+      "open": 40918.0390625,
+      "high": 41099.51953125,
+      "low": 40705.62890625,
+      "close": 40752.9609375,
+      "adj_close": 40752.9609375,
+      "volume": 597270000
+    },
+    {
+      "date": "2025-05-02",
+      "open": 40960.421875,
+      "high": 41386.19140625,
+      "low": 40960.421875,
+      "close": 41317.4296875,
+      "adj_close": 41317.4296875,
+      "volume": 589870000
+    },
+    {
+      "date": "2025-05-05",
+      "open": 41173.37890625,
+      "high": 41445.91015625,
+      "low": 41063.44140625,
+      "close": 41218.828125,
+      "adj_close": 41218.828125,
+      "volume": 413440000
+    },
+    {
+      "date": "2025-05-06",
+      "open": 41000.19140625,
+      "high": 41164.328125,
+      "low": 40759.41015625,
+      "close": 40829,
+      "adj_close": 40829,
+      "volume": 416110000
+    },
+    {
+      "date": "2025-05-07",
+      "open": 40956.078125,
+      "high": 41266.91015625,
+      "low": 40829.2890625,
+      "close": 41113.96875,
+      "adj_close": 41113.96875,
+      "volume": 533870000
+    },
+    {
+      "date": "2025-05-08",
+      "open": 41312.5703125,
+      "high": 41773.21875,
+      "low": 41167.76171875,
+      "close": 41368.44921875,
+      "adj_close": 41368.44921875,
+      "volume": 514850000
+    },
+    {
+      "date": "2025-05-09",
+      "open": 41405.48046875,
+      "high": 41512.4296875,
+      "low": 41150.73046875,
+      "close": 41249.37890625,
+      "adj_close": 41249.37890625,
+      "volume": 373930000
+    },
+    {
+      "date": "2025-05-12",
+      "open": 41899.05078125,
+      "high": 42418.05078125,
+      "low": 41899.05078125,
+      "close": 42410.1015625,
+      "adj_close": 42410.1015625,
+      "volume": 653810000
+    },
+    {
+      "date": "2025-05-13",
+      "open": 42507.328125,
+      "high": 42507.328125,
+      "low": 42132.0390625,
+      "close": 42140.4296875,
+      "adj_close": 42140.4296875,
+      "volume": 729860000
+    },
+    {
+      "date": "2025-05-14",
+      "open": 42150.08984375,
+      "high": 42254.75,
+      "low": 41952.859375,
+      "close": 42051.05859375,
+      "adj_close": 42051.05859375,
+      "volume": 660230000
+    },
+    {
+      "date": "2025-05-15",
+      "open": 41777.98046875,
+      "high": 42351.421875,
+      "low": 41777.98046875,
+      "close": 42322.75,
+      "adj_close": 42322.75,
+      "volume": 736430000
+    },
+    {
+      "date": "2025-05-16",
+      "open": 42356.19921875,
+      "high": 42663.6796875,
+      "low": 42232.55859375,
+      "close": 42654.73828125,
+      "adj_close": 42654.73828125,
+      "volume": 621250000
+    },
+    {
+      "date": "2025-05-19",
+      "open": 42542.80859375,
+      "high": 42842.0390625,
+      "low": 42337.7109375,
+      "close": 42792.0703125,
+      "adj_close": 42792.0703125,
+      "volume": 536830000
+    },
+    {
+      "date": "2025-05-20",
+      "open": 42735.109375,
+      "high": 42800.0390625,
+      "low": 42485.37109375,
+      "close": 42677.23828125,
+      "adj_close": 42677.23828125,
+      "volume": 441530000
+    },
+    {
+      "date": "2025-05-21",
+      "open": 42354.4609375,
+      "high": 42439.26953125,
+      "low": 41785.21875,
+      "close": 41860.44140625,
+      "adj_close": 41860.44140625,
+      "volume": 607900000
+    },
+    {
+      "date": "2025-05-22",
+      "open": 41763.6796875,
+      "high": 42090.421875,
+      "low": 41714.4296875,
+      "close": 41859.08984375,
+      "adj_close": 41859.08984375,
+      "volume": 476080000
+    },
+    {
+      "date": "2025-05-23",
+      "open": 41525.69921875,
+      "high": 41788.609375,
+      "low": 41354.08984375,
+      "close": 41603.0703125,
+      "adj_close": 41603.0703125,
+      "volume": 497060000
+    },
+    {
+      "date": "2025-05-27",
+      "open": 41849.0390625,
+      "high": 42350.66015625,
+      "low": 41849.0390625,
+      "close": 42343.6484375,
+      "adj_close": 42343.6484375,
+      "volume": 501340000
+    },
+    {
+      "date": "2025-05-28",
+      "open": 42361.62890625,
+      "high": 42448.71875,
+      "low": 42042.26171875,
+      "close": 42098.69921875,
+      "adj_close": 42098.69921875,
+      "volume": 518840000
+    },
+    {
+      "date": "2025-05-29",
+      "open": 42190.01953125,
+      "high": 42266,
+      "low": 41828.3515625,
+      "close": 42215.73046875,
+      "adj_close": 42215.73046875,
+      "volume": 665310000
+    },
+    {
+      "date": "2025-05-30",
+      "open": 42192.3515625,
+      "high": 42376.078125,
+      "low": 41906.16015625,
+      "close": 42270.0703125,
+      "adj_close": 42270.0703125,
+      "volume": 796200000
+    },
+    {
+      "date": "2025-06-02",
+      "open": 42199.94140625,
+      "high": 42317,
+      "low": 41853.62109375,
+      "close": 42305.48046875,
+      "adj_close": 42305.48046875,
+      "volume": 454680000
+    },
+    {
+      "date": "2025-06-03",
+      "open": 42304.5,
+      "high": 42568.37890625,
+      "low": 42186.44140625,
+      "close": 42519.640625,
+      "adj_close": 42519.640625,
+      "volume": 504410000
+    },
+    {
+      "date": "2025-06-04",
+      "open": 42574.12890625,
+      "high": 42645,
+      "low": 42427.73828125,
+      "close": 42427.73828125,
+      "adj_close": 42427.73828125,
+      "volume": 409600000
+    },
+    {
+      "date": "2025-06-05",
+      "open": 42487.890625,
+      "high": 42601.44921875,
+      "low": 42211.69140625,
+      "close": 42319.73828125,
+      "adj_close": 42319.73828125,
+      "volume": 532850000
+    },
+    {
+      "date": "2025-06-06",
+      "open": 42631.8203125,
+      "high": 42924.55859375,
+      "low": 42582.55078125,
+      "close": 42762.87109375,
+      "adj_close": 42762.87109375,
+      "volume": 414540000
+    },
+    {
+      "date": "2025-06-09",
+      "open": 42786.19140625,
+      "high": 42893.08984375,
+      "low": 42567.55078125,
+      "close": 42761.76171875,
+      "adj_close": 42761.76171875,
+      "volume": 485780000
+    },
+    {
+      "date": "2025-06-10",
+      "open": 42738.26953125,
+      "high": 42925.94140625,
+      "low": 42710.08984375,
+      "close": 42866.87109375,
+      "adj_close": 42866.87109375,
+      "volume": 446850000
+    },
+    {
+      "date": "2025-06-11",
+      "open": 42882.859375,
+      "high": 43115.69140625,
+      "low": 42738.62109375,
+      "close": 42865.76953125,
+      "adj_close": 42865.76953125,
+      "volume": 467260000
+    },
+    {
+      "date": "2025-06-12",
+      "open": 42737.359375,
+      "high": 42970.3984375,
+      "low": 42606.421875,
+      "close": 42967.62109375,
+      "adj_close": 42967.62109375,
+      "volume": 455760000
+    },
+    {
+      "date": "2025-06-13",
+      "open": 42579.48046875,
+      "high": 42602.48046875,
+      "low": 42081.08984375,
+      "close": 42197.7890625,
+      "adj_close": 42197.7890625,
+      "volume": 485930000
+    },
+    {
+      "date": "2025-06-16",
+      "open": 42300.12890625,
+      "high": 42707.73046875,
+      "low": 42300.12890625,
+      "close": 42515.08984375,
+      "adj_close": 42515.08984375,
+      "volume": 467040000
+    },
+    {
+      "date": "2025-06-17",
+      "open": 42358.62109375,
+      "high": 42530.828125,
+      "low": 42132.6484375,
+      "close": 42215.80078125,
+      "adj_close": 42215.80078125,
+      "volume": 423070000
+    },
+    {
+      "date": "2025-06-18",
+      "open": 42236.03125,
+      "high": 42510.0703125,
+      "low": 42118.23046875,
+      "close": 42171.66015625,
+      "adj_close": 42171.66015625,
+      "volume": 485440000
+    },
+    {
+      "date": "2025-06-20",
+      "open": 42291.08984375,
+      "high": 42432.19140625,
+      "low": 42089.98828125,
+      "close": 42206.8203125,
+      "adj_close": 42206.8203125,
+      "volume": 859840000
+    },
+    {
+      "date": "2025-06-23",
+      "open": 42178.55078125,
+      "high": 42609.46875,
+      "low": 41981.140625,
+      "close": 42581.78125,
+      "adj_close": 42581.78125,
+      "volume": 496750000
+    },
+    {
+      "date": "2025-06-24",
+      "open": 42807.12890625,
+      "high": 43183.48046875,
+      "low": 42794.078125,
+      "close": 43089.01953125,
+      "adj_close": 43089.01953125,
+      "volume": 516060000
+    },
+    {
+      "date": "2025-06-25",
+      "open": 43130.328125,
+      "high": 43130.328125,
+      "low": 42871.5,
+      "close": 42982.4296875,
+      "adj_close": 42982.4296875,
+      "volume": 527460000
+    },
+    {
+      "date": "2025-06-26",
+      "open": 43084.0703125,
+      "high": 43430.98828125,
+      "low": 43084.0703125,
+      "close": 43386.83984375,
+      "adj_close": 43386.83984375,
+      "volume": 536710000
+    },
+    {
+      "date": "2025-06-27",
+      "open": 43505.6015625,
+      "high": 43966.37109375,
+      "low": 43505.6015625,
+      "close": 43819.26953125,
+      "adj_close": 43819.26953125,
+      "volume": 921330000
+    },
+    {
+      "date": "2025-06-30",
+      "open": 44020.66015625,
+      "high": 44138.69140625,
+      "low": 43889.16015625,
+      "close": 44094.76953125,
+      "adj_close": 44094.76953125,
+      "volume": 623630000
+    },
+    {
+      "date": "2025-07-01",
+      "open": 44061.48828125,
+      "high": 44604.1484375,
+      "low": 44013.5390625,
+      "close": 44494.94140625,
+      "adj_close": 44494.94140625,
+      "volume": 593600000
+    },
+    {
+      "date": "2025-07-02",
+      "open": 44455.66015625,
+      "high": 44557.8203125,
+      "low": 44354.01171875,
+      "close": 44484.421875,
+      "adj_close": 44484.421875,
+      "volume": 499870000
+    },
+    {
+      "date": "2025-07-03",
+      "open": 44565.75,
+      "high": 44885.828125,
+      "low": 44550.421875,
+      "close": 44828.53125,
+      "adj_close": 44828.53125,
+      "volume": 346620000
+    },
+    {
+      "date": "2025-07-07",
+      "open": 44803.359375,
+      "high": 44803.359375,
+      "low": 44160.3203125,
+      "close": 44406.359375,
+      "adj_close": 44406.359375,
+      "volume": 442350000
+    },
+    {
+      "date": "2025-07-08",
+      "open": 44378.578125,
+      "high": 44436.9609375,
+      "low": 44201.37109375,
+      "close": 44240.76171875,
+      "adj_close": 44240.76171875,
+      "volume": 445670000
+    },
+    {
+      "date": "2025-07-09",
+      "open": 44327.12890625,
+      "high": 44556.6796875,
+      "low": 44225.87890625,
+      "close": 44458.30078125,
+      "adj_close": 44458.30078125,
+      "volume": 531790000
+    },
+    {
+      "date": "2025-07-10",
+      "open": 44427.75,
+      "high": 44775.46875,
+      "low": 44372.921875,
+      "close": 44650.640625,
+      "adj_close": 44650.640625,
+      "volume": 452340000
+    },
+    {
+      "date": "2025-07-11",
+      "open": 44480.76953125,
+      "high": 44480.76953125,
+      "low": 44275.25,
+      "close": 44371.51171875,
+      "adj_close": 44371.51171875,
+      "volume": 474090000
+    },
+    {
+      "date": "2025-07-14",
+      "open": 44346.1484375,
+      "high": 44472.12890625,
+      "low": 44237.28125,
+      "close": 44459.6484375,
+      "adj_close": 44459.6484375,
+      "volume": 410250000
+    },
+    {
+      "date": "2025-07-15",
+      "open": 44459.83984375,
+      "high": 44504.26953125,
+      "low": 44002.390625,
+      "close": 44023.2890625,
+      "adj_close": 44023.2890625,
+      "volume": 496270000
+    },
+    {
+      "date": "2025-07-16",
+      "open": 44152.73828125,
+      "high": 44260.19140625,
+      "low": 43758.98046875,
+      "close": 44254.78125,
+      "adj_close": 44254.78125,
+      "volume": 450190000
+    },
+    {
+      "date": "2025-07-17",
+      "open": 44229.87890625,
+      "high": 44558.05078125,
+      "low": 44200.0390625,
+      "close": 44484.48828125,
+      "adj_close": 44484.48828125,
+      "volume": 455310000
+    },
+    {
+      "date": "2025-07-18",
+      "open": 44571.6796875,
+      "high": 44571.6796875,
+      "low": 44224.58984375,
+      "close": 44342.19140625,
+      "adj_close": 44342.19140625,
+      "volume": 497800000
+    },
+    {
+      "date": "2025-07-21",
+      "open": 44368.3984375,
+      "high": 44601.8515625,
+      "low": 44311.421875,
+      "close": 44323.0703125,
+      "adj_close": 44323.0703125,
+      "volume": 446590000
+    },
+    {
+      "date": "2025-07-22",
+      "open": 44338.62109375,
+      "high": 44542.53125,
+      "low": 44272.6015625,
+      "close": 44502.44140625,
+      "adj_close": 44502.44140625,
+      "volume": 483560000
+    },
+    {
+      "date": "2025-07-23",
+      "open": 44661.12109375,
+      "high": 45016.7109375,
+      "low": 44638.44140625,
+      "close": 45010.2890625,
+      "adj_close": 45010.2890625,
+      "volume": 446630000
+    },
+    {
+      "date": "2025-07-24",
+      "open": 44776.41015625,
+      "high": 44912.26953125,
+      "low": 44674.5703125,
+      "close": 44693.91015625,
+      "adj_close": 44693.91015625,
+      "volume": 453000000
+    },
+    {
+      "date": "2025-07-25",
+      "open": 44757.28125,
+      "high": 44944.4609375,
+      "low": 44650.58984375,
+      "close": 44901.921875,
+      "adj_close": 44901.921875,
+      "volume": 369500000
+    },
+    {
+      "date": "2025-07-28",
+      "open": 44946.98046875,
+      "high": 44946.98046875,
+      "low": 44739.9609375,
+      "close": 44837.55859375,
+      "adj_close": 44837.55859375,
+      "volume": 416510000
+    },
+    {
+      "date": "2025-07-29",
+      "open": 44833.73828125,
+      "high": 44883.66015625,
+      "low": 44568.828125,
+      "close": 44632.98828125,
+      "adj_close": 44632.98828125,
+      "volume": 488780000
+    },
+    {
+      "date": "2025-07-30",
+      "open": 44677.8984375,
+      "high": 44739.53125,
+      "low": 44261.7109375,
+      "close": 44461.28125,
+      "adj_close": 44461.28125,
+      "volume": 456840000
+    },
+    {
+      "date": "2025-07-31",
+      "open": 44665.8203125,
+      "high": 44665.8203125,
+      "low": 44049.01171875,
+      "close": 44130.98046875,
+      "adj_close": 44130.98046875,
+      "volume": 689040000
+    },
+    {
+      "date": "2025-08-01",
+      "open": 43781.76953125,
+      "high": 43781.76953125,
+      "low": 43340.6796875,
+      "close": 43588.578125,
+      "adj_close": 43588.578125,
+      "volume": 705150000
+    },
+    {
+      "date": "2025-08-04",
+      "open": 43724.01953125,
+      "high": 44188.359375,
+      "low": 43724.01953125,
+      "close": 44173.640625,
+      "adj_close": 44173.640625,
+      "volume": 514180000
+    },
+    {
+      "date": "2025-08-05",
+      "open": 44200.0703125,
+      "high": 44308.5,
+      "low": 43923.80859375,
+      "close": 44111.73828125,
+      "adj_close": 44111.73828125,
+      "volume": 455690000
+    },
+    {
+      "date": "2025-08-06",
+      "open": 44196.609375,
+      "high": 44290.08984375,
+      "low": 44017.7109375,
+      "close": 44193.12109375,
+      "adj_close": 44193.12109375,
+      "volume": 518970000
+    },
+    {
+      "date": "2025-08-07",
+      "open": 44430.08984375,
+      "high": 44498.4296875,
+      "low": 43799.19921875,
+      "close": 43968.640625,
+      "adj_close": 43968.640625,
+      "volume": 492480000
+    },
+    {
+      "date": "2025-08-08",
+      "open": 44044.94921875,
+      "high": 44272.75,
+      "low": 44028.94140625,
+      "close": 44175.609375,
+      "adj_close": 44175.609375,
+      "volume": 452500000
+    },
+    {
+      "date": "2025-08-11",
+      "open": 44184.359375,
+      "high": 44273.03125,
+      "low": 43911.30859375,
+      "close": 43975.08984375,
+      "adj_close": 43975.08984375,
+      "volume": 431510000
+    },
+    {
+      "date": "2025-08-12",
+      "open": 44050.53125,
+      "high": 44497.58984375,
+      "low": 44050.53125,
+      "close": 44458.609375,
+      "adj_close": 44458.609375,
+      "volume": 442850000
+    },
+    {
+      "date": "2025-08-13",
+      "open": 44571.53125,
+      "high": 44949.12109375,
+      "low": 44571.53125,
+      "close": 44922.26953125,
+      "adj_close": 44922.26953125,
+      "volume": 521430000
+    },
+    {
+      "date": "2025-08-14",
+      "open": 44890.83984375,
+      "high": 44948.69921875,
+      "low": 44690.5,
+      "close": 44911.26171875,
+      "adj_close": 44911.26171875,
+      "volume": 453530000
+    }
+  ],
+  "news": [
+    {
+      "date": "2025-04-02",
+      "rank": "top1",
+      "headline": "Tech sector drives markets higher as investors return to growth stocks"
+    },
+    {
+      "date": "2025-04-02",
+      "rank": "top2",
+      "headline": "Financials see moderate gains amid steady trading volumes"
+    },
+    {
+      "date": "2025-04-03",
+      "rank": "top1",
+      "headline": "Markets retreat on profit-taking after strong tech rally"
+    },
+    {
+      "date": "2025-04-03",
+      "rank": "top2",
+      "headline": "Banking sector dips as bond yields stabilize"
+    },
+    {
+      "date": "2025-04-04",
+      "rank": "top1",
+      "headline": "Major indices slide as investors brace for economic data"
+    },
+    {
+      "date": "2025-04-04",
+      "rank": "top2",
+      "headline": "Energy stocks struggle while consumer goods hold steady"
+    },
+    {
+      "date": "2025-04-07",
+      "rank": "top1",
+      "headline": "Volatility rises as markets test support levels"
+    },
+    {
+      "date": "2025-04-07",
+      "rank": "top2",
+      "headline": "Healthcare and utilities outperform in a choppy session"
+    },
+    {
+      "date": "2025-04-08",
+      "rank": "top1",
+      "headline": "Investor sentiment weakens as global growth concerns resurface"
+    },
+    {
+      "date": "2025-04-08",
+      "rank": "top2",
+      "headline": "Technology stocks face pressure after recent highs"
+    },
+    {
+      "date": "2025-04-09",
+      "rank": "top1",
+      "headline": "Markets rebound sharply as buyers step in on dip"
+    },
+    {
+      "date": "2025-04-09",
+      "rank": "top2",
+      "headline": "Financial sector leads recovery amid heavy trading"
+    },
+    {
+      "date": "2025-04-10",
+      "rank": "top1",
+      "headline": "Indices drift lower ahead of earnings season kickoff"
+    },
+    {
+      "date": "2025-04-10",
+      "rank": "top2",
+      "headline": "Consumer discretionary stocks lag on weak retail outlook"
+    },
+    {
+      "date": "2025-04-11",
+      "rank": "top1",
+      "headline": "Tech stocks boost markets despite light trading volume"
+    },
+    {
+      "date": "2025-04-11",
+      "rank": "top2",
+      "headline": "Financials stabilize as banks prepare earnings reports"
+    },
+    {
+      "date": "2025-04-14",
+      "rank": "top1",
+      "headline": "Markets edge higher on cautious optimism ahead of data releases"
+    },
+    {
+      "date": "2025-04-14",
+      "rank": "top2",
+      "headline": "Energy shares support gains as oil prices firm up"
+    },
+    {
+      "date": "2025-04-15",
+      "rank": "top1",
+      "headline": "Indices stall as traders await corporate earnings guidance"
+    },
+    {
+      "date": "2025-04-15",
+      "rank": "top2",
+      "headline": "Financial sector mixed ahead of bank results"
+    },
+    {
+      "date": "2025-04-16",
+      "rank": "top1",
+      "headline": "Markets dip as investors digest mixed earnings reports"
+    },
+    {
+      "date": "2025-04-16",
+      "rank": "top2",
+      "headline": "Technology stocks underperform while energy sees support"
+    },
+    {
+      "date": "2025-04-17",
+      "rank": "top1",
+      "headline": "Weak close as growth concerns weigh on equities"
+    },
+    {
+      "date": "2025-04-17",
+      "rank": "top2",
+      "headline": "Banks and industrials drag markets lower"
+    },
+    {
+      "date": "2025-04-21",
+      "rank": "top1",
+      "headline": "Markets slip as cautious sentiment dominates post-holiday trade"
+    },
+    {
+      "date": "2025-04-21",
+      "rank": "top2",
+      "headline": "Defensive sectors attract investor flows amid uncertainty"
+    },
+    {
+      "date": "2025-04-22",
+      "rank": "top1",
+      "headline": "Indices rebound as corporate earnings beat expectations"
+    },
+    {
+      "date": "2025-04-22",
+      "rank": "top2",
+      "headline": "Tech and financials drive broad-based market gains"
+    },
+    {
+      "date": "2025-04-23",
+      "rank": "top1",
+      "headline": "Markets consolidate after recent rebound"
+    },
+    {
+      "date": "2025-04-23",
+      "rank": "top2",
+      "headline": "Energy sector lags despite positive oil outlook"
+    },
+    {
+      "date": "2025-04-24",
+      "rank": "top1",
+      "headline": "Equities rise modestly as investors rotate into financials"
+    },
+    {
+      "date": "2025-04-24",
+      "rank": "top2",
+      "headline": "Tech stocks steady after volatile week"
+    },
+    {
+      "date": "2025-04-25",
+      "rank": "top1",
+      "headline": "Markets end week on cautious tone ahead of Fed commentary"
+    },
+    {
+      "date": "2025-04-25",
+      "rank": "top2",
+      "headline": "Banking sector steadies while utilities attract buyers"
+    },
+    {
+      "date": "2025-04-28",
+      "rank": "top1",
+      "headline": "Investors push markets higher on improving earnings outlook"
+    },
+    {
+      "date": "2025-04-28",
+      "rank": "top2",
+      "headline": "Technology sector leads early-week rally"
+    },
+    {
+      "date": "2025-04-29",
+      "rank": "top1",
+      "headline": "Indices extend gains as financial stocks shine"
+    },
+    {
+      "date": "2025-04-29",
+      "rank": "top2",
+      "headline": "Energy names climb on stronger commodity prices"
+    },
+    {
+      "date": "2025-04-30",
+      "rank": "top1",
+      "headline": "Markets close April higher despite volatility"
+    },
+    {
+      "date": "2025-04-30",
+      "rank": "top2",
+      "headline": "Tech and banks support strong month-end performance"
+    }
+  ]
+}

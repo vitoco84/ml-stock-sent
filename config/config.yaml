@@ -6,6 +6,7 @@ data:
   fig_dir: "../data/figures"
   processed_dir: "../data/processed"
   raw_dir: "../data/raw"
+  models_dir: "../data/models"
   name_news: "djia_combined_news.csv"
   name_prices: "djia_table.csv"
   name_prices_sentiment: "prices_with_sentiment_table.csv"

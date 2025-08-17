@@ -5,6 +5,9 @@ from ta.momentum import rsi
 from ta.trend import macd_diff
 from ta.volatility import bollinger_hband, bollinger_lband
 
+from src.data import merge_price_news
+from src.sentiment import FinBERT
+
 
 def create_features_and_target(df: pd.DataFrame, forecast_horizon: int = 30) -> pd.DataFrame:
     """
@@ -53,3 +56,20 @@ def create_features_and_target(df: pd.DataFrame, forecast_horizon: int = 30) -> 
 
     max_lag = 51
     return df.iloc[max_lag:].copy()
+
+def generate_full_feature_row(price_df: pd.DataFrame, news_df: pd.DataFrame, sentiment_model: FinBERT) -> pd.DataFrame:
+    enriched_news = sentiment_model.transform(news_df)
+    daily_sentiment = sentiment_model.aggregate_daily(enriched_news)
+    daily_sentiment.drop(columns=["headline_count"], inplace=True)
+
+    merged = merge_price_news(price_df, daily_sentiment)
+    features_df = create_features_and_target(merged)
+
+    if features_df.empty:
+        raise ValueError("Feature DataFrame is empty. Likely due to insufficient price history.")
+
+    return features_df.iloc[[-1]].copy()
+
+def convert_log_return(current_price: float, predicted_log_return: float) -> float:
+    """Converts predicted log return to actual price."""
+    return current_price * np.exp(predicted_log_return)
