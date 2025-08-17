@@ -28,6 +28,7 @@ databricks-sdk==0.63.0
 debugpy==1.8.16
 decorator==5.2.1
 defusedxml==0.7.1
+distro==1.9.0
 executing==2.2.0
 fastapi==0.116.1
 fastjsonschema==2.21.2
@@ -54,6 +55,7 @@ ipywidgets==8.1.7
 isoduration==20.11.0
 jedi==0.19.2
 Jinja2==3.1.4
+jiter==0.10.0
 joblib==1.5.1
 json5==0.12.1
 jsonpointer==3.0.0
@@ -87,9 +89,12 @@ nbconvert==7.16.6
 nbformat==5.10.4
 nest-asyncio==1.6.0
 networkx==3.3
+newsapi==0.1.1
+newsapi-python==0.2.7
 notebook==7.4.5
 notebook_shim==0.2.4
 numpy==2.3.2
+openai==1.99.9
 opentelemetry-api==1.36.0
 opentelemetry-sdk==1.36.0
 opentelemetry-semantic-conventions==0.57b0
@@ -122,6 +127,7 @@ Pygments==2.19.2
 pyparsing==3.2.3
 pytest==8.4.1
 python-dateutil==2.9.0.post0
+python-dotenv==1.1.1
 python-json-logger==3.3.0
 pytz==2025.2
 PyYAML==6.0.2

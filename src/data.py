@@ -1,6 +1,8 @@
+from datetime import datetime, timedelta
 from typing import Tuple
 
 import pandas as pd
+import requests
 import yfinance as yf
 
 from src.logger import get_logger
@@ -70,8 +72,10 @@ def time_series_split(df: pd.DataFrame, train_ratio: float = 0.8, val_ratio: flo
     return train, val, test, forecast
 
 def get_price_history(symbol: str, end_date: str, days: int = 90) -> pd.DataFrame:
+    """Fetch Prices from Yahoo Finance."""
     end = pd.to_datetime(end_date)
-    start = end - pd.Timedelta(days=days * 1.5)
+    # cushion to cover weekends/holidays and ensure trading days >= days
+    start = end - pd.Timedelta(days=int(days * 2.0))
 
     df = yf.download(symbol, start=start.strftime("%Y-%m-%d"), end=end.strftime("%Y-%m-%d"), auto_adjust=False)
 
@@ -92,3 +96,34 @@ def get_price_history(symbol: str, end_date: str, days: int = 90) -> pd.DataFram
         raise ValueError(f"Missing expected columns: {missing}")
 
     return df[["date", "open", "high", "low", "close", "adj_close", "volume"]]
+
+def get_news_history(query: str, end_date: str, days: int, api_key: str) -> pd.DataFrame:
+    """Fetch NEws from NewsAPI."""
+    to_date = datetime.strptime(end_date, "%Y-%m-%d")
+    from_date = to_date - timedelta(days=days)
+
+    url = "https://newsapi.org/v2/everything"
+    params = {
+        "q": query,
+        "from": from_date.strftime("%Y-%m-%d"),
+        "to": to_date.strftime("%Y-%m-%d"),
+        "sortBy": "relevancy",
+        "language": "en",
+        "pageSize": 100,
+        "apiKey": api_key
+    }
+
+    response = requests.get(url, params=params)
+    response.raise_for_status()
+    articles = response.json().get("articles", [])
+
+    records = [
+        {
+            "date": article["publishedAt"][:10],
+            "rank": "top1",  # Default value
+            "headline": article["title"]
+        }
+        for article in articles
+    ]
+
+    return pd.DataFrame(records)

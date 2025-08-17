@@ -42,7 +42,7 @@ def create_features_and_target(df: pd.DataFrame, forecast_horizon: int = 30) -> 
     df['h_bollinger'] = bollinger_hband(df['log_return'])
     df['l_bollinger'] = bollinger_lband(df['log_return'])
 
-    for lag in [5, 10, 25, 50]:
+    for lag in [5, 10, 25]:
         df[f'lag_{lag}'] = df['log_return'].shift(lag)
         df[f'sma_{lag}'] = ta.trend.sma_indicator(df['log_return'], lag)
         df[f'ema_{lag}'] = ta.trend.ema_indicator(df['log_return'], lag)
@@ -54,7 +54,7 @@ def create_features_and_target(df: pd.DataFrame, forecast_horizon: int = 30) -> 
     df['q_std'] = df['quarter'].map(df.groupby('quarter')['log_return'].std())
     df['q_skew'] = df['quarter'].map(df.groupby('quarter')['log_return'].skew())
 
-    max_lag = 51
+    max_lag = 26
     return df.iloc[max_lag:].copy()
 
 def generate_full_feature_row(price_df: pd.DataFrame, news_df: pd.DataFrame, sentiment_model: FinBERT) -> pd.DataFrame:

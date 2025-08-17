@@ -31,10 +31,17 @@
 
 * Run PyTests from Terminal with: `pytest`
 
-## FastAPI
+## FastAPI and Streamlit
 
-* Run: `uvicorn app.api.main:app --reload`
-* Swagger: `http://localhost:8000/docs`
+* FastAPI
+  * Run: `uvicorn app.api.main:app --reload`
+  * Swagger: `http://localhost:8000/docs`
+
+* Streamlist
+  * Run: `streamlit run app/streamlit/ui.py`
+  * Dashboar: `http://localhost:8501/`
+
+* Or Run Script `./run_app.sh` from root folder in Terminal
 
 ### Endpoints
 
@@ -117,3 +124,9 @@ curl -X POST http://localhost:8000/predict-raw \
   "predicted_price": 104.55
 }
 ```
+
+# Ollama Integration for News Generation and Testing
+
+* Generating Fake News with Ollama
+* Install model local: `ollama pull llama3`
+* OLLAMA_URL = `http://localhost:11434/api/generate`
