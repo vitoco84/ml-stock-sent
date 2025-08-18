@@ -1,24 +1,19 @@
-import os
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List
+from pathlib import Path
+from typing import Any, Dict
 
 import joblib
 import numpy as np
 import optuna
 
-from src.logger import get_logger
-
 
 class Base(ABC):
     """Base class for all models."""
-
     name = 'base_model'
 
-    def __init__(self, horizon: int = 30, random_state: int = 42, **kwargs):
+    def __init__(self, horizon: int = 30, random_state: int = 42):
         self.horizon = horizon
         self.random_state = random_state
-        self.kwargs = kwargs
-        self.logger = get_logger(self.__class__.__name__)
 
     @abstractmethod
     def fit(self, X_train: np.ndarray, y_train: np.ndarray) -> "Base":
@@ -32,17 +27,18 @@ class Base(ABC):
     def suggest_hyperparameters(self, trial: optuna.Trial) -> Dict[str, Any]:
         raise NotImplementedError
 
-    def save(self, path: str) -> None:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        joblib.dump(self, path)
+    def train(self, X_train, y_train, X_val=None, y_val=None):
+        return self.fit(X_train, y_train)
+
+    def get_params(self, deep: bool = True) -> Dict[str, Any]:
+        return {"horizon": self.horizon, "random_state": self.random_state}
+
+    def save(self, path: Path) -> None:
+        joblib.dump(self, Path(path))
 
     @classmethod
-    def load(cls, path: str) -> "Base":
-        if not os.path.exists(path):
-            raise FileNotFoundError(f"Model file not found: {path}")
-        return joblib.load(path)
+    def load(cls, path: Path) -> "Base":
+        return joblib.load(Path(path))
 
     def __repr__(self):
-        attrs = vars(self)
-        attr_str = ", ".join(f"{k}={v}" for k, v in attrs.items() if not k.startswith("_"))
-        return f"{self.__class__.__name__}({attr_str})"
+        return f"{self.__class__.__name__}(horizon={self.horizon}, random_state={self.random_state})"

@@ -24,9 +24,7 @@ ENV/
 # Bytecode
 *.class
 
-# Data / Models
-models/
-data/
+# Assets
 assets/
 
 # System

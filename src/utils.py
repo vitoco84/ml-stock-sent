@@ -1,5 +1,6 @@
 import os
 import random
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -45,10 +46,10 @@ def is_cuda_available() -> bool:
     except Exception:
         return False
 
-def load_csv(path: str) -> pd.DataFrame:
+def load_csv(path: Path) -> pd.DataFrame:
     """ Load a CSV file."""
     return pd.read_csv(path)
 
-def save_csv(path: str, df: pd.DataFrame) -> None:
+def save_csv(path: Path, df: pd.DataFrame) -> None:
     """Save to a CSV file."""
     df.to_csv(path, index=False)

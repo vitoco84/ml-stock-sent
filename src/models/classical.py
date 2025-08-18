@@ -9,8 +9,9 @@ from src.models.base import Base
 
 class LinearElasticNet(Base):
     """
-    Linear regression with combined L1 and L2 priors as regularizer.
-    Multi target regression.
+    Linear regression with combined L1/L2 regularization (ElasticNet).
+    Supports single-target or multi-target (e.g., 30-step vector) via MultiOutputRegressor.
+    Use recursive roll-forward outside this class to produce a multi-day path.
     """
 
     name = "linear_elasticnet"
@@ -21,31 +22,70 @@ class LinearElasticNet(Base):
             alpha: float = 0.1,
             l1_ratio: float = 0.2,
             random_state: int = 42,
-            multioutput: bool = False,
-            **kwargs
+            selection: str = "cyclic",  # 'cyclic' or 'random'
+            max_iter: int = 2000,
+            multioutput: bool = True
     ):
-        super().__init__(horizon, random_state, **kwargs)
+        super().__init__(horizon=horizon, random_state=random_state)
+        self.alpha = alpha
+        self.l1_ratio = l1_ratio
+        self.selection = selection
+        self.max_iter = max_iter
+        self.multioutput = multioutput
+        self._build_estimator()
 
+    def _build_estimator(self) -> None:
         base = ElasticNet(
-            alpha=alpha,
-            l1_ratio=l1_ratio,
-            random_state=random_state,
-            max_iter=2000,
-            **kwargs
+            alpha=self.alpha,
+            l1_ratio=self.l1_ratio,
+            selection=self.selection,
+            random_state=self.random_state,
+            max_iter=self.max_iter
         )
+        self.model = MultiOutputRegressor(base) if self.multioutput else base
 
-        self.model = MultiOutputRegressor(base) if multioutput else base
+    def _build(self) -> None:
+        self._build_estimator()
 
     def fit(self, X_train: np.ndarray, y_train: np.ndarray) -> "LinearElasticNet":
-        self.logger.info("Starting model training...")
+        if not self.multioutput and y_train.ndim == 2 and y_train.shape[1] == 1:
+            y_train = y_train.ravel()
         self.model.fit(X_train, y_train)
         return self
 
     def predict(self, X_test: np.ndarray) -> np.ndarray:
-        return self.model.predict(X_test)
+        yhat = self.model.predict(X_test)
+        if not self.multioutput and yhat.ndim == 2 and yhat.shape[1] == 1:
+            yhat = yhat.ravel()
+        return yhat
 
-    def suggest_hyperparameters(self, trial) -> Dict[str, Any]:
+    def get_params(self, deep: bool = True) -> Dict[str, Any]:
         return {
-            "alpha": trial.suggest_float("alpha", 1e-4, 10.0, log=True),
-            "l1_ratio": trial.suggest_float("l1_ratio", 0.0, 1.0)
+            "horizon": self.horizon,
+            "random_state": self.random_state,
+            "alpha": self.alpha,
+            "l1_ratio": self.l1_ratio,
+            "selection": self.selection,
+            "max_iter": self.max_iter,
+            "multioutput": self.multioutput,
+        }
+
+    def set_params(self, **params):
+        known = {
+            "horizon", "random_state",
+            "alpha", "l1_ratio", "selection", "max_iter",
+            "multioutput",
+        }
+        for k, v in list(params.items()):
+            if k in known:
+                setattr(self, k, v)
+                params.pop(k)
+        self._build_estimator()
+        return self
+
+    def suggest_hyperparameters(self, trial):
+        return {
+            "alpha": trial.suggest_float("alpha", 1e-5, 100.0, log=True),
+            "l1_ratio": trial.suggest_float("l1_ratio", 0.0, 1.0),
+            "selection": trial.suggest_categorical("selection", ["cyclic", "random"])
         }

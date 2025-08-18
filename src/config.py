@@ -1,3 +1,4 @@
+from pathlib import Path
 from types import SimpleNamespace
 
 import yaml
@@ -6,15 +7,20 @@ import yaml
 class Config:
     """Configuration Class: Loads configuration from YAML file."""
 
-    def __init__(self, path: str):
-        with open(path, "r", encoding="utf-8") as f:
+    def __init__(self, path: Path):
+        path = Path(path)
+        if not path.exists():
+            raise FileNotFoundError(f"Config file not found: {path}")
+        with path.open("r", encoding="utf-8") as f:
             cfg_dict = yaml.safe_load(f)
-        self._config = self._dict_to_namespace(cfg_dict)
+        self._config = self._to_namespace(cfg_dict)
 
-    def _dict_to_namespace(self, d):
-        if isinstance(d, dict):
-            return SimpleNamespace(**{k: self._dict_to_namespace(v) for k, v in d.items()})
-        return d
+    def _to_namespace(self, obj):
+        if isinstance(obj, dict):
+            return SimpleNamespace(**{k: self._to_namespace(v) for k, v in obj.items()})
+        if isinstance(obj, list):
+            return [self._to_namespace(v) for v in obj]
+        return obj
 
     def __getattr__(self, name):
         return getattr(self._config, name)

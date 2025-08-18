@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Tuple
 
 import pandas as pd
@@ -15,16 +16,16 @@ def _rename_columns(df: pd.DataFrame) -> None:
     """Rename the columns of the dataframe to lower case."""
     df.columns = [col.strip().lower().replace(" ", "_") for col in df.columns]
 
-def load_price(path: str) -> pd.DataFrame:
+def load_price(path: Path) -> pd.DataFrame:
     """Loads Price Dataset."""
-    df = load_csv(path)
+    df = load_csv(Path(path))
     _rename_columns(df)
     df["date"] = pd.to_datetime(df["date"])
     return df.sort_values("date").reset_index(drop=True)
 
-def load_news(path: str) -> pd.DataFrame:
+def load_news(path: Path) -> pd.DataFrame:
     """Loads News Dataset."""
-    df = load_csv(path)
+    df = load_csv(Path(path))
     _rename_columns(df)
     top_cols = [c for c in df.columns if c.startswith("top")]
     df = df.melt(
@@ -37,10 +38,10 @@ def load_news(path: str) -> pd.DataFrame:
     df["date"] = pd.to_datetime(df["date"])
     return df.sort_values("date").reset_index(drop=True)
 
-def load_prices_sentiment(path: str) -> pd.DataFrame:
+def load_prices_sentiment(path: Path) -> pd.DataFrame:
     """Loads Combined Sentiment with Prices Dataset."""
     try:
-        df = load_csv(path)
+        df = load_csv(Path(path))
         df["date"] = pd.to_datetime(df["date"])
         df = df.sort_values("date").reset_index(drop=True)
     except FileNotFoundError:
@@ -50,15 +51,26 @@ def load_prices_sentiment(path: str) -> pd.DataFrame:
 
 def merge_price_news(price: pd.DataFrame, news: pd.DataFrame) -> pd.DataFrame:
     """Merge price and news data."""
-    return (pd.merge(price, news, on="date", how="left", validate="many_to_many")
-            .sort_values("date")
-            .reset_index(drop=True))
+    return (
+        pd.merge(price, news, on="date", how="left", validate="many_to_many")
+        .sort_values("date")
+        .reset_index(drop=True)
+    )
 
-def time_series_split(df: pd.DataFrame, train_ratio: float = 0.8, val_ratio: float = 0.1, horizon: int = 30
-                      ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def time_series_split(
+        df: pd.DataFrame,
+        train_ratio: float = 0.8,
+        val_ratio: float = 0.1,
+        horizon: int = 30
+) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Chronologically split DataFrame into train, val, test, and forecast sets. """
     df = df.sort_values("date").reset_index(drop=True)
-    usable = df[df["target"].notna()].copy()
+
+    target_cols = [c for c in df.columns if c == "target" or c.startswith("target_")]
+    if not target_cols:
+        raise ValueError("No target columns found. Did you run create_features_and_target()?")
+
+    usable = df[df[target_cols].notna().all(axis=1)].copy()
     forecast = df.tail(horizon).copy()
 
     total = len(usable)
@@ -77,7 +89,12 @@ def get_price_history(symbol: str, end_date: str, days: int = 90) -> pd.DataFram
     # cushion to cover weekends/holidays and ensure trading days >= days
     start = end - pd.Timedelta(days=int(days * 2.0))
 
-    df = yf.download(symbol, start=start.strftime("%Y-%m-%d"), end=end.strftime("%Y-%m-%d"), auto_adjust=False)
+    df = yf.download(
+        symbol,
+        start=start.strftime("%Y-%m-%d"),
+        end=end.strftime("%Y-%m-%d"),
+        auto_adjust=False
+    )
 
     if df.empty:
         raise ValueError(f"No data returned for symbol {symbol}")

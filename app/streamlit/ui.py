@@ -1,9 +1,10 @@
 from datetime import datetime
+
+import altair as alt
 import pandas as pd
 import requests
 import streamlit as st
-import altair as alt
-from pandas.tseries.offsets import BDay
+
 
 API_BASE_URL = "http://localhost:8000"
 
@@ -15,6 +16,24 @@ symbol = st.text_input("Ticker Symbol", value="AAPL")
 end_date = st.date_input("End Date", value=datetime.today())
 days = st.slider("Lookback Days", min_value=30, max_value=365, value=90)
 enrich_flag = st.checkbox("Enrich with LLM if headlines missing", value=False)
+
+st.subheader("Upload CSVs (optional)")
+price_file = st.file_uploader("Prices CSV (date, open, high, low, close, adj_close, volume)", type=["csv"])
+news_file = st.file_uploader("News CSV (date, rank, headline)", type=["csv"])
+
+if price_file is not None:
+    df_up = pd.read_csv(price_file)
+    if "date" in df_up.columns:
+        df_up["date"] = pd.to_datetime(df_up["date"]).dt.strftime("%Y-%m-%d")
+    st.session_state.price_data = df_up.to_dict(orient="records")
+    st.success(f"Loaded {len(df_up)} price rows from CSV")
+
+if news_file is not None:
+    df_news_up = pd.read_csv(news_file)
+    if "date" in df_news_up.columns:
+        df_news_up["date"] = pd.to_datetime(df_news_up["date"]).dt.strftime("%Y-%m-%d")
+    st.session_state.news_data = df_news_up.to_dict(orient="records")
+    st.success(f"Loaded {len(df_news_up)} news rows from CSV")
 
 # --- FETCH PRICE DATA ---
 if st.button("Fetch Price History"):
@@ -53,14 +72,19 @@ for i in range(3):
 # --- PREDICTION ---
 if st.button("Predict Price"):
     if "price_data" not in st.session_state or not st.session_state.price_data:
-        st.warning("Please fetch price history first.")
+        st.warning("Please fetch price history or upload a prices CSV first.")
     else:
         payload = {
             "price": st.session_state.price_data,
-            "news": news_input  # may be empty; LLM will handle if enrich=True
+            "news": st.session_state.get("news_data", news_input)  # prefer uploaded; else text inputs
+        }
+        params = {
+            "enrich": enrich_flag,
+            "horizon": 30,
+            "return_path": True,
+            "symbol": symbol,
         }
 
-        params = {"enrich": str(enrich_flag).lower()}
         with st.spinner("Predicting..."):
             response = requests.post(f"{API_BASE_URL}/predict-raw", params=params, json=payload)
 
@@ -68,74 +92,50 @@ if st.button("Predict Price"):
             result = response.json()
             st.success("Prediction Complete")
             st.write(f"**Current Price:** ${result['current_price']:.2f}")
-            st.write(f"**Predicted Price:** ${result['predicted_price']:.2f}")
-            st.write(f"**Log Return:** {result['log_return']:.6f}")
+            st.write(f"**Next-day Price (h=1):** ${result['predicted_price']:.2f}")
+            st.write(f"**Next-day Log Return:** {result['log_return']:.6f}")
 
-            # ---- Build a chart with actual + predicted ----
+            # ---- Build a chart with history + 30-day forecast path ----
             if "price_data" in st.session_state and st.session_state.price_data:
                 price_df = pd.DataFrame(st.session_state.price_data).copy()
                 price_df["date"] = pd.to_datetime(price_df["date"])
                 price_df = price_df.sort_values("date")
 
-                last_date = price_df["date"].max()
-                pred_date = last_date + BDay(1)  # next business day
-                predicted_price = float(result["predicted_price"])
-                last_actual = float(price_df["adj_close"].iloc[-1])
-
-                # Data for dashed segment from last actual to predicted
-                segment_df = pd.DataFrame({
-                    "date": [last_date, pred_date],
-                    "price": [last_actual, predicted_price],
-                    "layer": ["projection", "projection"]
-                })
-
-                # Actual line data
                 actual_df = price_df.rename(columns={"adj_close": "price"})[["date", "price"]].copy()
                 actual_df["layer"] = "actual"
 
-                # Predicted point
-                pred_point_df = pd.DataFrame({
-                    "date": [pred_date],
-                    "price": [predicted_price],
-                    "layer": ["predicted"]
-                })
+                pred_dates = result.get("predicted_dates", [])
+                pred_prices = result.get("predicted_price_path", [])
+                if hasattr(pred_dates, "tolist"): pred_dates = pred_dates.tolist()
+                if hasattr(pred_prices, "tolist"): pred_prices = pred_prices.tolist()
+                pred_dates = [pd.to_datetime(d) for d in list(pred_dates)]
+                pred_prices = [float(x) for x in list(pred_prices)]
 
-                base = alt.Chart().encode(
-                    x=alt.X("date:T", title="Date"),
-                    y=alt.Y("price:Q", title="Adj Close (USD)")
-                )
+                if pred_dates and pred_prices and len(pred_dates) == len(pred_prices):
+                    path_df = pd.DataFrame({"date": pred_dates, "price": pred_prices})
+                    path_df["layer"] = "forecast"
 
-                actual_line = base.mark_line().transform_filter(
-                    alt.datum.layer == "actual"
-                )
+                    encoding = alt.X("date:T", title="Date"), alt.Y("price:Q", title="Adj Close (USD)")
 
-                projection_line = base.mark_line(strokeDash=[6, 6]).transform_filter(
-                    alt.datum.layer == "projection"
-                )
+                    actual_line = alt.Chart(actual_df).mark_line().encode(*encoding).transform_filter(
+                        alt.datum.layer == "actual"
+                    )
+                    forecast_line = alt.Chart(path_df).mark_line(strokeDash=[6, 6]).encode(*encoding).transform_filter(
+                        alt.datum.layer == "forecast"
+                    )
+                    last_pt = path_df.tail(1)
+                    pred_point = alt.Chart(last_pt).mark_point(size=70, color="red").encode(*encoding)
+                    pred_label = alt.Chart(last_pt).mark_text(dx=8, dy=-8, color="red").encode(
+                        *encoding, text=alt.Text("price:Q", format="$.2f")
+                    )
 
-                pred_point = base.mark_point(size=70, color="red").transform_filter(
-                    alt.datum.layer == "predicted"
-                )
-
-                pred_label = base.mark_text(dx=8, dy=-8, color="red").encode(
-                    text=alt.Text("price:Q", format="$.2f")
-                ).transform_filter(
-                    alt.datum.layer == "predicted"
-                )
-
-                chart = alt.layer(
-                    actual_line.data(actual_df),
-                    projection_line.data(segment_df),
-                    pred_point.data(pred_point_df),
-                    pred_label.data(pred_point_df),
-                ).properties(
-                    width=700,
-                    height=380,
-                    title="Adj Close: Actual vs Predicted Next Business Day"
-                )
-
-                st.subheader("Price Chart")
-                st.altair_chart(chart, use_container_width=True)
+                    chart = alt.layer(actual_line, forecast_line, pred_point, pred_label).properties(
+                        width=700, height=380, title="Adj Close: Actual + Predicted Next 30 Business Days"
+                    )
+                    st.subheader("Price Chart")
+                    st.altair_chart(chart, use_container_width=True)
+                else:
+                    st.info("No forecast path returned; check API parameters.")
         else:
             try:
                 error_msg = response.json().get("error", "Unknown error")

@@ -80,7 +80,7 @@ def test_predict_raw_from_file():
         payload = json.load(f)
 
     with TestClient(app) as client:
-        response = client.post("/predict-raw?enrich=false", json=payload)
+        response = client.post("/predict-raw?enrich=false&symbol=DJIA", json=payload)
 
         assert response.status_code == 200, response.text
         data = response.json()

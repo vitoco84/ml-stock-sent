@@ -1,6 +1,7 @@
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel
+
 
 # ------------------------------------------------------------
 # REQUEST SCHEMA
@@ -30,4 +31,11 @@ class PredictionRequest(BaseModel):
     - A list of news headlines
     """
     price: List[PriceRow]
+    news: Optional[List[NewsRow]] = []
+
+class PriceHistoryResponse(BaseModel):
+    price: List[PriceRow]
+
+class NewsHistoryResponse(BaseModel):
     news: List[NewsRow]
+    message: str | None = None

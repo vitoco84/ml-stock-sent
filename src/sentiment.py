@@ -21,8 +21,7 @@ class FinBERT:
         model_name = config.sentiment.model
 
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.classifier = AutoModelForSequenceClassification.from_pretrained(model_name, use_safetensors=True).to(
-            device)
+        self.classifier = AutoModelForSequenceClassification.from_pretrained(model_name, use_safetensors=True).to(self.device)
         self.embedder = self.classifier.base_model
         self.logger = get_logger(self.__class__.__name__)
         self.logger.info(f"Loading FinBERT model: {model_name} on device: {self.device}")
