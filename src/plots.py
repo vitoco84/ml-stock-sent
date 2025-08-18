@@ -1,18 +1,21 @@
 from pathlib import Path
 from typing import List, Tuple
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
 from statsmodels.graphics.tsaplots import plot_acf
 
 
+ADJ_CLOSE  = "Adj Close"
+
 def plot_price_series(df: pd.DataFrame, path: Path) -> None:
     plt.figure(figsize=(10, 4))
     plt.plot(df["date"], df["adj_close"])
     plt.title("Closing Price Over Time")
     plt.xlabel("Date")
-    plt.ylabel("Adj Close")
+    plt.ylabel(ADJ_CLOSE)
     plt.grid(True)
     plt.tight_layout()
     plt.savefig(path)
@@ -22,7 +25,7 @@ def plot_price_series(df: pd.DataFrame, path: Path) -> None:
 def plot_price_overlay(
         df_feat: pd.DataFrame,
         X_test: pd.DataFrame,
-        y_pred: np.ndarray,
+        y_pred: pd.Series,
         path: Path
 ):
     idx = X_test.index.to_numpy()
@@ -38,23 +41,17 @@ def plot_price_overlay(
     plt.plot(dates, pred, label="Predicted (t+1)", linestyle="--", linewidth=2)
     plt.title("Actual vs Predicted Adj Close (H=1)")
     plt.xlabel("Date")
-    plt.ylabel("Adj Close")
+    plt.ylabel(ADJ_CLOSE)
     plt.legend()
     plt.grid(True, alpha=0.25)
     plt.tight_layout()
     plt.savefig(path)
     plt.show()
 
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from pathlib import Path
-
-
 def plot_price_overlay_next_30(
         df_feat: pd.DataFrame,
         test_df: pd.DataFrame,
-        y_pred: np.ndarray,
+        y_pred: pd.Series,
         horizon: int,
         hist_window: int,
         path: Path
@@ -101,7 +98,7 @@ def plot_moving_averages(df: pd.DataFrame, path: Path):
     df["sma_10"] = df["adj_close"].rolling(window=10).mean()
     df["ema_10"] = df["adj_close"].ewm(span=10).mean()
     plt.figure(figsize=(10, 4))
-    plt.plot(df["date"], df["adj_close"], label="Adj Close")
+    plt.plot(df["date"], df["adj_close"], label=ADJ_CLOSE)
     plt.plot(df["date"], df["sma_10"], label="SMA 10")
     plt.plot(df["date"], df["ema_10"], label="EMA 10")
     plt.title("Moving Averages")

@@ -1,12 +1,14 @@
 from typing import Any, Dict
 
-import numpy as np
+import pandas as pd
 from sklearn.linear_model import ElasticNet
 from sklearn.multioutput import MultiOutputRegressor
 
 from src.models.base import Base
+from src.annotations import tested
 
 
+@tested
 class LinearElasticNet(Base):
     """
     Linear regression with combined L1/L2 regularization (ElasticNet).
@@ -47,17 +49,19 @@ class LinearElasticNet(Base):
     def _build(self) -> None:
         self._build_estimator()
 
-    def fit(self, X_train: np.ndarray, y_train: np.ndarray) -> "LinearElasticNet":
+    def fit(self, X_train: pd.DataFrame, y_train: Any) -> "LinearElasticNet":
         if not self.multioutput and y_train.ndim == 2 and y_train.shape[1] == 1:
             y_train = y_train.ravel()
         self.model.fit(X_train, y_train)
         return self
 
-    def predict(self, X_test: np.ndarray) -> np.ndarray:
+    def predict(self, X_test: pd.DataFrame) -> Any:
         yhat = self.model.predict(X_test)
-        if not self.multioutput and yhat.ndim == 2 and yhat.shape[1] == 1:
-            yhat = yhat.ravel()
-        return yhat
+
+        if self.multioutput:
+            return pd.DataFrame(yhat, columns=[f"target_{i}" for i in range(self.horizon)])
+        else:
+            return pd.Series(yhat)
 
     def get_params(self, deep: bool = True) -> Dict[str, Any]:
         return {
@@ -85,7 +89,7 @@ class LinearElasticNet(Base):
 
     def suggest_hyperparameters(self, trial):
         return {
-            "alpha": trial.suggest_float("alpha", 1e-5, 100.0, log=True),
+            "alpha": trial.suggest_float("alpha", 1e-6, 1.0, log=True),
             "l1_ratio": trial.suggest_float("l1_ratio", 0.0, 1.0),
             "selection": trial.suggest_categorical("selection", ["cyclic", "random"])
         }

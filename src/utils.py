@@ -5,11 +5,13 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from src.annotations import tested
 from src.logger import get_logger
 
 
 logger = get_logger(__name__)
 
+@tested
 def set_seed(seed: int = 42) -> np.random.Generator:
     """Set Random Seed globally."""
     os.environ["PYTHONHASHSEED"] = str(seed)

@@ -11,14 +11,13 @@
 * Check Nvidia Cuda Version: `nvidia-smi` -> 12.9
     * CUDA 12.1: `pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121`
 
-## Pipeline
+## Pipeline Notebooks
 
-* EDA: Exploratory Data Analysis
-* Sentiment Analysis and Scoring with FinBERT
-* Feature Engineering
-* Train / Test
-* Hyperparameter Tuning with Optuna
-* Model Evaluation
+* 01_eda.ipynb: EDA: Exploratory Data Analysis
+* 02_sentiment.ipynb: Sentiment Analysis and Scoring with FinBERT
+* 03_feature.ipynb: Feature Engineering
+* 04_train.ipynb: Train / Test / Hyperparameter Tuning with Optuna
+* 05_shap.ipynb: odel Evaluation
 
 ## Links and Datasets
 
@@ -41,7 +40,8 @@
   * Run: `streamlit run app/streamlit/ui.py`
   * Dashboar: `http://localhost:8501/`
 
-* Or Run Script `./run_app.sh` from root folder in Terminal
+* Or Run Script `.scripts/run_app.sh` from root folder in Terminal
+* Logs: `tail -f ollama.log uvicorn.log`
 
 ### Endpoints
 

@@ -4,10 +4,11 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import requests
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query, Request
 
-from app.api.classes import NewsHistoryResponse, PredictionRequest, PriceHistoryResponse
+from app.api.classes import NewsHistoryResponse, PredictionRequest, PredictionResponse, PriceHistoryResponse
 from src.config import Config
 from src.data import get_news_history, get_price_history
 from src.features import generate_full_feature_row
@@ -15,8 +16,7 @@ from src.llm import enrich_news_with_generated
 from src.logger import get_logger
 from src.sentiment import FinBERT
 from src.train import ModelTrainer
-from src.utils import is_cuda_available
-
+from src.utils import is_cuda_available, tested
 
 logger = get_logger(__name__)
 
@@ -68,12 +68,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
+@tested
 @app.get("/")
 def root():
     """Return a simple message to confirm the API is running."""
     return {"message": "API is up and running!"}
 
+@tested
 @app.get("/price-history", response_model=PriceHistoryResponse)
 def fetch_price_history(
         symbol: str = Query(..., description="Ticker symbol, e.g., AAPL, ^DJI"),
@@ -105,10 +106,11 @@ def fetch_price_history(
         return {"price": records}
 
 
-    except Exception as e:
+    except Exception:
         logger.exception("fetch_price_history failed")
         raise HTTPException(status_code=500, detail="Internal server error")
 
+@tested
 @app.get("/news-history", response_model=NewsHistoryResponse)
 def fetch_news_history(
         request: Request,
@@ -137,11 +139,12 @@ def fetch_news_history(
 
         return {"news": df.to_dict(orient="records")}
 
-    except Exception as e:
+    except Exception:
         logger.exception("fetch_news_history failed")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-@app.post("/predict-raw")
+@tested
+@app.post("/predict-raw", response_model=PredictionResponse)
 def post_predict_from_raw(
         request_body: PredictionRequest,
         request: Request,
@@ -191,7 +194,7 @@ def post_predict_from_raw(
         logger.info("No initial news provided.")
 
     # --- ENRICH NEWS (if requested) ---
-    if enrich:
+    if enrich and _ollama_alive():
         logger.info("Enrich flag is ON — generating missing headlines via LLM")
         real_news = news_df.to_dict(orient="records")
         enriched_news = enrich_news_with_generated(price_dates, real_news, symbol=symbol)
@@ -208,9 +211,9 @@ def post_predict_from_raw(
     try:
         if news_df.empty:
             logger.info("Skipping sentiment: no news to process.")
-            feature_row = generate_full_feature_row(price_df, pd.DataFrame(), None)
+            feature_row = generate_full_feature_row(price_df, pd.DataFrame(), None, horizon)
         else:
-            feature_row = generate_full_feature_row(price_df, news_df, sentiment_model)
+            feature_row = generate_full_feature_row(price_df, news_df, sentiment_model, horizon)
     except Exception:
         logger.exception("Feature generation failed")
         raise HTTPException(status_code=500, detail="Failed to generate features from price/news data.")
@@ -239,7 +242,7 @@ def post_predict_from_raw(
     log_return = float(yhat[0, 0])
     predicted_price = current_price * float(np.exp(log_return))
 
-    resp = {
+    response_kwargs = {
         "horizon": H,
         "log_return": log_return,
         "current_price": current_price,
@@ -252,11 +255,18 @@ def post_predict_from_raw(
         from pandas.tseries.offsets import BDay
         future_dates = pd.bdate_range(price_df["date"].iloc[-1] + BDay(1), periods=H)
 
-        resp.update({
+        response_kwargs.update({
             "log_return_path": lr_path.tolist(),
             "predicted_price_path": [float(x) for x in price_path],
             "predicted_dates": future_dates.strftime("%Y-%m-%d").tolist(),
             "last_date": pd.to_datetime(price_df["date"].iloc[-1]).strftime("%Y-%m-%d"),
         })
 
-    return resp
+    return PredictionResponse(**response_kwargs)
+
+def _ollama_alive(url: str = "http://localhost:11434/api/tags", timeout: float = 1.0) -> bool:
+    try:
+        requests.get(url, timeout=timeout)
+        return True
+    except Exception:
+        return False

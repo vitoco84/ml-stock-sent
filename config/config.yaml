@@ -20,4 +20,4 @@ sentiment:
   model: "yiyanghkust/finbert-tone"
 
 model:
-  path: "data/models/enet_mo_best.pkl"
+  path: "../data/models/enet_mo_best.pkl"

@@ -3,8 +3,8 @@ from pathlib import Path
 from typing import Any, Dict
 
 import joblib
-import numpy as np
 import optuna
+import pandas as pd
 
 
 class Base(ABC):
@@ -16,18 +16,24 @@ class Base(ABC):
         self.random_state = random_state
 
     @abstractmethod
-    def fit(self, X_train: np.ndarray, y_train: np.ndarray) -> "Base":
+    def fit(self, X_train: pd.DataFrame, y_train: Any) -> "Base":
         raise NotImplementedError
 
     @abstractmethod
-    def predict(self, X_test: np.ndarray) -> np.ndarray:
+    def predict(self, X_test: pd.DataFrame) -> Any:
         raise NotImplementedError
 
     @abstractmethod
     def suggest_hyperparameters(self, trial: optuna.Trial) -> Dict[str, Any]:
         raise NotImplementedError
 
-    def train(self, X_train, y_train, X_val=None, y_val=None):
+    def train(
+            self,
+            X_train: pd.DataFrame,
+            y_train: Any,
+            X_val: pd.DataFrame = None,
+            y_val: pd.DataFrame = None
+    ) -> "Base":
         return self.fit(X_train, y_train)
 
     def get_params(self, deep: bool = True) -> Dict[str, Any]:

@@ -8,6 +8,7 @@ from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 from src.config import Config
 from src.logger import get_logger
+from src.annotations import tested
 
 
 class FinBERT:
@@ -21,7 +22,8 @@ class FinBERT:
         model_name = config.sentiment.model
 
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.classifier = AutoModelForSequenceClassification.from_pretrained(model_name, use_safetensors=True).to(self.device)
+        self.classifier = AutoModelForSequenceClassification.from_pretrained(model_name, use_safetensors=True).to(
+            self.device)
         self.embedder = self.classifier.base_model
         self.logger = get_logger(self.__class__.__name__)
         self.logger.info(f"Loading FinBERT model: {model_name} on device: {self.device}")
@@ -39,7 +41,7 @@ class FinBERT:
         probs = torch.nn.functional.softmax(logits, dim=1).cpu().numpy()
         return [{"pos": p[0], "neu": p[1], "neg": p[2], "pos_minus_neg": p[0] - p[2]} for p in probs]
 
-    def _get_embeddings(self, texts: Union[str, List[str]]) -> np.ndarray:
+    def _get_embeddings(self, texts: Union[str, List[str]]) -> pd.Series:
         inputs = self._prepare_inputs(texts)
         with torch.no_grad():
             hidden = self.embedder(**inputs).last_hidden_state
@@ -74,6 +76,7 @@ class FinBERT:
 
         return pd.concat([df.reset_index(drop=True), sentiment_df, embedding_df], axis=1)
 
+    @tested
     @staticmethod
     def aggregate_daily(df: pd.DataFrame, text_column: str = "headline") -> pd.DataFrame:
         df = df.copy()

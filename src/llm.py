@@ -4,10 +4,12 @@ import pandas as pd
 import requests
 
 from src.logger import get_logger
+from src.annotations import tested
 
 
 logger = get_logger(__name__)
 
+@tested
 def generate_local_headlines(symbol: str, dates: List[str], model: str = "llama3") -> List[dict]:
     logger.info(f"Generating {len(dates)} local headlines via LLM ({model}) for {symbol}")
     headlines = []
@@ -41,6 +43,7 @@ def generate_local_headlines(symbol: str, dates: List[str], model: str = "llama3
 
     return headlines
 
+@tested
 def enrich_news_with_generated(price_dates: List[str], real_news: List[dict], symbol: str) -> List[dict]:
     logger.info("Enriching news with generated headlines (LLM)")
 

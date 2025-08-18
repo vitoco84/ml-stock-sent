@@ -9,13 +9,12 @@ from sklearn.preprocessing import StandardScaler
 
 from src.logger import get_logger
 from src.metrics import metrics
-from src.models.base import Base
 
 
 class ModelTrainer:
     def __init__(
             self,
-            model: Base,
+            model: Any,
             name: str,
             config: Dict[str, Any],
             output_path: str = "../data/models",

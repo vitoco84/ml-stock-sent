@@ -68,7 +68,13 @@ def create_features_and_target(df: pd.DataFrame, forecast_horizon: int = 1) -> p
     max_lag = 26
     return df.iloc[max_lag:].copy()
 
-def generate_full_feature_row(price_df: pd.DataFrame, news_df: pd.DataFrame, sentiment_model: FinBERT | None) -> pd.DataFrame:
+def generate_full_feature_row(
+        price_df: pd.DataFrame,
+        news_df: pd.DataFrame,
+        sentiment_model: FinBERT | None,
+        horizon: int = 30
+) -> pd.DataFrame:
+    """Generate a full feature row."""
     if sentiment_model is None or news_df is None or news_df.empty:
         daily_sentiment = pd.DataFrame({
             "date": price_df["date"].copy(),
@@ -81,10 +87,15 @@ def generate_full_feature_row(price_df: pd.DataFrame, news_df: pd.DataFrame, sen
         daily_sentiment.drop(columns=["headline_count"], inplace=True)
 
     merged = merge_price_news(price_df, daily_sentiment)
-    features_df = create_features_and_target(merged)
+    features_df = create_features_and_target(merged, forecast_horizon=horizon)
 
     if features_df.empty:
         raise ValueError("Feature DataFrame is empty. Likely due to insufficient price history.")
+
+    target_cols = [f"target_{i}" for i in range(1, horizon + 1)]
+    if "target" in features_df.columns:
+        target_cols.append("target")
+    features_df = features_df.drop(columns=[c for c in target_cols if c in features_df.columns])
 
     return features_df.iloc[[-1]].copy()
 

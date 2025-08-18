@@ -1,15 +1,12 @@
+from datetime import date
 from typing import List, Optional
 
 from pydantic import BaseModel
 
 
-# ------------------------------------------------------------
-# REQUEST SCHEMA
-# ------------------------------------------------------------
-
 class PriceRow(BaseModel):
     """Schema for a single row of historical price data."""
-    date: str
+    date: date
     open: float
     high: float
     low: float
@@ -19,7 +16,7 @@ class PriceRow(BaseModel):
 
 class NewsRow(BaseModel):
     """Schema for a single news headline."""
-    date: str
+    date: date
     rank: str
     headline: str
 
@@ -34,8 +31,21 @@ class PredictionRequest(BaseModel):
     news: Optional[List[NewsRow]] = []
 
 class PriceHistoryResponse(BaseModel):
+    """Schema for price history response."""
     price: List[PriceRow]
 
 class NewsHistoryResponse(BaseModel):
+    """Schema for news history response."""
     news: List[NewsRow]
-    message: str | None = None
+    message: Optional[str] = None
+
+class PredictionResponse(BaseModel):
+    """Full schema for prediction response."""
+    horizon: int
+    log_return: float
+    current_price: float
+    predicted_price: float
+    log_return_path: Optional[List[float]]
+    predicted_price_path: Optional[List[float]]
+    predicted_dates: Optional[List[date]]
+    last_date: Optional[date]
