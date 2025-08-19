@@ -4,8 +4,8 @@ import pandas as pd
 from sklearn.linear_model import ElasticNet
 from sklearn.multioutput import MultiOutputRegressor
 
-from src.models.base import Base
 from src.annotations import tested
+from src.models.base import Base
 
 
 @tested
@@ -21,7 +21,7 @@ class LinearElasticNet(Base):
     def __init__(
             self,
             horizon: int = 30,
-            alpha: float = 0.1,
+            alpha: float = 1e-3,
             l1_ratio: float = 0.2,
             random_state: int = 42,
             selection: str = "cyclic",  # 'cyclic' or 'random'
@@ -89,7 +89,7 @@ class LinearElasticNet(Base):
 
     def suggest_hyperparameters(self, trial):
         return {
-            "alpha": trial.suggest_float("alpha", 1e-6, 1.0, log=True),
+            "alpha": trial.suggest_float("alpha", 1e-5, 1e-2, log=True),
             "l1_ratio": trial.suggest_float("l1_ratio", 0.0, 1.0),
             "selection": trial.suggest_categorical("selection", ["cyclic", "random"])
         }

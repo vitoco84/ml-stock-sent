@@ -1,14 +1,14 @@
-import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import requests
-from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.classes import NewsHistoryResponse, PredictionRequest, PredictionResponse, PriceHistoryResponse
+from app.api.settings import get_settings
 from src.config import Config
 from src.data import get_news_history, get_price_history
 from src.features import generate_full_feature_row
@@ -18,7 +18,11 @@ from src.sentiment import FinBERT
 from src.train import ModelTrainer
 from src.utils import is_cuda_available, tested
 
+
 logger = get_logger(__name__)
+
+config = Config(Path("config/config.yaml"))
+settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -29,20 +33,17 @@ async def lifespan(app: FastAPI):
     - Loads NEWS_API_KEY from .env
     - Stores initialized objects in `app.state` for later access
     """
-    config = Config(Path("config/config.yaml"))
-
     device = "cuda" if is_cuda_available() else "cpu"
     logger.info(f"Initializing FinBERT on {device}")
+
     sentiment_model = FinBERT(config, device=device)
-    model_path = Path(config.model.path)
+
+    model_path = Path(config.model.path_dir) / config.model.enet_mo_best_30
     if not model_path.exists():
         raise RuntimeError(f"Model file not found at {model_path}")
     model, preprocessor, y_scaler, y_scale = ModelTrainer.load(str(model_path))
 
-    load_dotenv()
-    api_key = os.getenv("NEWS_API_KEY")
-
-    app.state.news_api_key = api_key
+    app.state.news_api_key = settings.news_api_key
     app.state.sentiment_model = sentiment_model
     app.state.model = model
     app.state.preprocessor = preprocessor
@@ -52,27 +53,24 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(
+    root_path=settings.api_root_path,
     title="Stock Prediction API",
     description="Predict stock prices using historical prices, news sentiment, and FinBERT.",
     version="1.0.0",
     lifespan=lifespan
 )
 
-from fastapi.middleware.cors import CORSMiddleware
-
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8501"],  # Change domain
+    allow_origins=[str(o) for o in settings.cors_origins],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
+
 @tested
-@app.get("/")
-def root():
-    """Return a simple message to confirm the API is running."""
-    return {"message": "API is up and running!"}
+@app.get("/healthz")
+def healthz(): return {"ok": True}
 
 @tested
 @app.get("/price-history", response_model=PriceHistoryResponse)
@@ -91,24 +89,20 @@ def fetch_price_history(
     Returns JSON with price rows or an error message.
     """
     try:
-        df = get_price_history(symbol=symbol, end_date=end_date, days=days)
+        df = get_price_history(symbol, end_date, days)
 
         if df.empty:
-            raise HTTPException(status_code=404, detail="No price data returned. Check the symbol or date range.")
+            raise HTTPException(404, "No price data returned. Check the symbol or date range.")
 
         df["date"] = df["date"].dt.strftime("%Y-%m-%d")
         records = df.to_dict(orient="records")
 
-        logger.info(f"Fetched data types:\n{df.dtypes}")
         logger.info(f"Head of dataframe:\n{df.head()}")
         logger.debug(f"Sample record: {df.to_dict(orient='records')[0]}")
-
         return {"price": records}
-
-
     except Exception:
         logger.exception("fetch_price_history failed")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise HTTPException(500, "Internal server error")
 
 @tested
 @app.get("/news-history", response_model=NewsHistoryResponse)
@@ -130,21 +124,20 @@ def fetch_news_history(
     try:
         api_key = request.app.state.news_api_key
         if not api_key:
-            raise HTTPException(status_code=500, detail="Missing NEWS_API_KEY environment variable")
+            raise HTTPException(500, "Missing NEWS_API_KEY environment variable")
 
-        df = get_news_history(query=query, end_date=end_date, days=days, api_key=api_key)
+        df = get_news_history(query, end_date, days, api_key, settings.news_api_base)
 
         if df.empty:
             return {"news": [], "message": "No news found."}
 
         return {"news": df.to_dict(orient="records")}
-
     except Exception:
         logger.exception("fetch_news_history failed")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise HTTPException(500, "Internal server error")
 
 @tested
-@app.post("/predict-raw", response_model=PredictionResponse)
+@app.post("/predict-raw", response_model=PredictionResponse, response_model_exclude_none=True)
 def post_predict_from_raw(
         request_body: PredictionRequest,
         request: Request,
@@ -175,7 +168,7 @@ def post_predict_from_raw(
     try:
         price_rows = [row.model_dump() for row in request_body.price]
     except Exception:
-        raise HTTPException(status_code=422, detail="`price` is required and must be a non-empty list.")
+        raise HTTPException(422, "`price` is required and must be a non-empty list.")
 
     price_df = pd.DataFrame(price_rows)
     price_df["date"] = pd.to_datetime(price_df["date"]).dt.normalize()
@@ -194,10 +187,16 @@ def post_predict_from_raw(
         logger.info("No initial news provided.")
 
     # --- ENRICH NEWS (if requested) ---
-    if enrich and _ollama_alive():
+    if enrich and _ollama_alive(settings.ollama_tag):
         logger.info("Enrich flag is ON — generating missing headlines via LLM")
         real_news = news_df.to_dict(orient="records")
-        enriched_news = enrich_news_with_generated(price_dates, real_news, symbol=symbol)
+        enriched_news = enrich_news_with_generated(
+            price_dates=price_dates,
+            real_news=real_news,
+            symbol=symbol,
+            url_llm=settings.ollama_url,
+            model_llm=settings.ollama_model
+        )
         news_df = pd.DataFrame(enriched_news)
         if not news_df.empty:
             news_df["date"] = pd.to_datetime(news_df["date"]).dt.normalize()
@@ -216,7 +215,7 @@ def post_predict_from_raw(
             feature_row = generate_full_feature_row(price_df, news_df, sentiment_model, horizon)
     except Exception:
         logger.exception("Feature generation failed")
-        raise HTTPException(status_code=500, detail="Failed to generate features from price/news data.")
+        raise HTTPException(500, "Failed to generate features from price/news data.")
 
     logger.debug(f"Feature row:\n{feature_row}")
 
@@ -226,7 +225,7 @@ def post_predict_from_raw(
         yhat = model.predict(X)  # shape (1, H) or (1,)
     except Exception:
         logger.exception("Model prediction failed")
-        raise HTTPException(status_code=500, detail="Prediction failed.")
+        raise HTTPException(500, "Prediction failed.")
 
     yhat = np.asarray(yhat).reshape(1, -1)
 
@@ -259,12 +258,12 @@ def post_predict_from_raw(
             "log_return_path": lr_path.tolist(),
             "predicted_price_path": [float(x) for x in price_path],
             "predicted_dates": future_dates.strftime("%Y-%m-%d").tolist(),
-            "last_date": pd.to_datetime(price_df["date"].iloc[-1]).strftime("%Y-%m-%d"),
+            "last_date": pd.to_datetime(price_df["date"].iloc[-1]).date(),
         })
 
     return PredictionResponse(**response_kwargs)
 
-def _ollama_alive(url: str = "http://localhost:11434/api/tags", timeout: float = 1.0) -> bool:
+def _ollama_alive(url: str, timeout: float = 1.0) -> bool:
     try:
         requests.get(url, timeout=timeout)
         return True

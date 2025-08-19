@@ -28,7 +28,7 @@ class PredictionRequest(BaseModel):
     - A list of news headlines
     """
     price: List[PriceRow]
-    news: Optional[List[NewsRow]] = []
+    news: Optional[List[NewsRow]] = None
 
 class PriceHistoryResponse(BaseModel):
     """Schema for price history response."""
@@ -45,7 +45,7 @@ class PredictionResponse(BaseModel):
     log_return: float
     current_price: float
     predicted_price: float
-    log_return_path: Optional[List[float]]
-    predicted_price_path: Optional[List[float]]
-    predicted_dates: Optional[List[date]]
-    last_date: Optional[date]
+    log_return_path: Optional[List[float]] = None
+    predicted_price_path: Optional[List[float]] = None
+    predicted_dates: Optional[List[date]] = None
+    last_date: Optional[date] = None

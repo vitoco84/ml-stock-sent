@@ -34,3 +34,6 @@ Thumbs.db
 # Docker
 *.tar
 *.lock
+
+# Secrets
+secrets.*

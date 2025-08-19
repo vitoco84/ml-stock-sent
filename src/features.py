@@ -1,3 +1,5 @@
+from typing import Optional
+
 import numpy as np
 import pandas as pd
 import ta
@@ -51,7 +53,6 @@ def create_features_and_target(df: pd.DataFrame, forecast_horizon: int = 1) -> p
     df['h_bollinger'] = bollinger_hband(df['log_return'])
     df['l_bollinger'] = bollinger_lband(df['log_return'])
 
-    # Optional -> Shorter lags -> [1, 2, 3, 5, 10, 20, 25]:
     for lag in [5, 10, 25]:
         df[f'lag_{lag}'] = df['log_return'].shift(lag)
         df[f'sma_{lag}'] = ta.trend.sma_indicator(df['log_return'], lag)
@@ -70,7 +71,7 @@ def create_features_and_target(df: pd.DataFrame, forecast_horizon: int = 1) -> p
 
 def generate_full_feature_row(
         price_df: pd.DataFrame,
-        news_df: pd.DataFrame,
+        news_df: Optional[pd.DataFrame],
         sentiment_model: FinBERT | None,
         horizon: int = 30
 ) -> pd.DataFrame:

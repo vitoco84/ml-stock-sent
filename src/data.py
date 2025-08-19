@@ -89,7 +89,6 @@ def time_series_split(
 def get_price_history(symbol: str, end_date: str, days: int = 90) -> pd.DataFrame:
     """Fetch Prices from Yahoo Finance."""
     end = pd.to_datetime(end_date)
-    # cushion to cover weekends/holidays and ensure trading days >= days
     start = end - pd.Timedelta(days=int(days * 2.0))
 
     df = yf.download(
@@ -117,12 +116,11 @@ def get_price_history(symbol: str, end_date: str, days: int = 90) -> pd.DataFram
 
     return df[["date", "open", "high", "low", "close", "adj_close", "volume"]]
 
-def get_news_history(query: str, end_date: str, days: int, api_key: str) -> pd.DataFrame:
+def get_news_history(query: str, end_date: str, days: int, api_key: str, url: str) -> pd.DataFrame:
     """Fetch NEws from NewsAPI."""
     to_date = datetime.strptime(end_date, "%Y-%m-%d")
     from_date = to_date - timedelta(days=days)
 
-    url = "https://newsapi.org/v2/everything"
     params = {
         "q": query,
         "from": from_date.strftime("%Y-%m-%d"),

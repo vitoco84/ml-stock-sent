@@ -5,10 +5,10 @@ import joblib
 import numpy as np
 from sklearn.base import clone, TransformerMixin
 from sklearn.model_selection import TimeSeriesSplit
-from sklearn.preprocessing import StandardScaler
 
 from src.logger import get_logger
 from src.metrics import metrics
+from src.scaler import SafeStandardScaler
 
 
 class ModelTrainer:
@@ -25,23 +25,23 @@ class ModelTrainer:
         self.name = name
         self.config = config
         self.output_path = Path(output_path)
-        self.preprocessor = preprocessor or StandardScaler()
+        self.preprocessor = preprocessor or SafeStandardScaler()
         self.y_scale = y_scale
-        self.y_scaler: Optional[StandardScaler] = None
+        self.y_scaler: Optional[SafeStandardScaler] = None
 
         self.logger = get_logger(self.__class__.__name__)
         self.logger.info(f"Initialized ModelTrainer for model: {name}")
 
     def fit(self, X_train, y_train, X_val=None, y_val=None, best_params: Optional[dict] = None):
         self.logger.info("Starting model training...")
-        scaler: StandardScaler | object = clone(self.preprocessor)
+        scaler: SafeStandardScaler | object = clone(self.preprocessor)
         X_train_scaled = scaler.fit_transform(X_train)
         X_val_scaled = scaler.transform(X_val) if X_val is not None else None
 
         if self.y_scale:
-            self.y_scaler = StandardScaler()
-            y_train_scaled = self.y_scaler.fit_transform(np.asarray(y_train))
-            y_val_scaled = self.y_scaler.transform(np.asarray(y_val)) if y_val is not None else None
+            self.y_scaler = SafeStandardScaler()
+            y_train_scaled = self.y_scaler.fit_transform(y_train)
+            y_val_scaled = self.y_scaler.transform(y_val) if y_val is not None else None
         else:
             y_train_scaled = y_train
             y_val_scaled = y_val
@@ -66,7 +66,7 @@ class ModelTrainer:
         preds = self.model.predict(X_scaled)
 
         if self.y_scale and self.y_scaler is not None:
-            preds = self.y_scaler.inverse_transform(np.asarray(preds))
+            preds = self.y_scaler.inverse_transform(preds)
 
         return metrics(np.asarray(y), preds)
 
@@ -74,7 +74,7 @@ class ModelTrainer:
         X_scaled = self.preprocessor.transform(X)
         preds = self.model.predict(X_scaled)
         if self.y_scale and self.y_scaler is not None:
-            preds = self.y_scaler.inverse_transform(np.asarray(preds))
+            preds = self.y_scaler.inverse_transform(preds)
         return preds
 
     def save(self) -> Path:
@@ -83,8 +83,8 @@ class ModelTrainer:
         joblib.dump({
             "model": self.model,
             "preprocessor": self.preprocessor,
-            "y_scaler": self.y_scaler,  # <-- ADD
-            "y_scale": self.y_scale,  # <-- ADD
+            "y_scaler": self.y_scaler,
+            "y_scale": self.y_scale
         }, str(model_path))
         return model_path
 
@@ -113,9 +113,9 @@ class ModelTrainer:
             X_va_s = pre.transform(X_va)
 
             if self.y_scale:
-                y_sclr = StandardScaler()
-                y_tr_s = y_sclr.fit_transform(np.asarray(y_tr))
-                y_va_s = y_sclr.transform(np.asarray(y_va))
+                y_sclr = SafeStandardScaler()
+                y_tr_s = y_sclr.fit_transform(y_tr)
+                y_va_s = y_sclr.transform(y_va)
             else:
                 y_tr_s, y_va_s = y_tr, y_va
 
@@ -127,7 +127,7 @@ class ModelTrainer:
             preds = candidate.predict(X_va_s)
 
             if self.y_scale:
-                preds = y_sclr.inverse_transform(np.asarray(preds))
+                preds = y_sclr.inverse_transform(preds)
 
             m = metrics(np.asarray(y_va), preds)[metric_name]
             scores.append(-m if higher_is_better else m)

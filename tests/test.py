@@ -1,5 +1,6 @@
 import json
 import os
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -49,28 +50,38 @@ def test_convert_log_return_basic():
     assert abs(future_price - 110.0) < 0.01
 
 def test_config_loads_yaml_and_resolves_paths():
-    sample_yaml_path = Path("tests/test_config.yaml")
-    sample_yaml_path.write_text("""
-    general:
-      name: "simple-test"
-    data:
-      raw_dir: "../data/raw"
-    model:
-      path: "../data/models/model.pkl"
-    """)
+    with tempfile.NamedTemporaryFile("w+", suffix=".yaml", delete=False) as tmp:
+        tmp_path = Path(tmp.name)
+        tmp.write("""
+        general:
+          name: "simple-test"
+        data:
+          raw_dir: "../data/raw"
+        model:
+          path: "../data/models/model.pkl"
+        urls:
+          api: "http://localhost:8000"
+        """)
+        tmp.flush()
 
-    config = Config(sample_yaml_path)
+    try:
+        config = Config(tmp_path)
 
-    assert config.general.name == "simple-test"
-    assert isinstance(config.data.raw_dir, Path)
-    assert config.data.raw_dir.is_absolute()
-    assert config.data.raw_dir.name == "raw"
+        assert config.general.name == "simple-test"
 
-    assert isinstance(config.model.path, Path)
-    assert config.model.path.is_absolute()
-    assert config.model.path.name == "model.pkl"
+        assert isinstance(config.data.raw_dir, Path)
+        assert config.data.raw_dir.is_absolute()
+        assert config.data.raw_dir.name == "raw"
 
-    sample_yaml_path.unlink()
+        assert isinstance(config.model.path, Path)
+        assert config.model.path.is_absolute()
+        assert config.model.path.name == "model.pkl"
+
+        assert isinstance(config.urls.api, str)
+        assert config.urls.api == "http://localhost:8000"
+
+    finally:
+        tmp_path.unlink()
 
 def test_rename_columns():
     df = pd.DataFrame(columns=["Open", "Adj Close ", " Volume"])
@@ -122,9 +133,9 @@ def test_linear_elasticnet_singleoutput(config):
     assert preds.shape == (10,)
 
 def test_root(client):
-    response = client.get("/")
+    response = client.get("/healthz")
     assert response.status_code == 200
-    assert response.json() == {"message": "API is up and running!"}
+    assert response.json() == {"ok": True}
 
 @pytest.mark.integration
 def test_price_history(client):
@@ -146,13 +157,12 @@ def test_price_history(client):
         assert expected_keys.issubset(set(row.keys()))
 
 @pytest.mark.integration
-@pytest.mark.skipif(
-    not os.getenv("NEWS_API_KEY"),
-    reason="NEWS_API_KEY not set"
-)
-def test_news_history(client):
-    end_date = datetime.today().strftime("%Y-%m-%d")
+def test_news_history_integration(client, monkeypatch):
+    key = os.getenv("NEWS_API_KEY") or "placeholder"
+    monkeypatch.setenv("NEWS_API_KEY", key)
+    client.app.state.news_api_key = key
 
+    end_date = datetime.today().strftime("%Y-%m-%d")
     response = client.get("/news-history", params={
         "query": "Apple",
         "end_date": end_date,
@@ -160,9 +170,7 @@ def test_news_history(client):
     })
 
     assert response.status_code == 200
-
     data = response.json()
-
     assert "news" in data
     assert isinstance(data["news"], list)
 
@@ -180,7 +188,7 @@ def test_predict_raw_from_file():
         assert {"log_return", "current_price", "predicted_price"} <= data.keys()
 
 def test_enrich_news_fills_missing_dates(monkeypatch):
-    def fake_generate(symbol, dates, model="llama3"):
+    def fake_generate(symbol, dates, model="llama3", url_llm=None):
         return [{"date": d, "rank": "top1", "headline": f"{symbol} test headline for {d}"} for d in dates]
 
     monkeypatch.setattr("src.llm.generate_local_headlines", fake_generate)
@@ -188,7 +196,7 @@ def test_enrich_news_fills_missing_dates(monkeypatch):
     price_dates = ["2024-08-01", "2024-08-02", "2024-08-03"]
     real_news = [{"date": "2024-08-01", "rank": "top1", "headline": "Real news"}]
 
-    enriched = enrich_news_with_generated(price_dates, real_news, "AAPL")
+    enriched = enrich_news_with_generated(price_dates, real_news, "AAPL", "url_llm", "llama3")
 
     assert len(enriched) == 3
     dates = [r["date"] for r in enriched]

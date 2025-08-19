@@ -10,7 +10,12 @@ from src.annotations import tested
 logger = get_logger(__name__)
 
 @tested
-def generate_local_headlines(symbol: str, dates: List[str], model: str = "llama3") -> List[dict]:
+def generate_local_headlines(
+        symbol: str,
+        dates: List[str],
+        url: str,
+        model: str = "llama3"
+) -> List[dict]:
     logger.info(f"Generating {len(dates)} local headlines via LLM ({model}) for {symbol}")
     headlines = []
 
@@ -22,7 +27,7 @@ def generate_local_headlines(symbol: str, dates: List[str], model: str = "llama3
         logger.info(f"Prompting LLM for {date}: {prompt}")
 
         try:
-            response = requests.post("http://localhost:11434/api/generate", json={
+            response = requests.post(url, json={
                 "model": model,
                 "prompt": prompt,
                 "stream": False
@@ -44,7 +49,7 @@ def generate_local_headlines(symbol: str, dates: List[str], model: str = "llama3
     return headlines
 
 @tested
-def enrich_news_with_generated(price_dates: List[str], real_news: List[dict], symbol: str) -> List[dict]:
+def enrich_news_with_generated(price_dates: List[str], real_news: List[dict], symbol: str, url_llm: str, model_llm: str) -> List[dict]:
     logger.info("Enriching news with generated headlines (LLM)")
 
     price_dates = sorted(set(pd.to_datetime(price_dates).strftime("%Y-%m-%d")))
@@ -63,7 +68,7 @@ def enrich_news_with_generated(price_dates: List[str], real_news: List[dict], sy
 
     logger.info(f"Missing dates for LLM generation: {missing_dates[:3]}... total: {len(missing_dates)}")
 
-    generated_news = generate_local_headlines(symbol, missing_dates)
+    generated_news = generate_local_headlines(symbol, missing_dates, url_llm, model_llm)
 
     enriched = real_news_df.to_dict(orient="records") + generated_news
 

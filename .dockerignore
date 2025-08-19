@@ -1,0 +1,29 @@
+# Python cruft
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# VCS & build
+.git/
+.gitignore
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+ruff_cache/
+
+# Data & models (keeps builds small / avoids long paths)
+hf-cache/
+.hf/
+.hf_cache/
+data/
+models/
+notebooks/
+
+# OS/IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

@@ -1,27 +1,48 @@
-import pandas as pd
 import shap
+from sklearn.multioutput import MultiOutputRegressor
+from sklearn.linear_model import ElasticNet, LinearRegression
+from sklearn.ensemble import RandomForestRegressor
 
+class SHAPExplainer:
+    def __init__(self, model, preprocessor, background_data):
+        self.model = self._unwrap(model)
+        self.preprocessor = preprocessor
+        self.X_bg = self.preprocessor.transform(background_data)
 
-def run_shap(model, preprocessor, X_raw, sample_size=50, background_size=20, y_scaler=None):
-    """Evaluate SHAP."""
-    # Preprocess features
-    X_preprocessed = preprocessor.transform(X_raw)
-    feature_names = getattr(preprocessor, "get_feature_names_out", lambda: X_raw.columns)()
+    def explain(self, X):
+        X_proc = self.preprocessor.transform(X)
 
-    # Wrap into DataFrame so SHAP knows feature names
-    X_sample = pd.DataFrame(X_preprocessed[:sample_size], columns=feature_names)
+        if isinstance(self.model, MultiOutputRegressor):
+            return [self._explain_single(est, X_proc) for est in self.model.estimators_]
+        else:
+            return self._explain_single(self.model, X_proc)
 
-    # Background for KernelExplainer
-    # background = shap.kmeans(X_sample, background_size)
-    background = shap.kmeans(X_sample, min(background_size, len(X_sample)))
+    def _explain_single(self, model, X_proc):
+        model = self._unwrap(model)
+        model_type = self._infer_model_type(model)
 
-    # Explainer
-    explainer = shap.KernelExplainer(model.predict, background)
-    shap_values = explainer(X_sample)
+        if model_type == "tree":
+            explainer = shap.Explainer(model, self.X_bg)
+        elif model_type == "linear":
+            explainer = shap.LinearExplainer(model, self.X_bg)
+        else:
+            explainer = shap.KernelExplainer(model.predict, self.X_bg[:50])
 
-    # If y_scaler is provided and this is single-output → rescale SHAP values
-    if y_scaler is not None and shap_values.values.ndim == 2:
-        shap_values.values = shap_values.values * y_scaler.scale_
-        shap_values.base_values = shap_values.base_values * y_scaler.scale_ + y_scaler.mean_
+        return explainer.shap_values(X_proc)
 
-    return shap_values
+    def _unwrap(self, model):
+        return getattr(model, "model", model)
+
+    def _infer_model_type(self, model):
+        try:
+            from xgboost import XGBRegressor
+            from lightgbm import LGBMRegressor
+        except ImportError:
+            XGBRegressor = LGBMRegressor = object
+
+        if isinstance(model, (RandomForestRegressor, XGBRegressor, LGBMRegressor)):
+            return "tree"
+        elif isinstance(model, (ElasticNet, LinearRegression)):
+            return "linear"
+        else:
+            return "kernel"

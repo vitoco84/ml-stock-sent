@@ -39,7 +39,7 @@ class FinBERT:
         with torch.no_grad():
             logits = self.classifier(**inputs).logits
         probs = torch.nn.functional.softmax(logits, dim=1).cpu().numpy()
-        return [{"pos": p[0], "neu": p[1], "neg": p[2], "pos_minus_neg": p[0] - p[2]} for p in probs]
+        return [{"neu": p[0], "pos": p[1], "neg": p[2], "pos_minus_neg": p[1] - p[2]} for p in probs]
 
     def _get_embeddings(self, texts: Union[str, List[str]]) -> pd.Series:
         inputs = self._prepare_inputs(texts)

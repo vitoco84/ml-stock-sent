@@ -7,7 +7,7 @@ trap 'echo "Shutting down…"; kill 0 2>/dev/null || true' INT TERM EXIT
 # Config
 API_APP="app.api.main:app"
 API_PORT="${API_PORT:-8000}"
-UI_APP="app/streamlit/ui.py"
+UI_APP="app/ui/ui.py"
 
 # Start Ollama if not running
 if ! pgrep -x ollama >/dev/null; then

@@ -8,7 +8,7 @@ import seaborn as sns
 from statsmodels.graphics.tsaplots import plot_acf
 
 
-ADJ_CLOSE  = "Adj Close"
+ADJ_CLOSE = "Adj Close"
 
 def plot_price_series(df: pd.DataFrame, path: Path) -> None:
     plt.figure(figsize=(10, 4))
@@ -24,48 +24,101 @@ def plot_price_series(df: pd.DataFrame, path: Path) -> None:
 
 def plot_price_overlay(
         df_feat: pd.DataFrame,
-        X_test: pd.DataFrame,
-        y_pred: pd.Series,
-        path: Path
+        X_test: pd.DataFrame | None = None,
+        y_pred: pd.Series | None = None,
+        path: Path | None = None,
+        *,
+        lr1: float | None = None,
+        anchor_idx: int | None = None
 ):
-    idx = X_test.index.to_numpy()
-    valid = idx + 1 < len(df_feat)
-    idx, idx1 = idx[valid], idx[valid] + 1
+    ADJ_CLOSE = "Adj Close"
 
-    dates = pd.to_datetime(df_feat.loc[idx1, "date"])
-    actual = df_feat.loc[idx1, "adj_close"].to_numpy(float)
-    pred = df_feat.loc[idx, "adj_close"].to_numpy(float) * np.exp(y_pred[valid, 0])
+    if lr1 is not None and anchor_idx is not None:
+        idx0, idx1 = anchor_idx, anchor_idx + 1
+        if idx1 >= len(df_feat):
+            raise ValueError("Not enough future rows to plot H=1 overlay (idx1 out of range).")
 
-    plt.figure(figsize=(12, 5))
-    plt.plot(dates, actual, label="Actual (t+1)", linewidth=2)
-    plt.plot(dates, pred, label="Predicted (t+1)", linestyle="--", linewidth=2)
+        d1 = pd.to_datetime(df_feat.iloc[idx1]["date"])
+        actual = float(df_feat.iloc[idx1]["adj_close"])
+        start_price = float(df_feat.iloc[idx0]["adj_close"])
+        pred = start_price * float(np.exp(lr1))
+
+        dates = [d1]
+        actual_vals = [actual]
+        pred_vals = [pred]
+
+        plt.figure(figsize=(12, 5))
+        plt.plot(dates, actual_vals, label="Actual (t+1)", linewidth=2, marker="o")
+        plt.plot(dates, pred_vals, label="Predicted (t+1)", linestyle="--", linewidth=2, marker="o")
+
+        ymin = min(actual, pred)
+        ymax = max(actual, pred)
+        pad = max(1e-6, 0.002 * max(abs(ymin), abs(ymax)))
+        plt.ylim(ymin - pad, ymax + pad)
+
+    else:
+        idx = X_test.index.to_numpy()
+        valid = idx + 1 < len(df_feat)
+        idx, idx1 = idx[valid], idx[valid] + 1
+
+        dates = pd.to_datetime(df_feat.loc[idx1, "date"])
+        actual_vals = df_feat.loc[idx1, "adj_close"].to_numpy(float)
+        pred_vals = df_feat.loc[idx, "adj_close"].to_numpy(float) * np.exp(y_pred[valid, 0])
+
+        plt.figure(figsize=(12, 5))
+        plt.plot(dates, actual_vals, label="Actual (t+1)", linewidth=2)
+        plt.plot(dates, pred_vals, label="Predicted (t+1)", linestyle="--", linewidth=2)
+
     plt.title("Actual vs Predicted Adj Close (H=1)")
     plt.xlabel("Date")
     plt.ylabel(ADJ_CLOSE)
     plt.legend()
     plt.grid(True, alpha=0.25)
     plt.tight_layout()
-    plt.savefig(path)
+    if path is not None:
+        plt.savefig(path)
     plt.show()
 
 def plot_price_overlay_next_30(
         df_feat: pd.DataFrame,
-        test_df: pd.DataFrame,
-        y_pred: pd.Series,
-        horizon: int,
-        hist_window: int,
-        path: Path
+        test_df: pd.DataFrame | None = None,
+        y_pred: pd.Series | None = None,
+        horizon: int = 30,
+        hist_window: int = 200,
+        path: Path | None = None,
+        *,
+        lr_path: np.ndarray | None = None,
+        anchor_idx: int | None = None
 ):
-    anchor_idx = int(test_df.index[-1])
-    anchor_date = pd.to_datetime(df_feat.loc[anchor_idx, "date"])
-    start_price = float(df_feat.loc[anchor_idx, "adj_close"])
+    if lr_path is not None and anchor_idx is not None:
+        lr_path = np.asarray(lr_path, dtype=float).ravel()
+        H = int(len(lr_path))
+        if H == 0:
+            raise ValueError("lr_path is empty.")
+        horizon = H
 
-    pred_lr = np.asarray(y_pred[-1]).reshape(-1)[:horizon]
-    pred_price_path = start_price * np.exp(np.cumsum(pred_lr))
+        if anchor_idx + 1 + horizon > len(df_feat):
+            raise ValueError("Not enough future rows to compare against actuals.")
 
-    future = df_feat.iloc[anchor_idx + 1: anchor_idx + 1 + horizon]
-    future_dates = pd.to_datetime(future["date"].to_numpy())
-    actual_price_path = future["adj_close"].to_numpy()
+        anchor_date = pd.to_datetime(df_feat.iloc[anchor_idx]["date"])
+        start_price = float(df_feat.iloc[anchor_idx]["adj_close"])
+        pred_price_path = start_price * np.exp(np.cumsum(lr_path))
+
+        future = df_feat.iloc[anchor_idx + 1: anchor_idx + 1 + horizon]
+        future_dates = pd.to_datetime(future["date"].to_numpy())
+        actual_price_path = future["adj_close"].to_numpy(float)
+
+    else:
+        anchor_idx = int(test_df.index[-1])
+        anchor_date = pd.to_datetime(df_feat.loc[anchor_idx, "date"])
+        start_price = float(df_feat.loc[anchor_idx, "adj_close"])
+
+        pred_lr = np.asarray(y_pred[-1]).reshape(-1)[:horizon]
+        pred_price_path = start_price * np.exp(np.cumsum(pred_lr))
+
+        future = df_feat.iloc[anchor_idx + 1: anchor_idx + 1 + horizon]
+        future_dates = pd.to_datetime(future["date"].to_numpy())
+        actual_price_path = future["adj_close"].to_numpy()
 
     hist = df_feat.iloc[max(0, anchor_idx - hist_window + 1): anchor_idx + 1].copy()
     hist["date"] = pd.to_datetime(hist["date"])
@@ -81,7 +134,8 @@ def plot_price_overlay_next_30(
     plt.legend()
     plt.grid(True, alpha=0.25)
     plt.tight_layout()
-    plt.savefig(path)
+    if path is not None:
+        plt.savefig(path)
     plt.show()
 
 def plot_correlation_heatmap(df: pd.DataFrame, col: List[str], path: Path, figsize: Tuple = (8, 5)):
