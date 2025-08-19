@@ -58,7 +58,7 @@ if mode == "Upload CSVs":
     if news_file:
         news_df = load_csv(news_file)
         if "rank" in news_df.columns:
-            news_df["rank"] = news_df["rank"].astype(str)  # backend expects string
+            news_df["rank"] = news_df["rank"].astype(str)
         st.session_state.news_csv_df = news_df
         st.success(f"Loaded {len(news_df)} news rows")
 
