@@ -17,7 +17,7 @@ class PriceRow(BaseModel):
 class NewsRow(BaseModel):
     """Schema for a single news headline."""
     date: date
-    rank: str
+    rank: int
     headline: str
 
 class PredictionRequest(BaseModel):

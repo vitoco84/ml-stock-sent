@@ -166,9 +166,28 @@ def post_predict_from_raw(
 
     # --- PRICE ---
     try:
-        price_rows = [row.model_dump() for row in request_body.price]
+        if not getattr(request_body, "price", None):
+            raise HTTPException(422, "`price` is required and must be a non-empty list.")
+
+        def to_dict(row):
+            if hasattr(row, "model_dump"):  # Pydantic v2
+                return row.model_dump()
+            if hasattr(row, "dict"):  # Pydantic v1
+                return row.dict()
+            if isinstance(row, dict):  # plain dict (e.g., from CSV via UI)
+                return row
+            raise TypeError(f"Unsupported price row type: {type(row)}")
+
+        price_rows = [to_dict(row) for row in request_body.price]
+    except HTTPException:
+        raise
     except Exception:
-        raise HTTPException(422, "`price` is required and must be a non-empty list.")
+        logger.exception("Invalid `price` payload")
+        raise HTTPException(
+            422,
+            "`price` payload malformed. Expect a list of rows with "
+            "{date, open, high, low, close, adj_close, volume}."
+        )
 
     price_df = pd.DataFrame(price_rows)
     price_df["date"] = pd.to_datetime(price_df["date"]).dt.normalize()
@@ -179,9 +198,19 @@ def post_predict_from_raw(
     # --- NEWS ---
     news_payload = getattr(request_body, "news", None) or []
     if len(news_payload) > 0:
-        news_df = pd.DataFrame([row.model_dump() for row in request_body.news])
-        news_df["date"] = pd.to_datetime(news_df["date"]).dt.normalize()
-        logger.info(f"News DF:\n{news_df.tail()}")
+        try:
+            def to_news_dict(row):
+                if hasattr(row, "model_dump"): return row.model_dump()
+                if hasattr(row, "dict"):       return row.dict()
+                if isinstance(row, dict):      return row
+                raise TypeError(type(row))
+
+            news_df = pd.DataFrame([to_news_dict(row) for row in request_body.news])
+            news_df["date"] = pd.to_datetime(news_df["date"]).dt.normalize()
+            logger.info(f"News DF:\n{news_df.tail()}")
+        except Exception:
+            logger.exception("Invalid `news` payload")
+            raise HTTPException(422, "`news` payload malformed. Expect list of {date, rank, headline}.")
     else:
         news_df = pd.DataFrame(columns=["date", "rank", "headline"])
         logger.info("No initial news provided.")

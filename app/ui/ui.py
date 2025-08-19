@@ -13,7 +13,8 @@ st.set_page_config(page_title="Stock Prediction App", layout="centered")
 API_URL = os.getenv("API_URL", "http://localhost:8000")
 st.caption(f"Using API_URL: {API_URL}")
 
-REQUEST_TIMEOUT = 3.05
+# slightly longer timeout for model inference
+REQUEST_TIMEOUT = 15
 
 @st.cache_resource
 def http():
@@ -106,7 +107,14 @@ if predict_btn:
                 )
                 response.raise_for_status()
             except requests.RequestException as e:
-                st.error(f"Prediction failed: {e}")
+                if getattr(e, "response", None) is not None:
+                    try:
+                        err_json = e.response.json()
+                    except Exception:
+                        err_json = e.response.text
+                    st.error(f"Prediction failed [{e.response.status_code}]: {err_json}")
+                else:
+                    st.error(f"Prediction failed: {e}")
             else:
                 result = response.json()
                 st.success("Prediction Complete")
