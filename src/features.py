@@ -73,15 +73,18 @@ def generate_full_feature_row(
         price_df: pd.DataFrame,
         news_df: Optional[pd.DataFrame],
         sentiment_model: FinBERT | None,
-        horizon: int = 30
+        horizon: int = 30,
+        max_embedding_dims: int = 17
 ) -> pd.DataFrame:
     """Generate a full feature row."""
     if sentiment_model is None or news_df is None or news_df.empty:
-        daily_sentiment = pd.DataFrame({
-            "date": price_df["date"].copy(),
-            "sentiment": 0.0,
-            "sentiment_score": 0.0
-        })
+        daily_sentiment = pd.DataFrame({"date": price_df["date"].copy()})
+        daily_sentiment["pos"] = 0.0
+        daily_sentiment["neg"] = 0.0
+        daily_sentiment["neu"] = 0.0
+        daily_sentiment["pos_minus_neg"] = 0.0
+        for i in range(max_embedding_dims):
+            daily_sentiment[f"emb_{i}"] = 0.0
     else:
         enriched_news = sentiment_model.transform(news_df)
         daily_sentiment = sentiment_model.aggregate_daily(enriched_news)

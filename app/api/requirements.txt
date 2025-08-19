@@ -24,4 +24,4 @@ tqdm==4.67.1
 transformers==4.55.2
 xgboost==3.0.4
 yfinance==0.2.65
-uvicorn[standard]==0.30.6
+uvicorn[standard]>=0.30
