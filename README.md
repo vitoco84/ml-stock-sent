@@ -270,8 +270,8 @@ pipreqs src     --force --savepath app/api/req-src.txt
 ```
 Build & run:
 ```bash
-docker compose build --no-cache
-docker compose up
+docker compose build --no-cache # clean rebuild
+docker compose up --build # reuse images
 ```
 Stop:
 ```bash
