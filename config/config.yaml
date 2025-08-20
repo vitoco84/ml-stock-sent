@@ -13,6 +13,9 @@ data:
   name_prices: "djia_table.csv"
   name_prices_sentiment: "prices_with_sentiment_table.csv"
   name_features_full: "features_full_table.csv"
+  results_direct_multi_step: "results_direct_multi_step.csv"
+  results_direct_multi_step_wo_sent: "results_direct_multi_step_wo_sent.csv"
+  results_recursive_forecast: "results_recursive_forecast.csv"
 
 runtime:
   n_jobs: 24
@@ -22,3 +25,4 @@ model:
   path_dir: "../data/models"
   enet_mo_best_1: "enet_mo_1.pkl"
   enet_mo_best_30: "enet_mo_30.pkl"
+  enet_mo_best_wo_sent_30: "enet_mo_wo_sent_30.pkl"

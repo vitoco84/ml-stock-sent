@@ -8,7 +8,6 @@ import yfinance as yf
 from joblib import Memory
 
 from src.logger import get_logger
-from src.utils import load_csv
 
 
 logger = get_logger(__name__)
@@ -21,14 +20,14 @@ def _rename_columns(df: pd.DataFrame) -> None:
 
 def load_price(path: Path) -> pd.DataFrame:
     """Loads Price Dataset."""
-    df = load_csv(Path(path))
+    df = pd.read_csv(Path(path))
     _rename_columns(df)
     df["date"] = pd.to_datetime(df["date"])
     return df.sort_values("date").reset_index(drop=True)
 
 def load_news(path: Path) -> pd.DataFrame:
     """Loads News Dataset."""
-    df = load_csv(Path(path))
+    df = pd.read_csv(Path(path))
     _rename_columns(df)
     top_cols = [c for c in df.columns if c.startswith("top")]
     df = df.melt(
@@ -44,7 +43,7 @@ def load_news(path: Path) -> pd.DataFrame:
 def load_prices_sentiment(path: Path) -> pd.DataFrame:
     """Loads Combined Sentiment with Prices Dataset."""
     try:
-        df = load_csv(Path(path))
+        df = pd.read_csv(Path(path))
         df["date"] = pd.to_datetime(df["date"])
         df = df.sort_values("date").reset_index(drop=True)
     except FileNotFoundError:

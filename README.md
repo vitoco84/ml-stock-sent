@@ -213,6 +213,7 @@ curl -X POST "http://localhost:8000/predict-raw?symbol=AAPL&horizon=5&return_pat
 4. **04_train_forecast.ipynb** – Model training & hyperparameter tuning (Optuna)
 5. **05_train_recursive_forecast.ipynb** – Recursive forecasting
 6. **06_shap.ipynb** – Model evaluation & interpretability
+7. **07_train_wo_sentiment.ipynb** - Model training without Sentiment
 
 ---
 
@@ -307,14 +308,12 @@ This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for d
 - [ ] Implement **Random Forest Regressor**
 - [ ] Implement **Neural Network (MLP)**
 - [ ] Implement **LSTM** for sequential modeling
-- [ ] Add **ensemble method** (averaging or stacking top models)
 - [ ] Write **academic-style report** (thesis-like)
-- [ ] Prepare **10-slide PowerPoint** for presentation
+- [ ] Prepare **PowerPoint** presentation
+- [ ] Add **ensemble method** (averaging or stacking top models)
 - [ ] Deploy demo API + Streamlit to cloud (Render / Fly.io / AWS)
 - [ ] If deployed:
     - [ ] Add authentication
     - [ ] Add rate-limiting
     - [ ] Add request logging
 - [ ] Add monitoring & logging integration (Prometheus/Grafana)
-- [ ] Plots: residuals = y_true - y_pred , cumulative Return, visualize sentiment trends over time (pos_minus_neg)
-- [ ] UI Bugs: Clear Data when clearing CSVs and make enrich news available for file upload as well
