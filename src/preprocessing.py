@@ -6,10 +6,7 @@ from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
-from src.annotations import tested
 
-
-@tested
 def get_preprocessor(X: pd.DataFrame) -> Tuple[Pipeline, list[str]]:
     """Build a preprocessing pipeline using ColumnTransformer."""
     target_cols = [c for c in X.columns if c == "target" or c.startswith("target_")]

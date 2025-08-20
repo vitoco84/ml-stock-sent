@@ -3,12 +3,12 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import requests
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.classes import NewsHistoryResponse, PredictionRequest, PredictionResponse, PriceHistoryResponse
 from app.api.settings import get_settings
+from app.api.utils import _ollama_alive, LimitUploadSizeMiddleware, to_dict
 from src.config import Config
 from src.data import get_news_history, get_price_history
 from src.features import generate_full_feature_row
@@ -16,7 +16,7 @@ from src.llm import enrich_news_with_generated
 from src.logger import get_logger
 from src.sentiment import FinBERT
 from src.train import ModelTrainer
-from src.utils import is_cuda_available, tested
+from src.utils import is_cuda_available
 
 
 logger = get_logger(__name__)
@@ -67,12 +67,11 @@ app.add_middleware(
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
+app.add_middleware(LimitUploadSizeMiddleware)
 
-@tested
 @app.get("/healthz")
 def healthz(): return {"ok": True}
 
-@tested
 @app.get("/price-history", response_model=PriceHistoryResponse)
 def fetch_price_history(
         symbol: str = Query(..., description="Ticker symbol, e.g., AAPL, ^DJI"),
@@ -104,7 +103,6 @@ def fetch_price_history(
         logger.exception("fetch_price_history failed")
         raise HTTPException(500, "Internal server error")
 
-@tested
 @app.get("/news-history", response_model=NewsHistoryResponse)
 def fetch_news_history(
         request: Request,
@@ -136,7 +134,6 @@ def fetch_news_history(
         logger.exception("fetch_news_history failed")
         raise HTTPException(500, "Internal server error")
 
-@tested
 @app.post("/predict-raw", response_model=PredictionResponse, response_model_exclude_none=True)
 def post_predict_from_raw(
         request_body: PredictionRequest,
@@ -158,26 +155,17 @@ def post_predict_from_raw(
     - **current_price**: Latest price
     - **predicted_price**: Predicted next price
     """
+    horizon = min(horizon, 30)
+
     logger.info("Received prediction request")
 
     sentiment_model = request.app.state.sentiment_model
     model = request.app.state.model
     preprocessor = request.app.state.preprocessor
 
-    # --- PRICE ---
     try:
         if not getattr(request_body, "price", None):
             raise HTTPException(422, "`price` is required and must be a non-empty list.")
-
-        def to_dict(row):
-            if hasattr(row, "model_dump"):  # Pydantic v2
-                return row.model_dump()
-            if hasattr(row, "dict"):  # Pydantic v1
-                return row.dict()
-            if isinstance(row, dict):  # plain dict (e.g., from CSV via UI)
-                return row
-            raise TypeError(f"Unsupported price row type: {type(row)}")
-
         price_rows = [to_dict(row) for row in request_body.price]
     except HTTPException:
         raise
@@ -189,9 +177,18 @@ def post_predict_from_raw(
             "{date, open, high, low, close, adj_close, volume}."
         )
 
+    # --- PRICE ---
     price_df = pd.DataFrame(price_rows)
     price_df["date"] = pd.to_datetime(price_df["date"]).dt.normalize()
     price_df = price_df.sort_values("date").drop_duplicates(subset=["date"], keep="last")
+
+    if price_df.empty:
+        raise HTTPException(422, "Price data is empty or invalid.")
+    if len(price_df) > 2000:
+        raise HTTPException(400, "Price data exceeds 2000-row limit.")
+    if (price_df["date"].max() - price_df["date"].min()).days > 365 * 5:
+        raise HTTPException(400, "Price data spans more than 5 years.")
+
     price_dates = price_df["date"].dt.strftime("%Y-%m-%d").tolist()
     logger.info(f"Price DF:\n{price_df.tail()}")
 
@@ -199,13 +196,11 @@ def post_predict_from_raw(
     news_payload = getattr(request_body, "news", None) or []
     if len(news_payload) > 0:
         try:
-            def to_news_dict(row):
-                if hasattr(row, "model_dump"): return row.model_dump()
-                if hasattr(row, "dict"):       return row.dict()
-                if isinstance(row, dict):      return row
-                raise TypeError(type(row))
+            news_df = pd.DataFrame([to_dict(row) for row in request_body.news])
 
-            news_df = pd.DataFrame([to_news_dict(row) for row in request_body.news])
+            if not news_df.empty and len(news_df) > 2000:
+                raise HTTPException(400, detail="News data exceeds 2000-row limit.")
+
             news_df["date"] = pd.to_datetime(news_df["date"]).dt.normalize()
             logger.info(f"News DF:\n{news_df.tail()}")
         except Exception:
@@ -278,7 +273,7 @@ def post_predict_from_raw(
     }
 
     if return_path:
-        lr_path = yhat[0, :H]  # length H
+        lr_path = yhat[0, :H]
         price_path = current_price * np.exp(np.cumsum(lr_path))
         from pandas.tseries.offsets import BDay
         future_dates = pd.bdate_range(price_df["date"].iloc[-1] + BDay(1), periods=H)
@@ -291,10 +286,3 @@ def post_predict_from_raw(
         })
 
     return PredictionResponse(**response_kwargs)
-
-def _ollama_alive(url: str, timeout: float = 1.0) -> bool:
-    try:
-        requests.get(url, timeout=timeout)
-        return True
-    except Exception:
-        return False

@@ -8,8 +8,10 @@ from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 from src.config import Config
 from src.logger import get_logger
-from src.annotations import tested
+from src.utils import set_seed
 
+
+DEFAULT_FINBERT_MODEL = "yiyanghkust/finbert-tone"
 
 class FinBERT:
     """FinBERT Class: Generate Sentiment scores and Embeddings."""
@@ -18,15 +20,13 @@ class FinBERT:
         self.config = config
         self.device = device if torch.cuda.is_available() and device == "cuda" else "cpu"
         self.max_embedding_dims = max_embedding_dims
-
-        model_name = config.sentiment.model
-
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.classifier = AutoModelForSequenceClassification.from_pretrained(model_name, use_safetensors=True).to(
-            self.device)
+        self.tokenizer = AutoTokenizer.from_pretrained(DEFAULT_FINBERT_MODEL)
+        self.classifier = AutoModelForSequenceClassification.from_pretrained(
+            DEFAULT_FINBERT_MODEL,
+            use_safetensors=True).to(self.device)
         self.embedder = self.classifier.base_model
         self.logger = get_logger(self.__class__.__name__)
-        self.logger.info(f"Loading FinBERT model: {model_name} on device: {self.device}")
+        self.logger.info(f"Loading FinBERT model: {DEFAULT_FINBERT_MODEL} on device: {self.device}")
 
     def _prepare_inputs(self, texts: Union[str, List[str]]) -> Dict[str, torch.Tensor]:
         inputs = self.tokenizer(
@@ -52,13 +52,13 @@ class FinBERT:
         return mean_embeddings
 
     def transform(self, df: pd.DataFrame, text_column: str = "headline", batch_size: int = 32) -> pd.DataFrame:
+        set_seed(self.config.runtime.seed)
+
         df = df.copy()
         texts = df[text_column].tolist()
 
         sentiment_scores = []
         embeddings = []
-
-        self.logger.info(f"Starting FinBERT transform on {len(texts)} texts with batch size {batch_size}")
 
         for i in tqdm(range(0, len(texts), batch_size), desc="FinBERT Batch Processing"):
             batch = texts[i:i + batch_size]
@@ -68,15 +68,12 @@ class FinBERT:
             except Exception as e:
                 self.logger.error(f"Batch {i}-{i + batch_size} failed: {e}")
 
-        self.logger.info("FinBERT embedding and sentiment extraction complete.")
-
         sentiment_df = pd.DataFrame(sentiment_scores)
         emb_dim = embeddings[0].shape[1]
         embedding_df = pd.DataFrame(np.vstack(embeddings), columns=[f"emb_{i}" for i in range(emb_dim)])
 
         return pd.concat([df.reset_index(drop=True), sentiment_df, embedding_df], axis=1)
 
-    @tested
     @staticmethod
     def aggregate_daily(df: pd.DataFrame, text_column: str = "headline") -> pd.DataFrame:
         df = df.copy()

@@ -1,7 +1,8 @@
 from datetime import date
 from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from typing_extensions import Annotated
 
 
 class PriceRow(BaseModel):
@@ -27,8 +28,8 @@ class PredictionRequest(BaseModel):
     - A list of price rows
     - A list of news headlines
     """
-    price: List[PriceRow]
-    news: Optional[List[NewsRow]] = None
+    price: Annotated[list[PriceRow], Field(max_length=2000)]
+    news: Optional[Annotated[list[NewsRow], Field(max_length=2000)]] = None
 
 class PriceHistoryResponse(BaseModel):
     """Schema for price history response."""

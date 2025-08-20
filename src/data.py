@@ -7,12 +7,11 @@ import requests
 import yfinance as yf
 
 from src.logger import get_logger
-from src.utils import load_csv, tested
+from src.utils import load_csv
 
 
 logger = get_logger(__name__)
 
-@tested
 def _rename_columns(df: pd.DataFrame) -> None:
     """Rename the columns of the dataframe to lower case."""
     df.columns = [col.strip().lower().replace(" ", "_") for col in df.columns]
@@ -39,7 +38,6 @@ def load_news(path: Path) -> pd.DataFrame:
     df["date"] = pd.to_datetime(df["date"])
     return df.sort_values("date").reset_index(drop=True)
 
-@tested
 def load_prices_sentiment(path: Path) -> pd.DataFrame:
     """Loads Combined Sentiment with Prices Dataset."""
     try:
@@ -59,7 +57,6 @@ def merge_price_news(price: pd.DataFrame, news: pd.DataFrame) -> pd.DataFrame:
         .reset_index(drop=True)
     )
 
-@tested
 def time_series_split(
         df: pd.DataFrame,
         train_ratio: float = 0.8,
@@ -135,10 +132,13 @@ def get_news_history(query: str, end_date: str, days: int, api_key: str, url: st
     response.raise_for_status()
     articles = response.json().get("articles", [])
 
+    if not articles:
+        logger.warning("No articles returned from NewsAPI.")
+
     records = [
         {
             "date": article["publishedAt"][:10],
-            "rank": "top1",  # Default value
+            "rank": 1,  # Default value
             "headline": article["title"]
         }
         for article in articles

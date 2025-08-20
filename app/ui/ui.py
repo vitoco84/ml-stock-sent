@@ -1,4 +1,5 @@
 import os
+import re
 from datetime import datetime
 from typing import Optional
 
@@ -11,7 +12,9 @@ import streamlit as st
 st.set_page_config(page_title="Stock Prediction App", layout="centered")
 
 API_URL = os.getenv("API_URL", "http://localhost:8000")
-REQUEST_TIMEOUT = 5.0
+CONNECT_TIMEOUT = 5.0
+READ_TIMEOUT_FETCH = 15.0
+READ_TIMEOUT_PREDICT = 180.0
 
 @st.cache_resource
 def http():
@@ -24,7 +27,6 @@ HTTP = http()
 st.title("Stock Prediction App (FinBERT + LLM)")
 st.caption(f"Using API_URL: {API_URL}")
 
-# ---------- Helpers ----------
 def load_csv(file, date_col: str = "date") -> Optional[pd.DataFrame]:
     if file is None:
         return None
@@ -41,14 +43,20 @@ def clear_csv_state():
     for k in ["price_csv_df", "news_csv_df"]:
         st.session_state.pop(k, None)
 
-# ---------- Mode ----------
+def symbol_valid():
+    if not re.fullmatch(r"[\w^]+", symbol):
+        st.error("Invalid symbol format.")
+        st.stop()
+
 mode = st.radio("Data source", ["Fetch from API", "Upload CSVs"], horizontal=True)
+
 
 if mode == "Upload CSVs":
     clear_fetch_state()
     st.subheader("Upload CSVs")
-    price_file = st.file_uploader("Prices CSV (date, open, high, low, close, adj_close, volume)", type=["csv"],
-                                  key="price_upl")
+    price_file = st.file_uploader(
+        "Prices CSV (date, open, high, low, close, adj_close, volume)", type=["csv"], key="price_upl"
+    )
     news_file = st.file_uploader("News CSV (date, rank, headline)", type=["csv"], key="news_upl")
 
     if price_file:
@@ -68,9 +76,10 @@ else:
     clear_csv_state()
     with st.form("fetch_controls"):
         symbol = st.text_input("Ticker Symbol", value=st.session_state.get("symbol", "AAPL"))
+        symbol_valid()
         end_date = st.date_input("End Date", value=st.session_state.get("end_date", datetime.today()))
         days = st.slider("Lookback Days", min_value=30, max_value=365, value=int(st.session_state.get("days", 90)))
-        enrich_flag = st.checkbox("Enrich with LLM if headlines missing", value=False)
+        st.checkbox("Enrich with LLM if headlines missing", key="enrich_flag", value=False)
 
         st.subheader("Optional headlines for today")
         news_input = []
@@ -91,7 +100,7 @@ else:
                 r = HTTP.get(
                     f"{API_URL}/price-history",
                     params={"symbol": symbol, "end_date": end_date.strftime("%Y-%m-%d"), "days": int(days)},
-                    timeout=REQUEST_TIMEOUT,
+                    timeout=(CONNECT_TIMEOUT, READ_TIMEOUT_FETCH),
                 )
                 r.raise_for_status()
                 data = r.json()
@@ -110,7 +119,6 @@ else:
                 else:
                     st.warning("No price data returned.")
 
-# ---------- Predict ----------
 if predict_btn:
     if mode == "Upload CSVs":
         price_df = st.session_state.get("price_csv_df")
@@ -119,13 +127,8 @@ if predict_btn:
             st.stop()
         news_df = st.session_state.get("news_csv_df")
         news_records = news_df.to_dict(orient="records") if isinstance(news_df, pd.DataFrame) else []
-
-        payload = {
-            "price": price_df.to_dict(orient="records"),
-            "news": news_records,
-        }
+        payload = {"price": price_df.to_dict(orient="records"), "news": news_records}
         params = {"enrich": False, "horizon": 30, "return_path": True, "symbol": "CSV"}
-
     else:
         price_df = st.session_state.get("fetched_price_df")
         if price_df is None or price_df.empty:
@@ -134,20 +137,35 @@ if predict_btn:
         news_records = st.session_state.get("news_input", [])
         payload = {"price": price_df.to_dict(orient="records"), "news": news_records}
         params = {
-            "enrich": enrich_flag,
+            "enrich": st.session_state.get("enrich_flag", False) if "enrich_flag" in st.session_state else False,
             "horizon": 30,
             "return_path": True,
             "symbol": st.session_state.get("symbol", "AAPL"),
         }
 
-    with st.spinner("Predicting..."):
+    with st.spinner("Predicting (this may take a while for large CSV/news)…"):
         try:
-            r = HTTP.post(f"{API_URL}/predict-raw", params=params, json=payload, timeout=REQUEST_TIMEOUT)
+            r = HTTP.post(
+                f"{API_URL}/predict-raw",
+                params=params,
+                json=payload,
+                timeout=(CONNECT_TIMEOUT, READ_TIMEOUT_PREDICT),
+            )
             r.raise_for_status()
             result = r.json()
-        except requests.RequestException as e:
+        except requests.ReadTimeout:
             st.error(
-                f"Prediction failed: {getattr(e, 'response', None) and getattr(e.response, 'status_code', '')}: {e}")
+                "Prediction timed out while waiting for the server. Increase the read timeout or reduce CSV/news size."
+            )
+            st.stop()
+        except requests.RequestException as e:
+            status = getattr(getattr(e, "response", None), "status_code", None)
+            body = None
+            try:
+                body = e.response.json() if e.response is not None else None
+            except Exception:
+                body = getattr(e.response, "text", None)
+            st.error(f"Prediction failed [{status}]: {body or e}")
             st.stop()
 
     st.success("Prediction Complete")
@@ -160,10 +178,8 @@ if predict_btn:
     df_prices = df_prices.sort_values("date")
     actual_df = df_prices.rename(columns={"adj_close": "price"})[["date", "price"]].copy()
 
-    pred_dates = result.get("predicted_dates", [])
-    pred_prices = result.get("predicted_price_path", [])
-    pred_dates = [pd.to_datetime(d) for d in list(pred_dates)]
-    pred_prices = [float(x) for x in list(pred_prices)]
+    pred_dates = [pd.to_datetime(d) for d in list(result.get("predicted_dates", []))]
+    pred_prices = [float(x) for x in list(result.get("predicted_price_path", []))]
 
     if pred_dates and pred_prices and len(pred_dates) == len(pred_prices):
         path_df = pd.DataFrame({"date": pred_dates, "price": pred_prices})

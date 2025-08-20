@@ -5,13 +5,11 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from src.annotations import tested
 from src.logger import get_logger
 
 
 logger = get_logger(__name__)
 
-@tested
 def set_seed(seed: int = 42) -> np.random.Generator:
     """Set Random Seed globally."""
     os.environ["PYTHONHASHSEED"] = str(seed)
@@ -35,7 +33,7 @@ def set_seed(seed: int = 42) -> np.random.Generator:
     except ImportError:
         pass
     except Exception as e:
-        print(f"[WARN] Could not fully set deterministic behavior for torch: {e}")
+        logger.warning(f"Could not fully set deterministic behavior for torch: {e}")
 
     logger.info(f"Global random seed set to {seed}")
     return np.random.default_rng(seed)

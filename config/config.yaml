@@ -1,3 +1,5 @@
+env: dev
+
 general:
   name: "ml-stock-ml"
   created: "2025-08-16"
@@ -15,9 +17,6 @@ data:
 runtime:
   n_jobs: 24
   seed: 42
-
-sentiment:
-  model: "yiyanghkust/finbert-tone"
 
 model:
   path_dir: "../data/models"

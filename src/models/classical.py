@@ -4,11 +4,9 @@ import pandas as pd
 from sklearn.linear_model import ElasticNet
 from sklearn.multioutput import MultiOutputRegressor
 
-from src.annotations import tested
 from src.models.base import Base
 
 
-@tested
 class LinearElasticNet(Base):
     """
     Linear regression with combined L1/L2 regularization (ElasticNet).
@@ -57,9 +55,9 @@ class LinearElasticNet(Base):
 
     def predict(self, X_test: pd.DataFrame) -> Any:
         yhat = self.model.predict(X_test)
-
         if self.multioutput:
-            return pd.DataFrame(yhat, columns=[f"target_{i}" for i in range(self.horizon)])
+            H = yhat.shape[1] if hasattr(yhat, "shape") and yhat.ndim == 2 else 1
+            return pd.DataFrame(yhat, columns=[f"target_{i}" for i in range(H)])
         else:
             return pd.Series(yhat)
 

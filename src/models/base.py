@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Union
 
 import joblib
 import optuna
@@ -39,8 +39,11 @@ class Base(ABC):
     def get_params(self, deep: bool = True) -> Dict[str, Any]:
         return {"horizon": self.horizon, "random_state": self.random_state}
 
-    def save(self, path: Path) -> None:
-        joblib.dump(self, Path(path))
+    def save(self, path: Union[str, Path]) -> None:
+        p = Path(path)
+        if p.parent and not p.parent.exists():
+            p.parent.mkdir(parents=True, exist_ok=True)
+        joblib.dump(self, p)
 
     @classmethod
     def load(cls, path: Path) -> "Base":

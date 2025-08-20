@@ -1,4 +1,3 @@
-import re
 from pathlib import Path
 from types import SimpleNamespace
 from urllib.parse import urlparse
@@ -6,52 +5,50 @@ from urllib.parse import urlparse
 import yaml
 
 
-HF_ID = re.compile(r'^[\w.-]+/[\w.-]+$')
+def _is_url(s: str) -> bool:
+    parsed = urlparse(s)
+    return parsed.scheme in ("http", "https")
 
 class Config:
-    """Configuration Class: Loads configuration from YAML file."""
+    """
+    Minimal YAML config loader.
+    - Dicts -> SimpleNamespace
+    - Lists -> list
+    - Strings:
+        * URLs stay strings
+        * Paths (relative/absolute) -> resolved absolute Path
+        * All else -> plain strings
+    """
 
     def __init__(self, path: Path):
         path = Path(path).expanduser().resolve()
         if not path.exists():
             raise FileNotFoundError(f"Config file not found: {path}")
-        self._root = path.parent
+
+        self._config_file = path
+        self._config_dir = path.parent
 
         with path.open("r", encoding="utf-8") as f:
-            cfg_dict = yaml.safe_load(f)
+            raw_cfg = yaml.safe_load(f) or {}
 
-        self._config = self._to_namespace(cfg_dict)
+        self._config = self._to_namespace(raw_cfg)
 
     def _to_namespace(self, obj):
         if isinstance(obj, dict):
             return SimpleNamespace(**{k: self._to_namespace(v) for k, v in obj.items()})
-        elif isinstance(obj, list):
+        if isinstance(obj, list):
             return [self._to_namespace(v) for v in obj]
-        elif isinstance(obj, str):
+        if isinstance(obj, str):
             s = obj.strip()
-            if self._is_url(s) or self._is_hf_repo_id(s):
+            if _is_url(s):
                 return s
-            if self._looks_like_path(s):
-                p = Path(s)
-                if not p.is_absolute():
-                    p = (self._root / p).resolve()
-                return p
+            if s.startswith((".", "/", "\\")) or ("/" in s or "\\" in s):
+                return (self._config_dir / s).expanduser().resolve()
             return s
-        else:
-            return obj
-
-    def _is_url(self, s: str) -> bool:
-        parsed = urlparse(s)
-        return parsed.scheme in ("http", "https")
-
-    def _is_hf_repo_id(self, s: str) -> bool:
-        return bool(HF_ID.fullmatch(s))
-
-    def _looks_like_path(self, s: str) -> bool:
-        return s.startswith((".", "..", "/", "\\")) or ("/" in s or "\\" in s)
+        return obj
 
     def __getattr__(self, name):
         return getattr(self._config, name)
 
     def __repr__(self):
-        return repr(self._config)
+        return f"Config({self._config_file})"

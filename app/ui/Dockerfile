@@ -9,10 +9,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-RUN python -m pip install --upgrade pip
-
 COPY app/ui/requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir -r /tmp/requirements.txt
+RUN python -m pip install --upgrade pip && \
+    pip install --no-cache-dir -r /tmp/requirements.txt
 
 COPY app/ui/ /app/
 

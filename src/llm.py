@@ -4,12 +4,10 @@ import pandas as pd
 import requests
 
 from src.logger import get_logger
-from src.annotations import tested
 
 
 logger = get_logger(__name__)
 
-@tested
 def generate_local_headlines(
         symbol: str,
         dates: List[str],
@@ -48,8 +46,8 @@ def generate_local_headlines(
 
     return headlines
 
-@tested
-def enrich_news_with_generated(price_dates: List[str], real_news: List[dict], symbol: str, url_llm: str, model_llm: str) -> List[dict]:
+def enrich_news_with_generated(price_dates: List[str], real_news: List[dict], symbol: str, url_llm: str,
+                               model_llm: str) -> List[dict]:
     logger.info("Enriching news with generated headlines (LLM)")
 
     price_dates = sorted(set(pd.to_datetime(price_dates).strftime("%Y-%m-%d")))

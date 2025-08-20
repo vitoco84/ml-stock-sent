@@ -1,7 +1,8 @@
 import shap
-from sklearn.multioutput import MultiOutputRegressor
-from sklearn.linear_model import ElasticNet, LinearRegression
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import ElasticNet, LinearRegression
+from sklearn.multioutput import MultiOutputRegressor
+
 
 class SHAPExplainer:
     def __init__(self, model, preprocessor, background_data):
