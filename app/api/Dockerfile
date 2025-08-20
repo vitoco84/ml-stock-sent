@@ -18,9 +18,9 @@ COPY app/api/requirements.txt /tmp/requirements.txt
 RUN python -m pip install --upgrade pip && \
     pip install --no-cache-dir -r /tmp/requirements.txt
 
-COPY app/api/ /app/api/
+COPY app/api/ /app/app/api/
 COPY src/ /app/src/
 COPY config/ /app/config/
 
 EXPOSE 8000
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--loop", "uvloop", "--http", "httptools", "--workers", "2"]
+CMD ["uvicorn", "app.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--loop", "uvloop", "--http", "httptools", "--workers", "2"]
