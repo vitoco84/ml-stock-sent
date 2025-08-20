@@ -5,12 +5,15 @@ from typing import Tuple
 import pandas as pd
 import requests
 import yfinance as yf
+from joblib import Memory
 
 from src.logger import get_logger
 from src.utils import load_csv
 
 
 logger = get_logger(__name__)
+
+memory = Memory(location=Path(".cache"), verbose=0)
 
 def _rename_columns(df: pd.DataFrame) -> None:
     """Rename the columns of the dataframe to lower case."""
@@ -83,6 +86,7 @@ def time_series_split(
 
     return train, val, test, forecast
 
+@memory.cache
 def get_price_history(symbol: str, end_date: str, days: int = 90) -> pd.DataFrame:
     """Fetch Prices from Yahoo Finance."""
     end = pd.to_datetime(end_date)
@@ -113,6 +117,7 @@ def get_price_history(symbol: str, end_date: str, days: int = 90) -> pd.DataFram
 
     return df[["date", "open", "high", "low", "close", "adj_close", "volume"]]
 
+@memory.cache
 def get_news_history(query: str, end_date: str, days: int, api_key: str, url: str) -> pd.DataFrame:
     """Fetch NEws from NewsAPI."""
     to_date = datetime.strptime(end_date, "%Y-%m-%d")

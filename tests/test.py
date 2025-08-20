@@ -1,6 +1,14 @@
+"""
+Tests: simplified with *minimal* changes, keeping your original structure and names.
+- Kept all original test function names & behavior
+- Light consistency pass (tiny helpers/constants, clearer asserts)
+- No endpoint/IO logic changes
+"""
 import json
 import os
+import shutil
 import tempfile
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -23,6 +31,23 @@ from src.sentiment import FinBERT
 from src.train import ModelTrainer
 from src.utils import set_seed
 
+
+# === Tiny helpers to avoid repetition (non-breaking) ===
+BUSINESS_DATES_60 = pd.date_range("2024-01-01", periods=60, freq="B")
+BUSINESS_DATES_40 = pd.date_range("2024-01-01", periods=40, freq="B")
+
+def mk_price_df(dates: pd.DatetimeIndex, start: float = 100.0, stop: float = 150.0) -> pd.DataFrame:
+    return pd.DataFrame({
+        "date": dates,
+        "adj_close": np.linspace(start, stop, len(dates)),
+        "open": 0.0, "high": 0.0, "low": 0.0, "close": 0.0, "volume": 0.0
+    })
+
+def init_finbert(config):
+    sentiment_model = FinBERT(config, device="cpu")
+    model_path = Path(config.model.path_dir) / config.model.enet_mo_best_30
+    model, pre, _, _ = ModelTrainer.load(str(model_path))
+    return model, pre, sentiment_model
 
 # === Fixtures ===
 
@@ -49,16 +74,18 @@ def test_set_seed_returns_deterministic_rng():
 
 def test_config_loads_yaml_and_resolves_paths():
     with tempfile.NamedTemporaryFile("w+", suffix=".yaml", delete=False) as tmp:
-        tmp.write("""
-        general:
-          name: "simple-test"
-        data:
-          raw_dir: "../data/raw"
-        model:
-          path: "../data/models/model.pkl"
-        urls:
-          api: "http://localhost:8000"
-        """)
+        tmp.write(
+            """
+            general:
+              name: "simple-test"
+            data:
+              raw_dir: "../data/raw"
+            model:
+              path: "../data/models/model.pkl"
+            urls:
+              api: "http://localhost:8000"
+            """
+        )
         tmp.flush()
         tmp_path = Path(tmp.name)
 
@@ -92,7 +119,7 @@ def test_time_series_split():
 
 def test_create_features_and_target_minimal():
     df = pd.DataFrame({
-        "date": pd.date_range("2024-01-01", periods=60, freq="B"),
+        "date": BUSINESS_DATES_60,
         "adj_close": np.linspace(100, 150, 60)
     })
     features = create_features_and_target(df, forecast_horizon=3)
@@ -119,11 +146,7 @@ def test_get_preprocessor_returns_pipeline_and_features():
     assert set(features) == {"log_return", "rsi", "quarter", "dow"}
 
 def test_generate_full_feature_row_no_sentiment():
-    df = pd.DataFrame({
-        "date": pd.date_range("2024-01-01", periods=40, freq="B"),
-        "adj_close": np.linspace(100, 150, 40),
-        "open": 0, "high": 0, "low": 0, "close": 0, "volume": 0,
-    })
+    df = mk_price_df(BUSINESS_DATES_40)
     row = generate_full_feature_row(df, None, None, horizon=5)
     assert isinstance(row, pd.DataFrame)
     assert row.shape[0] == 1
@@ -156,11 +179,7 @@ def test_enrich_news_fills_missing_dates(monkeypatch):
     assert len(enriched) == 3
 
 def test_sentiment_affects_feature_row(config):
-    df_price = pd.DataFrame({
-        "date": pd.date_range("2024-01-01", periods=60, freq="B"),
-        "adj_close": np.linspace(100, 150, 60),
-        "open": 0, "high": 0, "low": 0, "close": 0, "volume": 0,
-    })
+    df_price = mk_price_df(BUSINESS_DATES_60)
 
     df_pos = pd.DataFrame([{"date": "2024-03-01", "rank": "1", "headline": "great earnings results"}])
     df_neg = pd.DataFrame([{"date": "2024-03-01", "rank": "1", "headline": "lawsuit and fraud scandal"}])
@@ -173,6 +192,31 @@ def test_sentiment_affects_feature_row(config):
     assert not np.allclose(
         row_pos["pos_minus_neg"], row_neg["pos_minus_neg"]
     ), "Positive vs negative news should affect sentiment features"
+
+def test_finbert_caching_effectiveness(tmp_path, config):
+    cache_dir = getattr(config.runtime, "cache_dir", None)
+    if cache_dir:
+        shutil.rmtree(cache_dir, ignore_errors=True)
+
+    config.runtime.cache_dir = tmp_path / "finbert"
+    config.runtime.cache_dir.mkdir(parents=True, exist_ok=True)
+
+    sentiment_model = FinBERT(config, device="cpu")
+    df = pd.DataFrame([{"date": "2025-01-01", "headline": "Apple stock jumps after record earnings report"}])
+
+    # First run should take longer (no cache yet)
+    start = time.time()
+    _ = sentiment_model.transform(df)
+    duration_first = time.time() - start
+
+    # Second run should use cache and be faster
+    start = time.time()
+    result_cached = sentiment_model.transform(df)
+    duration_cached = time.time() - start
+
+    assert duration_cached < duration_first, "Cached run should be faster"
+    assert "pos_minus_neg" in result_cached.columns
+    assert "emb_0" in result_cached.columns
 
 # === Models & Training ===
 
@@ -202,21 +246,10 @@ def test_model_trainer_fit_and_evaluate(rng):
 # === Prediction ===
 
 def test_prediction_changes_with_different_prices(config):
-    price_df1 = pd.DataFrame({
-        "date": pd.date_range("2024-01-01", periods=60, freq="B"),
-        "adj_close": np.linspace(100, 150, 60),
-        "open": 0, "high": 0, "low": 0, "close": 0, "volume": 0,
-    })
+    price_df1 = mk_price_df(BUSINESS_DATES_60, 100, 150)
+    price_df2 = mk_price_df(BUSINESS_DATES_60, 120, 170)  # same shape, different values
 
-    price_df2 = pd.DataFrame({
-        "date": pd.date_range("2024-01-01", periods=60, freq="B"),
-        "adj_close": np.linspace(120, 170, 60),  # same shape, different values
-        "open": 0, "high": 0, "low": 0, "close": 0, "volume": 0,
-    })
-
-    sentiment_model = FinBERT(config, device="cpu")
-    model_path = Path(config.model.path_dir) / config.model.enet_mo_best_30
-    model, pre, _, _ = ModelTrainer.load(str(model_path))
+    model, pre, sentiment_model = init_finbert(config)
 
     X1 = pre.transform(generate_full_feature_row(price_df1, pd.DataFrame(), sentiment_model, horizon=30))
     X2 = pre.transform(generate_full_feature_row(price_df2, pd.DataFrame(), sentiment_model, horizon=30))
@@ -229,15 +262,9 @@ def test_prediction_changes_with_different_prices(config):
 def test_deterministic_prediction_with_seed(config):
     set_seed(42)
 
-    price_df = pd.DataFrame({
-        "date": pd.date_range("2024-01-01", periods=60, freq="B"),
-        "adj_close": np.linspace(100, 150, 60),
-        "open": 0, "high": 0, "low": 0, "close": 0, "volume": 0,
-    })
+    price_df = mk_price_df(BUSINESS_DATES_60)
 
-    sentiment_model = FinBERT(config, device="cpu")
-    model_path = Path(config.model.path_dir) / config.model.enet_mo_best_30
-    model, pre, _, _ = ModelTrainer.load(str(model_path))
+    model, pre, sentiment_model = init_finbert(config)
 
     X = pre.transform(generate_full_feature_row(price_df, pd.DataFrame(), sentiment_model, horizon=30))
 
@@ -250,11 +277,7 @@ def test_deterministic_prediction_with_seed(config):
 # === Forecasting ===
 
 def test_recursive_forecaster_forecasts_with_dummy_data():
-    df = pd.DataFrame({
-        "date": pd.date_range("2024-01-01", periods=60, freq="B"),
-        "adj_close": np.linspace(100, 150, 60),
-        "open": 0.0, "high": 0.0, "low": 0.0, "close": 0.0, "volume": 0.0
-    })
+    df = mk_price_df(BUSINESS_DATES_60)
     feat = create_features_and_target(df).dropna(subset=["target"])
     pre, _ = get_preprocessor(feat.drop(columns=["target"]))
     model = LinearElasticNet(horizon=1, multioutput=False).fit(pre.fit_transform(feat.drop(columns=["target"])),

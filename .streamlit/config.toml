@@ -12,3 +12,6 @@ gatherUsageStats = false
 
 [logger]
 level = "info"
+
+[client]
+toolbarMode = "viewer"

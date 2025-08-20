@@ -198,3 +198,82 @@ def plot_ohlc_pairplot(df: pd.DataFrame, path: Path):
     plt.savefig(path)
     plt.show()
     plt.close()
+
+def plot_forecast_diagnostics(
+        future_dates: np.ndarray,
+        actual_price_path: np.ndarray,
+        pred_price_path: np.ndarray,
+        path: Path
+):
+    # --- Residuals ---
+    residuals = actual_price_path - pred_price_path
+
+    plt.figure(figsize=(10, 4))
+    plt.plot(future_dates, residuals, label="Residuals (Actual - Forecast)")
+    plt.axhline(0, linestyle="--", color="gray", linewidth=1)
+    plt.title("Next 30-day Residuals Over Time")
+    plt.xlabel("Date")
+    plt.ylabel("Residual (Price Difference)")
+    plt.grid(True, alpha=0.3)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(path)
+    plt.show()
+    plt.close()
+
+    # --- Cumulative Returns ---
+    actual_return = np.cumsum(np.log(actual_price_path / actual_price_path[0]))
+    pred_return = np.cumsum(np.log(pred_price_path / pred_price_path[0]))
+
+    plt.figure(figsize=(10, 4))
+    plt.plot(future_dates, actual_return, label="Actual Cumulative Return")
+    plt.plot(future_dates, pred_return, label="Predicted Cumulative Return", linestyle="--")
+    plt.title("Next 30-da Cumulative Log Return")
+    plt.xlabel("Date")
+    plt.ylabel("Cumulative Return")
+    plt.grid(True, alpha=0.3)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(path)
+    plt.show()
+    plt.close()
+
+    # --- Price Comparison ---
+    plt.figure(figsize=(10, 4))
+    plt.plot(future_dates, actual_price_path, label="Actual Price")
+    plt.plot(future_dates, pred_price_path, label="Predicted Price", linestyle="--")
+    plt.title("Next 30-day Forecast vs Actual Price")
+    plt.xlabel("Date")
+    plt.ylabel("Price")
+    plt.grid(True, alpha=0.3)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(path)
+    plt.show()
+    plt.close()
+
+def plot_sentiment_trend(df: pd.DataFrame, path: Path, window: int = 7):
+    df = df.copy()
+    df["date"] = pd.to_datetime(df["date"])
+    df = df.sort_values("date")
+
+    df["smoothed"] = df["pos_minus_neg"].rolling(window=window).mean()
+
+    plt.figure(figsize=(14, 5))
+    plt.plot(df["date"], df["pos_minus_neg"], label="Daily pos_minus_neg", alpha=0.3, color="green")
+    plt.plot(df["date"], df["smoothed"], label=f"{window}-Day Rolling Avg", color="black", linewidth=2)
+
+    plt.axhline(0.0, linestyle="--", color="gray", linewidth=1)
+    plt.axhline(0.05, linestyle="--", color="blue", alpha=0.5, linewidth=1)
+    plt.axhline(-0.05, linestyle="--", color="red", alpha=0.5, linewidth=1)
+
+    plt.title("Sentiment Trend Over Time", fontsize=14)
+    plt.xlabel("Date", fontsize=12)
+    plt.ylabel("pos_minus_neg", fontsize=12)
+
+    plt.grid(True, linestyle="--", alpha=0.3)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(path)
+    plt.show()
+    plt.close()

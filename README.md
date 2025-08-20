@@ -303,14 +303,11 @@ This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for d
 
 ## 📝 TODO
 
-- [ ] Confirm model targets (log_return) are shifted properly
 - [ ] Implement **XGBoost Regressor**
 - [ ] Implement **Random Forest Regressor**
 - [ ] Implement **Neural Network (MLP)**
 - [ ] Implement **LSTM** for sequential modeling
 - [ ] Add **ensemble method** (averaging or stacking top models)
-- [ ] Add caching for LLM/FinBERT responses (hash-based)
-- [ ] Add caching layer for price/news history endpoints
 - [ ] Write **academic-style report** (thesis-like)
 - [ ] Prepare **10-slide PowerPoint** for presentation
 - [ ] Deploy demo API + Streamlit to cloud (Render / Fly.io / AWS)
@@ -320,3 +317,4 @@ This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for d
     - [ ] Add request logging
 - [ ] Add monitoring & logging integration (Prometheus/Grafana)
 - [ ] Plots: residuals = y_true - y_pred , cumulative Return, visualize sentiment trends over time (pos_minus_neg)
+- [ ] UI Bugs: Clear Data when clearing CSVs and make enrich news available for file upload as well

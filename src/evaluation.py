@@ -5,10 +5,11 @@ from sklearn.multioutput import MultiOutputRegressor
 
 
 class SHAPExplainer:
-    def __init__(self, model, preprocessor, background_data):
+    def __init__(self, model, preprocessor, background_data, seed: int = 42):
         self.model = self._unwrap(model)
         self.preprocessor = preprocessor
         self.X_bg = self.preprocessor.transform(background_data)
+        self.seed = seed
 
     def explain(self, X):
         X_proc = self.preprocessor.transform(X)
@@ -27,8 +28,7 @@ class SHAPExplainer:
         elif model_type == "linear":
             explainer = shap.LinearExplainer(model, self.X_bg)
         else:
-            explainer = shap.KernelExplainer(model.predict, self.X_bg[:50])
-
+            explainer = shap.KernelExplainer(model.predict, self.X_bg[:50], seed=self.seed)
         return explainer.shap_values(X_proc)
 
     def _unwrap(self, model):

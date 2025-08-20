@@ -1,3 +1,6 @@
+import hashlib
+import pickle
+from pathlib import Path
 from typing import Dict, List, Union
 
 import numpy as np
@@ -14,9 +17,15 @@ from src.utils import set_seed
 DEFAULT_FINBERT_MODEL = "yiyanghkust/finbert-tone"
 
 class FinBERT:
-    """FinBERT Class: Generate Sentiment scores and Embeddings."""
+    """FinBERT Class: Generate Sentiment scores and Embeddings with optional caching."""
 
-    def __init__(self, config: Config, device: str = "cuda", max_embedding_dims: int = None):
+    def __init__(
+            self,
+            config: Config,
+            device: str = "cuda",
+            max_embedding_dims: int = None,
+            cache_dir: Union[str, Path] = ".cache/finbert"
+    ):
         self.config = config
         self.device = device if torch.cuda.is_available() and device == "cuda" else "cpu"
         self.max_embedding_dims = max_embedding_dims
@@ -26,7 +35,17 @@ class FinBERT:
             use_safetensors=True).to(self.device)
         self.embedder = self.classifier.base_model
         self.logger = get_logger(self.__class__.__name__)
-        self.logger.info(f"Loading FinBERT model: {DEFAULT_FINBERT_MODEL} on device: {self.device}")
+        self.logger.info(f"Loaded FinBERT model: {DEFAULT_FINBERT_MODEL} on {self.device}")
+
+        self.cache_dir = Path(cache_dir)
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+
+    def _hash_texts(self, texts: List[str]) -> str:
+        key = "\n".join(sorted(texts)).encode("utf-8")
+        return hashlib.sha256(key).hexdigest()
+
+    def _cache_path(self, hash_key: str) -> Path:
+        return self.cache_dir / f"{hash_key}.pkl"
 
     def _prepare_inputs(self, texts: Union[str, List[str]]) -> Dict[str, torch.Tensor]:
         inputs = self.tokenizer(
@@ -34,22 +53,35 @@ class FinBERT:
         )
         return {k: v.to(self.device) for k, v in inputs.items()}
 
-    def _get_sentiment_scores(self, texts: Union[str, List[str]]) -> List[Dict[str, float]]:
+    def _process_batch(self, texts: List[str]) -> Dict[str, np.ndarray]:
         inputs = self._prepare_inputs(texts)
         with torch.no_grad():
             logits = self.classifier(**inputs).logits
-        probs = torch.nn.functional.softmax(logits, dim=1).cpu().numpy()
-        return [{"neu": p[0], "pos": p[1], "neg": p[2], "pos_minus_neg": p[1] - p[2]} for p in probs]
-
-    def _get_embeddings(self, texts: Union[str, List[str]]) -> pd.Series:
-        inputs = self._prepare_inputs(texts)
-        with torch.no_grad():
+            probs = torch.nn.functional.softmax(logits, dim=1).cpu().numpy()
             hidden = self.embedder(**inputs).last_hidden_state
+            embeddings = hidden.mean(dim=1).cpu().numpy()
 
-        mean_embeddings = hidden.mean(dim=1).cpu().numpy()
-        if self.max_embedding_dims is not None:
-            mean_embeddings = mean_embeddings[:, :self.max_embedding_dims]
-        return mean_embeddings
+        return {"scores": probs, "embeddings": embeddings}
+
+    def _process_or_load_cache(self, texts: List[str]) -> Dict[str, np.ndarray]:
+        hash_key = self._hash_texts(texts)
+        cache_file = self._cache_path(hash_key)
+
+        if cache_file.exists():
+            try:
+                with open(cache_file, "rb") as f:
+                    return pickle.load(f)
+            except Exception:
+                self.logger.warning(f"Failed to load FinBERT cache: {cache_file}")
+                cache_file.unlink(missing_ok=True)
+
+        result = self._process_batch(texts)
+        try:
+            with open(cache_file, "wb") as f:
+                pickle.dump(result, f)
+        except Exception:
+            self.logger.warning(f"Failed to write FinBERT cache: {cache_file}")
+        return result
 
     def transform(self, df: pd.DataFrame, text_column: str = "headline", batch_size: int = 32) -> pd.DataFrame:
         set_seed(self.config.runtime.seed)
@@ -63,8 +95,18 @@ class FinBERT:
         for i in tqdm(range(0, len(texts), batch_size), desc="FinBERT Batch Processing"):
             batch = texts[i:i + batch_size]
             try:
-                sentiment_scores += self._get_sentiment_scores(batch)
-                embeddings.append(self._get_embeddings(batch))
+                result = self._process_or_load_cache(batch)
+                scores = result["scores"]
+                embs = result["embeddings"]
+
+                sentiment_scores += [
+                    {"neu": p[0], "pos": p[1], "neg": p[2], "pos_minus_neg": p[1] - p[2]} for p in scores
+                ]
+
+                if self.max_embedding_dims:
+                    embs = embs[:, :self.max_embedding_dims]
+
+                embeddings.append(embs)
             except Exception as e:
                 self.logger.error(f"Batch {i}-{i + batch_size} failed: {e}")
 

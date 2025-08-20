@@ -25,7 +25,6 @@ def http():
 HTTP = http()
 
 st.title("Stock Prediction App (FinBERT + LLM)")
-st.caption(f"Using API_URL: {API_URL}")
 
 def load_csv(file, date_col: str = "date") -> Optional[pd.DataFrame]:
     if file is None:
@@ -50,27 +49,58 @@ def symbol_valid():
 
 mode = st.radio("Data source", ["Fetch from API", "Upload CSVs"], horizontal=True)
 
-
 if mode == "Upload CSVs":
     clear_fetch_state()
     st.subheader("Upload CSVs")
-    price_file = st.file_uploader(
-        "Prices CSV (date, open, high, low, close, adj_close, volume)", type=["csv"], key="price_upl"
-    )
-    news_file = st.file_uploader("News CSV (date, rank, headline)", type=["csv"], key="news_upl")
 
+    # Prices
+    st.markdown("<span style='color:#16a34a; font-weight:700'>💹 Prices CSV</span>", unsafe_allow_html=True)
+    price_file = st.file_uploader(
+        "Prices CSV (date, open, high, low, close, adj_close, volume)",
+        type=["csv"],
+        key="price_upl",
+        label_visibility="collapsed",
+    )
+
+    # News
+    st.markdown("<span style='color:#2563eb; font-weight:700'>📰 News CSV (optional)</span>", unsafe_allow_html=True)
+    news_file = st.file_uploader(
+        "News CSV (date, rank, headline)",
+        type=["csv"],
+        key="news_upl",
+        label_visibility="collapsed",
+    )
+
+    # --- Keep session_state in sync with uploaders ---
     if price_file:
         st.session_state.price_csv_df = load_csv(price_file)
         st.success(f"Loaded {len(st.session_state.price_csv_df)} price rows")
+    else:
+        # If user clears the uploader, drop cached DF so Predict can’t run
+        st.session_state.pop("price_csv_df", None)
 
     if news_file:
         news_df = load_csv(news_file)
-        if "rank" in news_df.columns:
+        if isinstance(news_df, pd.DataFrame) and "rank" in news_df.columns:
             news_df["rank"] = news_df["rank"].astype(str)
         st.session_state.news_csv_df = news_df
         st.success(f"Loaded {len(news_df)} news rows")
+    else:
+        st.session_state.pop("news_csv_df", None)
 
-    predict_btn = st.button("Predict Price")
+    # Enrich flag also available in CSV mode
+    st.checkbox(
+        "Enrich with LLM if headlines missing",
+        key="enrich_flag",
+        value=False,
+    )
+
+    # Only enable Predict when we actually have prices
+    can_predict_csv = (
+            isinstance(st.session_state.get("price_csv_df"), pd.DataFrame)
+            and not st.session_state["price_csv_df"].empty
+    )
+    predict_btn = st.button("Predict Price", disabled=not can_predict_csv)
 
 else:
     clear_csv_state()
@@ -128,7 +158,12 @@ if predict_btn:
         news_df = st.session_state.get("news_csv_df")
         news_records = news_df.to_dict(orient="records") if isinstance(news_df, pd.DataFrame) else []
         payload = {"price": price_df.to_dict(orient="records"), "news": news_records}
-        params = {"enrich": False, "horizon": 30, "return_path": True, "symbol": "CSV"}
+        params = {
+            "enrich": st.session_state.get("enrich_flag", False),
+            "horizon": 30,
+            "return_path": True,
+            "symbol": "CSV",
+        }
     else:
         price_df = st.session_state.get("fetched_price_df")
         if price_df is None or price_df.empty:

@@ -27,3 +27,18 @@ notebooks/
 Thumbs.db
 .idea/
 .vscode/
+
+# Python cache
+*.py[cod]
+*.pkl
+*.joblib
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Local cache
+.cache/
+
+# Logs
+logs/
+*.log

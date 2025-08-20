@@ -95,6 +95,8 @@ class ModelTrainer:
 
     def objective(self, trial, X, y, n_splits: int = 3):
         params = self.model.suggest_hyperparameters(trial)
+        if "random_state" not in params:
+            params["random_state"] = self.config.get("seed", 42)
         candidate = self.model.__class__(**{**self.model.get_params(), **params})
 
         inner_gap = int(self.config.get("gap", 0))

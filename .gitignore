@@ -37,3 +37,8 @@ Thumbs.db
 
 # Secrets
 secrets.*
+
+# Caching
+.cache/
+*.joblib
+*.pkl
