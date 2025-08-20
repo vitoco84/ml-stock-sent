@@ -281,6 +281,10 @@ Status:
 ```bash
 docker compose ps
 ```
+Prune:
+```bash
+docker image prune
+```
 
 ---
 
