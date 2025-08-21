@@ -8,7 +8,6 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 
 def get_preprocessor(X: pd.DataFrame) -> Tuple[Pipeline, list[str]]:
-    """Build a preprocessing pipeline using ColumnTransformer."""
     target_cols = [c for c in X.columns if c == "target" or c.startswith("target_")]
 
     cat_features = [c for c in ["dow", "quarter"] if c in X.columns]

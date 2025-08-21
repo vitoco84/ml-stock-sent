@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Any, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -13,9 +13,9 @@ class RecursiveForecaster:
 
     def __init__(
             self,
-            model: object,
-            preprocessor: object,
-            y_scaler: Optional[object] = None,
+            model: Any,
+            preprocessor: Any,
+            y_scaler: Optional[Any] = None,
             sentiment_model: Optional[FinBERT] = None,
     ) -> None:
         self.model = model
@@ -28,19 +28,12 @@ class RecursiveForecaster:
         )
 
     def _align_feature_row(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Add any missing expected columns (fill 0.0), drop extras, then reorder."""
+        df = df.copy()
         if not self._expected_cols:
             return df
-
-        missing = [c for c in self._expected_cols if c not in df.columns]
-        if missing:
-            for c in missing:
+        for c in self._expected_cols:
+            if c not in df.columns:
                 df[c] = 0.0
-
-        extra = [c for c in df.columns if c not in self._expected_cols]
-        if extra:
-            df = df.drop(columns=extra)
-
         return df[self._expected_cols]
 
     def forecast(
@@ -52,6 +45,7 @@ class RecursiveForecaster:
         pdf = price_df.copy()
         ndf = news_df.copy() if news_df is not None else pd.DataFrame(columns=["date", "headline"])
         pdf["date"] = pd.to_datetime(pdf["date"]).dt.normalize()
+
         if not ndf.empty:
             ndf["date"] = pd.to_datetime(ndf["date"]).dt.normalize()
 
@@ -63,17 +57,22 @@ class RecursiveForecaster:
         last_date = pd.to_datetime(pdf["date"].iloc[-1])
 
         for _ in range(horizon):
-            feat_row = generate_full_feature_row(pdf, ndf, self.sentiment_model, horizon=1)
+            feat_row = generate_full_feature_row(
+                price_df=pdf,
+                news_df=ndf,
+                sentiment_model=self.sentiment_model,
+                horizon=1
+            )
             feat_row = self._align_feature_row(feat_row)
 
             X = self.preprocessor.transform(feat_row)
             y_pred = self.model.predict(X)
+            y_pred = np.asarray(y_pred).reshape(-1, 1)
 
             if self.y_scaler is not None:
                 y_pred = self.y_scaler.inverse_transform(y_pred)
 
-            y_pred = np.asarray(y_pred).ravel()
-            lr = float(y_pred[0])
+            lr = float(y_pred.ravel()[0])
             lr_path.append(lr)
 
             next_date = (last_date + BDay(1)).normalize()
@@ -82,11 +81,11 @@ class RecursiveForecaster:
             pdf = pd.concat([pdf, pd.DataFrame([{
                 "date": next_date,
                 "adj_close": next_price,
-                "open": np.nan,
-                "high": np.nan,
-                "low": np.nan,
-                "close": np.nan,
-                "volume": np.nan
+                "open": last_price,
+                "high": max(last_price, next_price),
+                "low": min(last_price, next_price),
+                "close": next_price,
+                "volume": pdf["volume"].iloc[-1]
             }])], ignore_index=True)
 
             last_price, last_date = next_price, next_date

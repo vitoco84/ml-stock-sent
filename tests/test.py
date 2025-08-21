@@ -22,7 +22,7 @@ from app.api.main import app
 from src.config import Config
 from src.data import _rename_columns, time_series_split
 from src.evaluation import SHAPExplainer
-from src.features import convert_log_return, create_features_and_target, generate_full_feature_row
+from src.features import create_features_and_target, generate_full_feature_row
 from src.llm import enrich_news_with_generated
 from src.models.classical import LinearElasticNet
 from src.preprocessing import get_preprocessor
@@ -125,11 +125,6 @@ def test_create_features_and_target_minimal():
     features = create_features_and_target(df, forecast_horizon=3)
     assert "target_1" in features.columns
     assert "log_return" in features.columns
-
-def test_convert_log_return_basic():
-    price = 100.0
-    log_return = np.log(1.10)
-    assert abs(convert_log_return(price, log_return) - 110.0) < 0.01
 
 def test_get_preprocessor_returns_pipeline_and_features():
     df = pd.DataFrame({

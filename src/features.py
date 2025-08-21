@@ -49,11 +49,12 @@ def create_features_and_target(df: pd.DataFrame, forecast_horizon: int = 1) -> p
         df['target'] = df['log_return'].shift(-1)
 
     df['rsi'] = rsi(price)
-    df['macd'] = macd_diff(df['log_return'])
-    df['h_bollinger'] = bollinger_hband(df['log_return'])
-    df['l_bollinger'] = bollinger_lband(df['log_return'])
+    df['macd'] = macd_diff(price)
+    df['h_bollinger'] = bollinger_hband(price)
+    df['l_bollinger'] = bollinger_lband(price)
 
-    for lag in [5, 10, 25]:
+    lags = [5, 10, 25]
+    for lag in lags:
         df[f'lag_{lag}'] = df['log_return'].shift(lag)
         df[f'sma_{lag}'] = ta.trend.sma_indicator(df['log_return'], lag)
         df[f'ema_{lag}'] = ta.trend.ema_indicator(df['log_return'], lag)
@@ -66,13 +67,13 @@ def create_features_and_target(df: pd.DataFrame, forecast_horizon: int = 1) -> p
     df['q_std'] = grp.expanding().std().reset_index(level=0, drop=True).shift(1)
     df['q_skew'] = grp.expanding().skew().reset_index(level=0, drop=True).shift(1)
 
-    max_lag = 26
+    max_lag = max(lags) + 1
     return df.iloc[max_lag:].copy()
 
 def generate_full_feature_row(
         price_df: pd.DataFrame,
         news_df: Optional[pd.DataFrame],
-        sentiment_model: FinBERT | None,
+        sentiment_model: Optional[FinBERT],
         horizon: int = 30,
         max_embedding_dims: int = 17
 ) -> pd.DataFrame:
@@ -102,7 +103,3 @@ def generate_full_feature_row(
     features_df = features_df.drop(columns=[c for c in target_cols if c in features_df.columns])
 
     return features_df.iloc[[-1]].copy()
-
-def convert_log_return(current_price: float, predicted_log_return: float) -> float:
-    """Converts predicted log return to actual price."""
-    return current_price * np.exp(predicted_log_return)

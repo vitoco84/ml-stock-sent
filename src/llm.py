@@ -2,18 +2,15 @@ from typing import List
 
 import pandas as pd
 import requests
+from requests import RequestException
 
 from src.logger import get_logger
 
 
 logger = get_logger(__name__)
 
-def generate_local_headlines(
-        symbol: str,
-        dates: List[str],
-        url: str,
-        model: str = "llama3"
-) -> List[dict]:
+def generate_local_headlines(symbol: str, dates: List[str], url: str, model: str = "llama3") -> List[dict]:
+    """Prompts local Ollama to generate fakes news headlines."""
     logger.info(f"Generating {len(dates)} local headlines via LLM ({model}) for {symbol}")
     headlines = []
 
@@ -34,7 +31,7 @@ def generate_local_headlines(
             result = response.json()
             text = result.get("response", "").strip()
             logger.info(f"Generated headline for {date}: {text}")
-        except Exception as e:
+        except RequestException as e:
             text = f"{symbol} news on {date} (auto-generated)"
             logger.warning(f"Failed to generate headline for {date}: {e}")
 
@@ -46,10 +43,14 @@ def generate_local_headlines(
 
     return headlines
 
-def enrich_news_with_generated(price_dates: List[str], real_news: List[dict], symbol: str, url_llm: str,
-                               model_llm: str) -> List[dict]:
+def enrich_news_with_generated(
+        price_dates: List[str],
+        real_news: List[dict],
+        symbol: str,
+        url_llm: str,
+        model_llm: str
+) -> List[dict]:
     logger.info("Enriching news with generated headlines (LLM)")
-
     price_dates = sorted(set(pd.to_datetime(price_dates).strftime("%Y-%m-%d")))
 
     if not real_news:
