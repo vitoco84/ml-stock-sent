@@ -314,7 +314,6 @@ This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for d
 - [ ] Implement **LSTM** for sequential modeling
 - [ ] Write **academic-style report** (thesis-like)
 - [ ] Prepare **PowerPoint** presentation
-- [ ] Add **ensemble method** (averaging or stacking top models)
 - [ ] Deploy demo API + Streamlit to cloud (Render / Fly.io / AWS)
 - [ ] If deployed:
     - [ ] Add authentication

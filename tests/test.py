@@ -6,6 +6,7 @@ Tests: simplified with *minimal* changes, keeping your original structure and na
 """
 import json
 import os
+import re
 import shutil
 import tempfile
 import time
@@ -24,7 +25,7 @@ from src.data import _rename_columns, time_series_split
 from src.evaluation import SHAPExplainer
 from src.features import create_features_and_target, generate_full_feature_row
 from src.llm import enrich_news_with_generated
-from src.models.classical import LinearElasticNet
+from src.models.linreg import LinearElasticNet
 from src.preprocessing import get_preprocessor
 from src.recursive import RecursiveForecaster
 from src.sentiment import FinBERT
@@ -242,7 +243,7 @@ def test_model_trainer_fit_and_evaluate(rng):
 
 def test_prediction_changes_with_different_prices(config):
     price_df1 = mk_price_df(BUSINESS_DATES_60, 100, 150)
-    price_df2 = mk_price_df(BUSINESS_DATES_60, 120, 170)  # same shape, different values
+    price_df2 = mk_price_df(BUSINESS_DATES_60, 120, 170)
 
     model, pre, sentiment_model = init_finbert(config)
 
@@ -299,6 +300,14 @@ def test_root(client):
     res = client.get("/healthz")
     assert res.status_code == 200
     assert res.json() == {"ok": True}
+
+def test_symbol_regex():
+    pattern = re.compile(r"[A-Za-z0-9_.^-]+")
+
+    assert pattern.fullmatch("AAPL")
+    assert pattern.fullmatch("^DJI")
+
+    assert not pattern.fullmatch("AAP L")
 
 @pytest.mark.integration
 def test_price_history(client):

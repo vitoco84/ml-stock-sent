@@ -48,7 +48,7 @@ async def lifespan(app: FastAPI):
     app.state.model = model
     app.state.preprocessor = preprocessor
     app.state.y_scaler = y_scaler
-    app.state.y_scale = y_scale or {}
+    app.state.y_scale = bool(y_scale)
 
     yield
 
@@ -253,15 +253,15 @@ def post_predict_from_raw(
 
     yhat = np.asarray(yhat).reshape(1, -1)
 
-    # inverse-transform if y was scaled during training
+    # Inverse-transform if y was scaled during training
     if getattr(request.app.state, "y_scaler", None) is not None:
         yhat = request.app.state.y_scaler.inverse_transform(yhat)
 
-    # clamp horizon to available outputs
+    # Clamp horizon to available outputs
     H = int(min(horizon, yhat.shape[1]))
     current_price = float(price_df["adj_close"].iloc[-1])
 
-    # headline (next day) stays for compatibility
+    # Headline (next day) stays for compatibility
     log_return = float(yhat[0, 0])
     predicted_price = current_price * float(np.exp(log_return))
 

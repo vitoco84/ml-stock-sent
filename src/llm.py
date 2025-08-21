@@ -15,7 +15,7 @@ def generate_local_headlines(symbol: str, dates: List[str], url: str, model: str
     headlines: List[dict] = []
 
     for date in dates:
-        # ensure YYYY-MM-DD string
+        # Ensure YYYY-MM-DD
         date_str = pd.to_datetime(date).strftime("%Y-%m-%d")
 
         prompt = (

@@ -20,7 +20,7 @@ def _ollama_alive(url: str, timeout: float = 1.0) -> bool:
         return False
 
 def to_dict(row):
-    if hasattr(row, "model_dump"): return row.model_dump() # Pydantic v2
-    if hasattr(row, "dict"): return row.dict() # Pydantic v1
-    if isinstance(row, dict): return row # plain dict (e.g., from CSV via UI)
+    if hasattr(row, "model_dump"): return row.model_dump()
+    if hasattr(row, "dict"): return row.dict()
+    if isinstance(row, dict): return row
     raise TypeError(f"Unsupported type: {type(row)}")

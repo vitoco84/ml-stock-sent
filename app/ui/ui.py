@@ -43,7 +43,7 @@ def clear_csv_state():
         st.session_state.pop(k, None)
 
 def symbol_valid():
-    if not re.fullmatch(r"[\w^]+", symbol):
+    if not re.fullmatch(r"[A-Za-z0-9_.^-]+", symbol):
         st.error("Invalid symbol format.")
         st.stop()
 
@@ -71,7 +71,7 @@ if mode == "Upload CSVs":
         label_visibility="collapsed",
     )
 
-    # --- Keep session_state in sync with uploaders ---
+    # Keep session_state in sync with uploaders
     if price_file:
         st.session_state.price_csv_df = load_csv(price_file)
         st.success(f"Loaded {len(st.session_state.price_csv_df)} price rows")
@@ -88,14 +88,14 @@ if mode == "Upload CSVs":
     else:
         st.session_state.pop("news_csv_df", None)
 
-    # Enrich flag also available in CSV mode
+    # Enrich flag
     st.checkbox(
         "Enrich with LLM if headlines missing",
         key="enrich_flag",
         value=False,
     )
 
-    # Only enable Predict when we actually have prices
+    # Only enable Predict when prices are available
     can_predict_csv = (
             isinstance(st.session_state.get("price_csv_df"), pd.DataFrame)
             and not st.session_state["price_csv_df"].empty
@@ -135,6 +135,7 @@ else:
                 r.raise_for_status()
                 data = r.json()
             except requests.RequestException as e:
+                st.session_state.pop("fetched_price_df", None)
                 st.error(f"API request failed: {e}")
             else:
                 rows = data.get("price", [])
@@ -147,6 +148,7 @@ else:
                     st.subheader("Price History (tail)")
                     st.dataframe(st.session_state.fetched_price_df.tail(10))
                 else:
+                    st.session_state.pop("fetched_price_df", None)
                     st.warning("No price data returned.")
 
 if predict_btn:
@@ -204,11 +206,19 @@ if predict_btn:
             st.stop()
 
     st.success("Prediction Complete")
-    st.write(f"**Current Price:** ${result['current_price']:.2f}")
-    st.write(f"**Next-day Price (h=1):** ${result['predicted_price']:.2f}")
-    st.write(f"**Next-day Log Return:** {result['log_return']:.6f}")
+    current_price = float(result.get("current_price", float("nan")))
+    predicted_price = float(result.get("predicted_price", float("nan")))
+    log_return = float(result.get("log_return", float("nan")))
+    st.write(f"**Current Price:** ${current_price:.2f}")
+    st.write(f"**Next-day Price (h=1):** ${predicted_price:.2f}")
+    st.write(f"**Next-day Log Return:** {log_return:.6f}")
 
     df_prices = price_df.copy()
+
+    if "adj_close" not in df_prices.columns or "date" not in df_prices.columns:
+        st.info("Cannot plot history: 'date' or 'adj_close' missing in price data.")
+        st.stop()
+
     df_prices["date"] = pd.to_datetime(df_prices["date"])
     df_prices = df_prices.sort_values("date")
     actual_df = df_prices.rename(columns={"adj_close": "price"})[["date", "price"]].copy()
