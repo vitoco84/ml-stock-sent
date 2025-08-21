@@ -1,16 +1,15 @@
 from typing import Any, Dict
 
 import numpy as np
-import pandas as pd
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 
-def _smape(y_true: pd.Series, y_pred: pd.Series) -> float:
+def _smape(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     """Symmetric mean absolute error."""
     denom = (np.abs(y_true) + np.abs(y_pred)) + 1e-12
     return float(np.mean(2.0 * np.abs(y_pred - y_true) / denom))
 
-def _mase(y_true: pd.Series, y_pred: pd.Series, y_insample: pd.Series) -> float:
+def _mase(y_true: np.ndarray, y_pred: np.ndarray, y_insample: np.ndarray) -> float:
     """Mean Absolute Scaled Error.
     y_insample: Historical target values (before forecast window) used to compute MASE.
     """
@@ -18,7 +17,7 @@ def _mase(y_true: pd.Series, y_pred: pd.Series, y_insample: pd.Series) -> float:
     naive = np.maximum(naive, 1e-8)
     return float(np.mean(np.abs(y_true - y_pred)) / naive)
 
-def metrics(y_true: pd.Series, y_pred: pd.Series, y_insample: pd.Series = None) -> Dict[str, Any]:
+def metrics(y_true: np.ndarray, y_pred: np.ndarray, y_insample: np.ndarray = None) -> Dict[str, Any]:
     """Aggregate Metrics."""
     mse = mean_squared_error(y_true, y_pred)
     result = {

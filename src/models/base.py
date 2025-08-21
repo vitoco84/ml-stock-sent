@@ -26,10 +26,14 @@ class Base(ABC):
     def suggest_hyperparameters(self, trial: optuna.Trial) -> Dict[str, Any]:
         raise NotImplementedError
 
-    @abstractmethod
-    def train(self, X_train: pd.DataFrame, y_train: Any, X_val: pd.DataFrame = None,
-              y_val: pd.DataFrame = None) -> "Base":
-        raise NotImplementedError
+    def train(
+            self,
+            X_train: pd.DataFrame,
+            y_train: Any,
+            X_val: pd.DataFrame = None,
+            y_val: pd.DataFrame = None
+    ) -> "Base":
+        return self.fit(X_train, y_train)
 
     def get_params(self, deep: bool = True) -> Dict[str, Any]:
         return {"horizon": self.horizon, "random_state": self.random_state}

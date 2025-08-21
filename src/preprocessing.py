@@ -11,10 +11,7 @@ def get_preprocessor(X: pd.DataFrame) -> Tuple[Pipeline, list[str]]:
     target_cols = [c for c in X.columns if c == "target" or c.startswith("target_")]
 
     cat_features = [c for c in ["dow", "quarter"] if c in X.columns]
-    num_features = [c for c in X.columns
-                    if c not in cat_features
-                    and c not in ["date"]
-                    and c not in target_cols]
+    num_features = [c for c in X.columns if c not in cat_features + ["date"] + target_cols]
 
     num_tf = Pipeline(steps=[
         ("imputer", SimpleImputer(strategy="median")),

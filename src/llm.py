@@ -12,31 +12,38 @@ logger = get_logger(__name__)
 def generate_local_headlines(symbol: str, dates: List[str], url: str, model: str = "llama3") -> List[dict]:
     """Prompts local Ollama to generate fakes news headlines."""
     logger.info(f"Generating {len(dates)} local headlines via LLM ({model}) for {symbol}")
-    headlines = []
+    headlines: List[dict] = []
 
     for date in dates:
+        # ensure YYYY-MM-DD string
+        date_str = pd.to_datetime(date).strftime("%Y-%m-%d")
+
         prompt = (
-            f"Write a realistic financial news headline for '{symbol}' on {date}. "
+            f"Write a realistic financial news headline for '{symbol}' on {date_str}. "
             f"Make it sound like a headline from a business news site."
         )
-        logger.info(f"Prompting LLM for {date}: {prompt}")
+        logger.info(f"Prompting LLM for {date_str}: {prompt}")
 
         try:
-            response = requests.post(url, json={
-                "model": model,
-                "prompt": prompt,
-                "stream": False
-            })
+            response = requests.post(
+                url,
+                json={
+                    "model": model,
+                    "prompt": prompt,
+                    "stream": False
+                },
+                timeout=10
+            )
             response.raise_for_status()
             result = response.json()
             text = result.get("response", "").strip()
-            logger.info(f"Generated headline for {date}: {text}")
+            logger.info(f"Generated headline for {date_str}: {text}")
         except RequestException as e:
-            text = f"{symbol} news on {date} (auto-generated)"
-            logger.warning(f"Failed to generate headline for {date}: {e}")
+            text = f"{symbol} news on {date_str} (auto-generated)"
+            logger.warning(f"Failed to generate headline for {date_str}: {e}")
 
         headlines.append({
-            "date": date,
+            "date": date_str,
             "rank": "top1",
             "headline": text
         })
@@ -64,20 +71,14 @@ def enrich_news_with_generated(
 
     real_dates = set(real_news_df["date"])
     missing_dates = sorted(set(price_dates) - real_dates)
-
     logger.info(f"Missing dates for LLM generation: {missing_dates[:3]}... total: {len(missing_dates)}")
 
-    generated_news = generate_local_headlines(symbol, missing_dates, url_llm, model_llm)
-
+    generated_news = generate_local_headlines(symbol, missing_dates, url_llm, model_llm) if missing_dates else []
     enriched = real_news_df.to_dict(orient="records") + generated_news
 
     for row in enriched:
-        if isinstance(row["date"], pd.Timestamp):
-            row["date"] = row["date"].strftime("%Y-%m-%d")
-        elif isinstance(row["date"], str):
-            continue
-        else:
-            raise ValueError(f"Unexpected date type in enriched row: {type(row['date'])}")
+        if not isinstance(row.get("date"), str):
+            row["date"] = pd.to_datetime(row.get("date")).strftime("%Y-%m-%d")
 
     enriched.sort(key=lambda x: x["date"])
     logger.info(f"Total enriched news rows: {len(enriched)}")

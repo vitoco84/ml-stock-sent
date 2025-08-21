@@ -59,10 +59,6 @@ class LinearElasticNet(Base):
         else:
             return pd.Series(yhat)
 
-    def train(self, X_train: pd.DataFrame, y_train: Any, X_val: pd.DataFrame = None,
-              y_val: pd.DataFrame = None) -> "LinearElasticNet":
-        return self.fit(X_train, y_train)
-
     def get_params(self, deep: bool = True) -> Dict[str, Any]:
         return {
             "horizon": self.horizon,

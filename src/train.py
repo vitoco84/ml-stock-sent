@@ -12,6 +12,7 @@ from src.scaler import SafeStandardScaler
 
 
 class ModelTrainer:
+
     def __init__(
             self,
             model: Any,
@@ -68,6 +69,7 @@ class ModelTrainer:
         if self.y_scale and self.y_scaler is not None:
             preds = self.y_scaler.inverse_transform(preds)
 
+        preds = np.asarray(preds)
         return metrics(np.asarray(y), preds)
 
     def predict(self, X):
@@ -75,17 +77,19 @@ class ModelTrainer:
         preds = self.model.predict(X_scaled)
         if self.y_scale and self.y_scaler is not None:
             preds = self.y_scaler.inverse_transform(preds)
-        return preds
+        return np.asarray(preds)
 
     def save(self) -> Path:
         self.output_path.mkdir(parents=True, exist_ok=True)
         model_path = self.output_path / f"{self.name}.pkl"
-        joblib.dump({
-            "model": self.model,
-            "preprocessor": self.preprocessor,
-            "y_scaler": self.y_scaler,
-            "y_scale": self.y_scale
-        }, str(model_path))
+        joblib.dump(
+            {
+                "model": self.model,
+                "preprocessor": self.preprocessor,
+                "y_scaler": self.y_scaler,
+                "y_scale": self.y_scale
+            }, str(model_path)
+        )
         return model_path
 
     @classmethod
@@ -127,10 +131,10 @@ class ModelTrainer:
                 candidate.fit(X_tr_s, y_tr_s)
 
             preds = candidate.predict(X_va_s)
-
             if self.y_scale:
                 preds = y_sclr.inverse_transform(preds)
 
+            preds = np.asarray(preds)
             m = metrics(np.asarray(y_va), preds)[metric_name]
             scores.append(-m if higher_is_better else m)
 

@@ -9,17 +9,19 @@ from src.logger import get_logger
 logger = get_logger(__name__)
 
 def set_seed(seed: int = 42) -> np.random.Generator:
-    """Set Random Seed globally."""
+    """Set random seed globally across numpy, random, torch, tensorflow if available."""
     os.environ["PYTHONHASHSEED"] = str(seed)
     random.seed(seed)
     np.random.seed(seed)
 
+    # TensorFlow
     try:
         import tensorflow as tf
         tf.random.set_seed(seed)
     except ImportError:
         pass
 
+    # PyTorch
     try:
         import torch
         torch.manual_seed(seed)

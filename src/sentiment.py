@@ -11,7 +11,7 @@ from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 from src.config import Config
 from src.logger import get_logger
-from src.utils import set_seed
+from src.utils import is_cuda_available, set_seed
 
 
 DEFAULT_FINBERT_MODEL = "yiyanghkust/finbert-tone"
@@ -27,13 +27,16 @@ class FinBERT:
             cache_dir: Union[str, Path] = ".cache/finbert"
     ):
         self.config = config
-        self.device = device if torch.cuda.is_available() and device == "cuda" else "cpu"
+        self.device = device if is_cuda_available() and device == "cuda" else "cpu"
         self.max_embedding_dims = max_embedding_dims
+
         self.tokenizer = AutoTokenizer.from_pretrained(DEFAULT_FINBERT_MODEL)
         self.classifier = AutoModelForSequenceClassification.from_pretrained(
             DEFAULT_FINBERT_MODEL,
-            use_safetensors=True).to(self.device)
+            use_safetensors=True
+        ).to(self.device)
         self.embedder = self.classifier.base_model
+
         self.logger = get_logger(self.__class__.__name__)
         self.logger.info(f"Loaded FinBERT model: {DEFAULT_FINBERT_MODEL} on {self.device}")
 
