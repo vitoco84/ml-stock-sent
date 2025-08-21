@@ -6,12 +6,12 @@ import pandas as pd
 import requests
 import yfinance as yf
 from joblib import Memory
+from requests import RequestException
 
 from src.logger import get_logger
 
 
 logger = get_logger(__name__)
-
 memory = Memory(location=Path(".cache"), verbose=0)
 
 def _rename_columns(df: pd.DataFrame) -> None:
@@ -19,14 +19,13 @@ def _rename_columns(df: pd.DataFrame) -> None:
     df.columns = [col.strip().lower().replace(" ", "_") for col in df.columns]
 
 def load_price(path: Path) -> pd.DataFrame:
-    """Loads Price Dataset."""
     df = pd.read_csv(Path(path))
     _rename_columns(df)
     df["date"] = pd.to_datetime(df["date"])
     return df.sort_values("date").reset_index(drop=True)
 
 def load_news(path: Path) -> pd.DataFrame:
-    """Loads News Dataset."""
+    """Loads News Dataset, only used in Jupyter Notebook."""
     df = pd.read_csv(Path(path))
     _rename_columns(df)
     top_cols = [c for c in df.columns if c.startswith("top")]
@@ -40,19 +39,7 @@ def load_news(path: Path) -> pd.DataFrame:
     df["date"] = pd.to_datetime(df["date"])
     return df.sort_values("date").reset_index(drop=True)
 
-def load_prices_sentiment(path: Path) -> pd.DataFrame:
-    """Loads Combined Sentiment with Prices Dataset."""
-    try:
-        df = pd.read_csv(Path(path))
-        df["date"] = pd.to_datetime(df["date"])
-        df = df.sort_values("date").reset_index(drop=True)
-    except FileNotFoundError:
-        logger.warning("Sentiment dataset not found, run sentiment notebook first.")
-        df = pd.DataFrame()
-    return df
-
 def merge_price_news(price: pd.DataFrame, news: pd.DataFrame) -> pd.DataFrame:
-    """Merge price and news data."""
     return (
         pd.merge(price, news, on="date", how="left", validate="many_to_many")
         .sort_values("date")
@@ -70,7 +57,7 @@ def time_series_split(
 
     target_cols = [c for c in df.columns if c == "target" or c.startswith("target_")]
     if not target_cols:
-        raise ValueError("No target columns found. Did you run create_features_and_target()?")
+        raise ValueError("No target columns found. Creat feature Dataset first!")
 
     usable = df[df[target_cols].notna().all(axis=1)].copy()
     forecast = df.tail(horizon).copy()
@@ -87,7 +74,7 @@ def time_series_split(
 
 @memory.cache
 def get_price_history(symbol: str, end_date: str, days: int = 90) -> pd.DataFrame:
-    """Fetch Prices from Yahoo Finance."""
+    """Fetch Open, High, Low, Clove, Volume and Adj Close Prices from Yahoo Finance."""
     end = pd.to_datetime(end_date)
     start = end - pd.Timedelta(days=int(days * 2.0))
 
@@ -103,22 +90,22 @@ def get_price_history(symbol: str, end_date: str, days: int = 90) -> pd.DataFram
 
     df = df.reset_index()
 
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = [col[0].lower() for col in df.columns]
-    else:
-        df.columns = [col.lower() for col in df.columns]
+    # Normalize columns: yfinance sometimes returns a MultiIndex
+    df.columns = [col[0].lower() for col in df.columns] \
+        if isinstance(df.columns, pd.MultiIndex) \
+        else [col.lower() for col in df.columns]
+    _rename_columns(df)
 
-    df.columns = [col.lower().replace(" ", "_") for col in df.columns]
-
-    missing = [col for col in ["date", "open", "high", "low", "close", "adj_close", "volume"] if col not in df.columns]
+    expected = ["date", "open", "high", "low", "close", "adj_close", "volume"]
+    missing = set(expected) - set(df.columns)
     if missing:
         raise ValueError(f"Missing expected columns: {missing}")
 
-    return df[["date", "open", "high", "low", "close", "adj_close", "volume"]]
+    return df[expected]
 
 @memory.cache
 def get_news_history(query: str, end_date: str, days: int, api_key: str, url: str) -> pd.DataFrame:
-    """Fetch NEws from NewsAPI."""
+    """Fetch News from NewsAPI (single page, up to 100 results)."""
     to_date = datetime.strptime(end_date, "%Y-%m-%d")
     from_date = to_date - timedelta(days=days)
 
@@ -132,9 +119,15 @@ def get_news_history(query: str, end_date: str, days: int, api_key: str, url: st
         "apiKey": api_key
     }
 
-    response = requests.get(url, params=params)
-    response.raise_for_status()
-    articles = response.json().get("articles", [])
+    payload = {}
+    try:
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        payload = response.json()
+    except RequestException as e:
+        logger.error(f"NewsAPI request failed: {e}")
+
+    articles = payload.get("articles", [])
 
     if not articles:
         logger.warning("No articles returned from NewsAPI.")

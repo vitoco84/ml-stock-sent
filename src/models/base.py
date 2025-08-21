@@ -8,7 +8,6 @@ import pandas as pd
 
 
 class Base(ABC):
-    """Base class for all models."""
     name = 'base_model'
 
     def __init__(self, horizon: int = 30, random_state: int = 42):

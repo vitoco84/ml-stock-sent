@@ -20,7 +20,7 @@ from sklearn.pipeline import Pipeline
 
 from app.api.main import app
 from src.config import Config
-from src.data import _rename_columns, load_prices_sentiment, time_series_split
+from src.data import _rename_columns, time_series_split
 from src.evaluation import SHAPExplainer
 from src.features import convert_log_return, create_features_and_target, generate_full_feature_row
 from src.llm import enrich_news_with_generated
@@ -294,7 +294,7 @@ def test_shap_explainer_outputs_values(rng):
     model = LinearElasticNet(horizon=1, multioutput=False).fit(X, y)
     pre, _ = get_preprocessor(X)
     pre.fit(X)
-    explainer = SHAPExplainer(model, pre, X)
+    explainer = SHAPExplainer(model, pre, X, "linear")
     shap_vals = explainer.explain(X)
     assert isinstance(shap_vals, (np.ndarray, list))
 
@@ -332,7 +332,3 @@ def test_predict_raw_from_file():
         assert response.status_code == 200, response.text
         data = response.json()
         assert {"log_return", "current_price", "predicted_price"} <= data.keys()
-
-def test_exception_and_logger():
-    df = load_prices_sentiment("foobar")
-    assert df.empty

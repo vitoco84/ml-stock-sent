@@ -10,7 +10,6 @@ from src.models.base import Base
 class LinearElasticNet(Base):
     """
     Linear regression with combined L1/L2 regularization (ElasticNet).
-
     Supports single-target or multi-target (e.g., 30-step vector) via MultiOutputRegressor.
     """
     name = "linear_elasticnet"
