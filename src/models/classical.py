@@ -10,10 +10,9 @@ from src.models.base import Base
 class LinearElasticNet(Base):
     """
     Linear regression with combined L1/L2 regularization (ElasticNet).
-    Supports single-target or multi-target (e.g., 30-step vector) via MultiOutputRegressor.
-    Use recursive roll-forward outside this class to produce a multi-day path.
-    """
 
+    Supports single-target or multi-target (e.g., 30-step vector) via MultiOutputRegressor.
+    """
     name = "linear_elasticnet"
 
     def __init__(
@@ -60,6 +59,10 @@ class LinearElasticNet(Base):
             return pd.DataFrame(yhat, columns=[f"target_{i}" for i in range(H)])
         else:
             return pd.Series(yhat)
+
+    def train(self, X_train: pd.DataFrame, y_train: Any, X_val: pd.DataFrame = None,
+              y_val: pd.DataFrame = None) -> "LinearElasticNet":
+        return self.fit(X_train, y_train)
 
     def get_params(self, deep: bool = True) -> Dict[str, Any]:
         return {

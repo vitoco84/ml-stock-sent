@@ -27,14 +27,10 @@ class Base(ABC):
     def suggest_hyperparameters(self, trial: optuna.Trial) -> Dict[str, Any]:
         raise NotImplementedError
 
-    def train(
-            self,
-            X_train: pd.DataFrame,
-            y_train: Any,
-            X_val: pd.DataFrame = None,
-            y_val: pd.DataFrame = None
-    ) -> "Base":
-        return self.fit(X_train, y_train)
+    @abstractmethod
+    def train(self, X_train: pd.DataFrame, y_train: Any, X_val: pd.DataFrame = None,
+              y_val: pd.DataFrame = None) -> "Base":
+        raise NotImplementedError
 
     def get_params(self, deep: bool = True) -> Dict[str, Any]:
         return {"horizon": self.horizon, "random_state": self.random_state}
@@ -43,10 +39,10 @@ class Base(ABC):
         p = Path(path)
         if p.parent and not p.parent.exists():
             p.parent.mkdir(parents=True, exist_ok=True)
-        joblib.dump(self, p)
+        joblib.dump(self, p, compress=True)
 
     @classmethod
-    def load(cls, path: Path) -> "Base":
+    def load(cls, path: Union[str, Path]) -> "Base":
         return joblib.load(Path(path))
 
     def __repr__(self):
