@@ -210,15 +210,18 @@ def post_predict_from_raw(
         news_df = pd.DataFrame(columns=["date", "rank", "headline"])
         logger.info("No initial news provided.")
 
+    ollama_base = settings.ollama_base
+    ollama_ok = _ollama_alive(ollama_base)
+
     # --- ENRICH NEWS (if requested) ---
-    if enrich and _ollama_alive(settings.ollama_tag):
+    if enrich and ollama_ok:
         logger.info("Enrich flag is ON — generating missing headlines via LLM")
         real_news = news_df.to_dict(orient="records")
         enriched_news = enrich_news_with_generated(
             price_dates=price_dates,
             real_news=real_news,
             symbol=symbol,
-            url_llm=settings.ollama_url,
+            url_llm=f"{ollama_base.rstrip('/')}/api/generate",
             model_llm=settings.ollama_model
         )
         news_df = pd.DataFrame(enriched_news)

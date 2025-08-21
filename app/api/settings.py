@@ -13,8 +13,7 @@ class Settings(BaseSettings):
 
     cors_origins: List[AnyHttpUrl] | List[str] = ["http://localhost:8501"]
 
-    ollama_url: str = "http://localhost:11434/api/generate"
-    ollama_tag: str = "http://localhost:11434/api/tags"
+    ollama_base: AnyHttpUrl | str = "http://localhost:11434"
     ollama_model: str = "llama3"
 
     api_root_path: str = ""

@@ -272,10 +272,12 @@ Build & run:
 ```bash
 docker compose build --no-cache # clean rebuild
 docker compose up --build # reuse images
+docker compose up -d # detached
 ```
 Stop:
 ```bash
 docker compose down
+docker compose down -v # removes volumes
 ```
 Status:
 ```bash
@@ -284,6 +286,16 @@ docker compose ps
 Prune:
 ```bash
 docker image prune
+```
+Ollama:
+```bash
+docker exec -it ollama ollama pull llama3 # first time only
+docker exec -it ollama ollama list
+```
+Logs:
+```bash
+docker compose logs api --tail=200
+docker compose logs ui --tail=200
 ```
 
 ---

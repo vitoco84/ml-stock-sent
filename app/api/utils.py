@@ -12,9 +12,10 @@ class LimitUploadSizeMiddleware(BaseHTTPMiddleware):
             return JSONResponse(content={"detail": "Payload too large"}, status_code=413)
         return await call_next(request)
 
-def _ollama_alive(url: str, timeout: float = 1.0) -> bool:
+def _ollama_alive(url: str, timeout: float = 3.0) -> bool:
     try:
-        requests.get(url, timeout=timeout)
+        r = requests.get(url, timeout=timeout)
+        r.raise_for_status()
         return True
     except Exception:
         return False
