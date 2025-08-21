@@ -7,18 +7,13 @@ import yaml
 
 def _is_url(s: str) -> bool:
     parsed = urlparse(s)
-    return parsed.scheme in ("http", "https")
+    return parsed.scheme in ("http", "https") and bool(parsed.netloc)
+
+def _looks_like_path(s: str) -> bool:
+    return s.startswith(("~", ".", "/", "\\")) or ("/" in s) or ("\\" in s)
 
 class Config:
-    """
-    Minimal YAML config loader.
-    - Dicts -> SimpleNamespace
-    - Lists -> list
-    - Strings:
-        * URLs stay strings
-        * Paths (relative/absolute) -> resolved absolute Path
-        * All else -> plain strings
-    """
+    """Minimal YAML config loader."""
 
     def __init__(self, path: Path):
         path = Path(path).expanduser().resolve()
@@ -42,7 +37,7 @@ class Config:
             s = obj.strip()
             if _is_url(s):
                 return s
-            if s.startswith((".", "/", "\\")) or ("/" in s or "\\" in s):
+            if _looks_like_path(s):
                 return (self._config_dir / s).expanduser().resolve()
             return s
         return obj
