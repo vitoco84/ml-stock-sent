@@ -210,10 +210,11 @@ curl -X POST "http://localhost:8000/predict-raw?symbol=AAPL&horizon=5&return_pat
 1. **01_eda.ipynb** – Exploratory Data Analysis
 2. **02_sentiment.ipynb** – Sentiment analysis with FinBERT
 3. **03_feature.ipynb** – Feature engineering
-4. **04_train_forecast.ipynb** – Model training & hyperparameter tuning (Optuna)
-5. **05_train_recursive_forecast.ipynb** – Recursive forecasting
+4. **04_linreg_forecast.ipynb** – Model training & hyperparameter tuning (Optuna)
+5. **05_linreg_recursive_forecast.ipynb** – Recursive forecasting
 6. **06_shap.ipynb** – Model evaluation & interpretability
-7. **07_train_wo_sentiment.ipynb** - Model training without Sentiment
+7. **07_linreg_wo_sentiment.ipynb** - Model training without Sentiment
+8. **08_runners.ipynb** - Runners for all Models (Linear Regression, XGBoost, Random Forest, NN MLP, LSTM)
 
 ---
 
@@ -320,9 +321,7 @@ This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for d
 
 ## 📝 TODO
 
-- [ ] Fix MultiOutputRegressor for XGB and LinReg
-- [ ] Implement **XGBoost Regressor** -> Single Target use ES
-- [ ] Implement **Random Forest Regressor** -> Single Target use ES
+- [ ] Implement **Random Forest Regressor**
 - [ ] Implement **Neural Network (MLP)**
 - [ ] Implement **LSTM** for sequential modeling
 - [ ] Write **academic-style report** (thesis-like)

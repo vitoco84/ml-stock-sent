@@ -1,5 +1,9 @@
-from typing import Any, Dict
+from __future__ import annotations
 
+from dataclasses import dataclass
+from typing import Any
+
+import numpy as np
 import pandas as pd
 from sklearn.linear_model import ElasticNet
 from sklearn.multioutput import MultiOutputRegressor
@@ -7,85 +11,45 @@ from sklearn.multioutput import MultiOutputRegressor
 from src.models.base import Base
 
 
+@dataclass
 class LinearElasticNet(Base):
     """
     Linear regression with combined L1/L2 regularization (ElasticNet).
     Supports single-target or multi-target (e.g., 30-step vector) via MultiOutputRegressor.
     """
-    name = "linear_elasticnet"
+    name = "linreg"
 
-    def __init__(
-            self,
-            horizon: int = 30,
-            alpha: float = 1e-3,
-            l1_ratio: float = 0.2,
-            random_state: int = 42,
-            selection: str = "cyclic",  # 'cyclic' or 'random'
-            max_iter: int = 2000,
-            multioutput: bool = True
-    ):
-        super().__init__(horizon=horizon, random_state=random_state)
-        self.alpha = alpha
-        self.l1_ratio = l1_ratio
-        self.selection = selection
-        self.max_iter = max_iter
-        self.multioutput = multioutput
-        self._build_estimator()
+    horizon: int = 30
+    random_state: int = 42
 
-    def _build_estimator(self) -> None:
+    alpha: float = 1e-3
+    l1_ratio: float = 0.2
+    selection: str = "cyclic"
+    max_iter: int = 2000
+
+    multioutput: bool = True
+
+    def __post_init__(self):
+        self._build()
+
+    def _build(self):
         base = ElasticNet(
             alpha=self.alpha,
             l1_ratio=self.l1_ratio,
             selection=self.selection,
             random_state=self.random_state,
-            max_iter=self.max_iter
+            max_iter=self.max_iter,
         )
         self.model = MultiOutputRegressor(base) if self.multioutput else base
 
-    def _build(self) -> None:
-        self._build_estimator()
-
-    def fit(self, X_train: pd.DataFrame, y_train: Any) -> "LinearElasticNet":
-        if not self.multioutput and y_train.ndim == 2 and y_train.shape[1] == 1:
-            y_train = y_train.ravel()
-        self.model.fit(X_train, y_train)
+    def fit(self, X: pd.DataFrame, y: Any) -> LinearElasticNet:
+        if not self.multioutput and getattr(y, "ndim", 1) == 2 and y.shape[1] == 1:
+            y = np.asarray(y).ravel()
+        self.model.fit(X, y)
         return self
 
-    def predict(self, X_test: pd.DataFrame) -> Any:
-        yhat = self.model.predict(X_test)
-        if self.multioutput:
-            H = yhat.shape[1] if hasattr(yhat, "shape") and yhat.ndim == 2 else 1
-            return pd.DataFrame(yhat, columns=[f"target_{i}" for i in range(H)])
-        else:
-            return pd.Series(yhat)
-
-    def get_params(self, deep: bool = True) -> Dict[str, Any]:
-        return {
-            "horizon": self.horizon,
-            "random_state": self.random_state,
-            "alpha": self.alpha,
-            "l1_ratio": self.l1_ratio,
-            "selection": self.selection,
-            "max_iter": self.max_iter,
-            "multioutput": self.multioutput,
-        }
-
-    def set_params(self, **params):
-        known = {
-            "horizon", "random_state",
-            "alpha", "l1_ratio", "selection", "max_iter",
-            "multioutput",
-        }
-        for k, v in list(params.items()):
-            if k in known:
-                setattr(self, k, v)
-                params.pop(k)
-        self._build_estimator()
-        return self
-
-    def suggest_hyperparameters(self, trial):
-        return {
-            "alpha": trial.suggest_float("alpha", 1e-5, 1e-2, log=True),
-            "l1_ratio": trial.suggest_float("l1_ratio", 0.0, 1.0),
-            "selection": trial.suggest_categorical("selection", ["cyclic", "random"])
-        }
+    def predict(self, X: pd.DataFrame) -> Any:
+        yhat = self.model.predict(X)
+        if self.multioutput and getattr(yhat, "ndim", 1) == 2:
+            return pd.DataFrame(yhat, columns=[f"target_{i}" for i in range(yhat.shape[1])])
+        return pd.Series(yhat)

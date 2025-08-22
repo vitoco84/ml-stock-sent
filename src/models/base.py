@@ -1,42 +1,48 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict, Union
+from typing import Any, Union
 
 import joblib
-import optuna
 import pandas as pd
+from sklearn.base import BaseEstimator
 
 
-class Base(ABC):
-    name = 'base_model'
+class Base(ABC, BaseEstimator):
+    name = "base"
 
     def __init__(self, horizon: int = 30, random_state: int = 42):
         self.horizon = horizon
         self.random_state = random_state
 
     @abstractmethod
-    def fit(self, X_train: pd.DataFrame, y_train: Any) -> "Base":
+    def fit(self, X_train: pd.DataFrame, y_train: Any) -> Base:
         raise NotImplementedError
 
     @abstractmethod
     def predict(self, X_test: pd.DataFrame) -> Any:
         raise NotImplementedError
 
-    @abstractmethod
-    def suggest_hyperparameters(self, trial: optuna.Trial) -> Dict[str, Any]:
-        raise NotImplementedError
+    def fit_with_val(
+            self,
+            X_train: pd.DataFrame,
+            y_train: Any,
+            X_val: pd.DataFrame,
+            y_val: Any,
+    ) -> Base:
+        return self.fit(X_train, y_train)
 
     def train(
             self,
             X_train: pd.DataFrame,
             y_train: Any,
             X_val: pd.DataFrame = None,
-            y_val: pd.DataFrame = None
-    ) -> "Base":
-        return self.fit(X_train, y_train)
-
-    def get_params(self, deep: bool = True) -> Dict[str, Any]:
-        return {"horizon": self.horizon, "random_state": self.random_state}
+            y_val: pd.DataFrame = None,
+    ) -> Base:
+        if X_val is None or y_val is None:
+            return self.fit(X_train, y_train)
+        return self.fit_with_val(X_train, y_train, X_val, y_val)
 
     def save(self, path: Union[str, Path]) -> None:
         p = Path(path)
@@ -45,8 +51,5 @@ class Base(ABC):
         joblib.dump(self, p, compress=True)
 
     @classmethod
-    def load(cls, path: Union[str, Path]) -> "Base":
+    def load(cls, path: Union[str, Path]) -> Base:
         return joblib.load(Path(path))
-
-    def __repr__(self):
-        return f"{self.__class__.__name__}(horizon={self.horizon}, random_state={self.random_state})"

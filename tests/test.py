@@ -25,6 +25,8 @@ from src.data import _rename_columns, time_series_split
 from src.evaluation import SHAPExplainer
 from src.features import create_features_and_target, generate_full_feature_row
 from src.llm import enrich_news_with_generated
+from src.models.direct_multi import DirectMultiStep
+from src.models.factory import build_model
 from src.models.linreg import LinearElasticNet
 from src.preprocessing import get_preprocessor
 from src.recursive import RecursiveForecaster
@@ -238,6 +240,12 @@ def test_model_trainer_fit_and_evaluate(rng):
     trainer.fit(X, y)
     results = trainer.evaluate(X, y)
     assert results["rmse"] > 0.0
+
+def test_build_model_wraps_xgboost_in_direct_multistep():
+    m_xgb = build_model("xgboost", horizon=5, random_state=0)
+    m_lr = build_model("linreg", horizon=5, random_state=0, multioutput=True)
+    assert isinstance(m_xgb, DirectMultiStep)
+    assert isinstance(m_lr, LinearElasticNet)
 
 # === Prediction ===
 
