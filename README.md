@@ -320,8 +320,9 @@ This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for d
 
 ## 📝 TODO
 
-- [ ] Implement **XGBoost Regressor**
-- [ ] Implement **Random Forest Regressor**
+- [ ] Fix MultiOutputRegressor for XGB and LinReg
+- [ ] Implement **XGBoost Regressor** -> Single Target use ES
+- [ ] Implement **Random Forest Regressor** -> Single Target use ES
 - [ ] Implement **Neural Network (MLP)**
 - [ ] Implement **LSTM** for sequential modeling
 - [ ] Write **academic-style report** (thesis-like)
@@ -332,3 +333,4 @@ This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for d
     - [ ] Add rate-limiting
     - [ ] Add request logging
 - [ ] Add monitoring & logging integration (Prometheus/Grafana)
+- [ ] Pipeline Orchestration: data -> train -> eval -> register -> deploy -> monitor

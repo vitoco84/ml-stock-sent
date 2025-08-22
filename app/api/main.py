@@ -97,7 +97,7 @@ def fetch_price_history(
         records = df.to_dict(orient="records")
 
         logger.info(f"Head of dataframe:\n{df.head()}")
-        logger.debug(f"Sample record: {df.to_dict(orient='records')[0]}")
+        logger.debug(f"Sample record: {df.to_dict(orient="records")[0]}")
         return {"price": records}
     except Exception:
         logger.exception("fetch_price_history failed")

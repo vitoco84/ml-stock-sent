@@ -33,25 +33,25 @@ def create_features_and_target(df: pd.DataFrame, forecast_horizon: int = 1) -> p
     to have additional information
     """
     df = df.copy()
-    df['date'] = pd.to_datetime(df['date'])
-    df = df.sort_values('date').reset_index(drop=True)
+    df["date"] = pd.to_datetime(df["date"])
+    df = df.sort_values("date").reset_index(drop=True)
 
-    if 'adj_close' not in df.columns:
+    if "adj_close" not in df.columns:
         raise ValueError("Expected 'adj_close' column in df.")
-    price = df['adj_close']
+    price = df["adj_close"]
 
     df["log_return"] = np.log(price / price.shift(1))
 
     if forecast_horizon > 1:
         for h in range(1, forecast_horizon + 1):
-            df[f'target_{h}'] = df['log_return'].shift(-h)
+            df[f"target_{h}"] = df["log_return"].shift(-h)
     else:
-        df['target'] = df['log_return'].shift(-1)
+        df["target"] = df["log_return"].shift(-1)
 
-    df['rsi'] = rsi(price)
-    df['macd'] = macd_diff(price)
-    df['h_bollinger'] = bollinger_hband(price)
-    df['l_bollinger'] = bollinger_lband(price)
+    df["rsi"] = rsi(price)
+    df["macd"] = macd_diff(price)
+    df["h_bollinger"] = bollinger_hband(price)
+    df["l_bollinger"] = bollinger_lband(price)
 
     lags = [5, 10, 25]
     for lag in lags:
