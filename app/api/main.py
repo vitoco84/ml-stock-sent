@@ -3,6 +3,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import torch
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -16,7 +17,6 @@ from src.llm import enrich_news_with_generated
 from src.logger import get_logger
 from src.sentiment import FinBERT
 from src.train import ModelTrainer
-from src.utils import is_cuda_available
 
 
 logger = get_logger(__name__)
@@ -33,7 +33,7 @@ async def lifespan(app: FastAPI):
     - Loads NEWS_API_KEY from .env
     - Stores initialized objects in `app.state` for later access
     """
-    device = "cuda" if is_cuda_available() else "cpu"
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     logger.info(f"Initializing FinBERT on {device}")
 
     sentiment_model = FinBERT(config, device=device)

@@ -37,11 +37,3 @@ def set_seed(seed: int = 42) -> np.random.Generator:
 
     logger.info(f"Global random seed set to {seed}")
     return np.random.default_rng(seed)
-
-def is_cuda_available() -> bool:
-    """Check if GPU is available."""
-    try:
-        import torch
-        return torch.cuda.is_available()
-    except Exception:
-        return False

@@ -26,7 +26,7 @@ model:
   path_dir: "../data/models"
   enet_mo_best_1: "enet_mo_1.pkl"
   best_params_enet_mo_best_1: "best_params_enet_mo_best_1.csv"
-  enet_mo_best_30: "enet_mo_30.pkl"
+  enet_mo_best_30: "linreg_h30.pkl"
   best_params_enet_mo_best_30: "best_params_enet_mo_best_30.csv"
   enet_mo_best_wo_sent_30: "enet_mo_wo_sent_30.pkl"
   best_params_enet_mo_best_wo_sent_30: "best_params_enet_mo_best_wo_sent_30.csv"

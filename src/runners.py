@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import numpy as np
 import optuna
 import pandas as pd
 
@@ -9,145 +10,132 @@ from src.preprocessing import get_preprocessor
 from src.train import ModelTrainer
 
 
-def get_sentiment_cols(df: pd.DataFrame) -> list[str]:
+def _sentiment_cols(df: pd.DataFrame) -> list[str]:
     base = ["pos", "neg", "neu", "pos_minus_neg"]
     emb = [c for c in df.columns if c.startswith("emb_")]
     return [c for c in base if c in df.columns] + emb
+
+def _select_cols(df_full: pd.DataFrame, include_sentiment: bool):
+    drop_cols = ["open", "high", "low", "close", "volume", "adj_close"]
+    target_cols = [c for c in df_full.columns if c == "target" or c.startswith("target_")]
+    feat_cols = [c for c in df_full.columns if c not in target_cols + ["date"] + drop_cols]
+    if not include_sentiment:
+        feat_cols = [c for c in feat_cols if c not in _sentiment_cols(df_full)]
+    return feat_cols, target_cols
+
+def _returns_to_prices(last_price: float, log_returns: np.ndarray) -> np.ndarray:
+    cum = np.cumsum(np.asarray(log_returns, dtype=float))
+    return last_price * np.exp(cum)
 
 def run_experiment(
         kind: str,
         df_full: pd.DataFrame,
         include_sentiment: bool,
-        path_dir: str, *,
-        horizon: int = 30,
-        random_state: int = 42
+        out_dir: str,
+        forecast_horizon: int = 30,
+        random_state: int = 42,
+        n_trials: int = 30
 ):
-    """
-    kind e.g.: 'linreg' or 'xgboost'
-    include_sentiment: True/False
-    returns: (results_df, study, final_trainer, context_dict)
-    """
-    # Train, Val, Split
-    train, val, test, forecast = time_series_split(df_full, train_ratio=0.8, val_ratio=0.1, horizon=horizon)
+    """Train/validate/test with Optuna tuning. kind ∈ {'linreg','xgboost'}."""
+    # Split and Features
+    train, val, test, _ = time_series_split(df_full, train_ratio=0.8, val_ratio=0.1, horizon=forecast_horizon)
 
-    # Features
     drop_cols = ["open", "high", "low", "close", "volume", "adj_close"]
     target_cols = [c for c in df_full.columns if c == "target" or c.startswith("target_")]
-    feat_cols = [c for c in df_full.columns if c not in target_cols + ["date"] + drop_cols]
-    sentiment_cols = get_sentiment_cols(df_full)
+    feature_cols = [c for c in df_full.columns if c not in target_cols + ["date"] + drop_cols]
 
     if not include_sentiment:
-        feat_cols = [c for c in feat_cols if c not in sentiment_cols]
+        sent = ["pos", "neg", "neu", "pos_minus_neg"] + [c for c in df_full.columns if c.startswith("emb_")]
+        feature_cols = [c for c in feature_cols if c not in sent]
 
-    X_train, y_train = train[feat_cols], train[target_cols]
-    X_val, y_val = val[feat_cols], val[target_cols]
-    X_test, y_test = test[feat_cols], test[target_cols]
-    X_forecast = forecast[feat_cols]
+    X_train, y_train = train[feature_cols], train[target_cols]
+    X_val, y_val = val[feature_cols], val[target_cols]
+    X_test, y_test = test[feature_cols], test[target_cols]
 
-    sent_tag = "with_sent" if include_sentiment else "wo_sent"
-    Path(path_dir).mkdir(parents=True, exist_ok=True)
-    X_test.to_parquet(Path(path_dir) / f"X_test_{kind}_{sent_tag}_h{horizon}.parquet", index=False)
-
-    # Preprocessor Pipeline
+    # Preprocessor
     preprocessor, _ = get_preprocessor(X_train)
 
-    # Model kwargs + y_scale
-    if kind == "xgboost":
-        model_kwargs = {
-            "horizon": horizon,
-            "random_state": random_state,
-            "tree_method": "hist",
-            "n_jobs": -1
-        }
-        y_scale = True
-    elif kind == "linreg":
-        model_kwargs = {
-            "horizon": horizon,
-            "random_state": random_state,
-            "multioutput": True,
-            "max_iter": 2000
-        }
-        y_scale = True
-    else:
-        raise ValueError(f"Unknown kind: {kind}")
+    # Base Model and Trainer
+    # DirectMultiStep auto-applied when horizon > 1
+    base_model = build_model(
+        kind,
+        horizon=forecast_horizon,
+        random_state=random_state,
+        multioutput=True if kind == "linreg" else False,
+        tree_method="hist" if kind == "xgboost" else None,
+        n_jobs=-1 if kind == "xgboost" else None,
+    )
 
-    # Base model and Trainer
-    base_model = build_model(kind, **model_kwargs)
     trainer = ModelTrainer(
         model=base_model,
-        name=f"{kind}_h{horizon}",
+        name=f"{kind}_h{forecast_horizon}",
         config={
             "optimization_metric": "rmse",
             "gap": 0,
             "seed": random_state,
-            "tune_targets": [0, 7, 14, 29],
-            "max_train_size": 5000
         },
         preprocessor=preprocessor,
-        y_scale=y_scale
+        y_scale=True
     )
 
-    # Tune Optuna
-    pruner = optuna.pruners.SuccessiveHalvingPruner(min_resource=1, reduction_factor=3)
+    # Optuna
     study = optuna.create_study(
         direction="minimize",
         sampler=optuna.samplers.TPESampler(seed=random_state),
-        pruner=pruner,
-        study_name=f"{kind}_{'with' if include_sentiment else 'wo'}_sent_h{horizon}"
+        pruner=optuna.pruners.SuccessiveHalvingPruner(min_resource=1, reduction_factor=3),
+        study_name=f"{kind}_{'with' if include_sentiment else 'wo'}_sent_h{forecast_horizon}"
     )
-    n_trials = 60 if kind == "xgboost" else 30
     study.optimize(lambda tr: trainer.objective(tr, X_train, y_train, n_splits=3), n_trials=n_trials, timeout=1200)
 
     best_params = study.best_trial.user_attrs.get("best_params", {}) or {}
     best_params.setdefault("random_state", random_state)
 
-    if kind == "xgboost":
-        final_model_kwargs = {**model_kwargs, **best_params, "tree_method": "hist", "device": "cuda", "n_jobs": 1}
-    else:
-        final_model_kwargs = {**model_kwargs, **best_params}
-
-    # Rebuild best and final Trainer
-    best_model = build_model(kind, **final_model_kwargs)
-    final_trainer = ModelTrainer(
+    # Rebuild with best params and train on train and val
+    best_model = build_model(kind, horizon=forecast_horizon, **best_params)
+    trainer = ModelTrainer(
         best_model,
-        name=f"{kind}_h{horizon}",
+        name=f"{kind}_h{forecast_horizon}",
         config={
             "optimization_metric": "rmse",
             "gap": 0,
             "seed": random_state
         },
         preprocessor=preprocessor,
-        y_scale=y_scale,
+        y_scale=True
     )
-    final_trainer.fit(X_train, y_train, X_val, y_val)
+    trainer.fit(X_train, y_train, X_val, y_val)
+
+    # Predictions
+    y_pred_test = np.asarray(trainer.predict(X_test))
+    y_true_test = np.asarray(y_test)
+    y_pred_last = y_pred_test[-1].ravel()
+    y_true_last = y_true_test[-1].ravel()
 
     # Metrics
-    meta = {
-        "scenario": f"direct_{'with' if include_sentiment else 'wo'}_sent",
-        "model": f"{kind}_h{horizon}",
-        "with_sentiment": include_sentiment,
-        "horizon": horizon,
-        "n_features": len(feat_cols)
-    }
-    results = {
-        "train": final_trainer.evaluate(X_train, y_train),
-        "val": final_trainer.evaluate(X_val, y_val),
-        "test": final_trainer.evaluate(X_test, y_test),
-    }
-    rows = [{"split": k, **meta, **v} for k, v in results.items()]
-    res_df = pd.DataFrame(rows)
+    metrics_train = trainer.evaluate(X_train, y_train)
+    metrics_val = trainer.evaluate(X_val, y_val)
+    metrics_test = trainer.evaluate(X_test, y_test)
 
-    # Save artifacts
-    pd.Series(best_params).to_csv(Path(path_dir) / f"final_params_{kind}_{meta['scenario']}_h{horizon}.csv")
-    model_path = final_trainer.save()
-    print("Best params:", best_params)
-    print("Saved model:", model_path)
+    # Save artifacts (minimal)
+    params_path = Path(out_dir) / f"best_params_{kind}_h{forecast_horizon}.csv"
+    pd.Series(best_params).to_csv(params_path)
+    model_path = trainer.save()
 
-    # Context for overlays
-    ctx = {
-        "df_full": df_full,
-        "train": train, "val": val, "test": test, "forecast": forecast,
-        "X_test": X_test, "y_test": y_test, "X_forecast": X_forecast,
-        "feat_cols": feat_cols, "target_cols": target_cols
+    return {
+        "kind": kind,
+        "horizon": forecast_horizon,
+        "include_sentiment": include_sentiment,
+
+        "paths": {"model": str(model_path), "params_csv": str(params_path)},
+        "best_params": best_params,
+        "features": {"feature_cols": feature_cols, "target_cols": target_cols},
+        "metrics": {"train": metrics_train, "val": metrics_val, "test": metrics_test},
+
+        "trainer": trainer,
+        "test_index": X_test.index,
+
+        "y_pred_test": y_pred_test,
+        "y_true_test": y_true_test,
+        "y_pred_last": y_pred_last,
+        "y_true_last": y_true_last
     }
-    return res_df, study, final_trainer, ctx

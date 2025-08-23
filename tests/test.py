@@ -25,11 +25,8 @@ from src.data import _rename_columns, time_series_split
 from src.evaluation import SHAPExplainer
 from src.features import create_features_and_target, generate_full_feature_row
 from src.llm import enrich_news_with_generated
-from src.models.direct_multi import DirectMultiStep
-from src.models.factory import build_model
 from src.models.linreg import LinearElasticNet
 from src.preprocessing import get_preprocessor
-from src.recursive import RecursiveForecaster
 from src.sentiment import FinBERT
 from src.train import ModelTrainer
 from src.utils import set_seed
@@ -145,7 +142,7 @@ def test_get_preprocessor_returns_pipeline_and_features():
 
 def test_generate_full_feature_row_no_sentiment():
     df = mk_price_df(BUSINESS_DATES_40)
-    row = generate_full_feature_row(df, None, None, horizon=5)
+    row = generate_full_feature_row(df, None, None, forecast_horizon=5)
     assert isinstance(row, pd.DataFrame)
     assert row.shape[0] == 1
 
@@ -184,8 +181,8 @@ def test_sentiment_affects_feature_row(config):
 
     model = FinBERT(config, device="cpu")
 
-    row_pos = generate_full_feature_row(df_price, df_pos, model, horizon=1)
-    row_neg = generate_full_feature_row(df_price, df_neg, model, horizon=1)
+    row_pos = generate_full_feature_row(df_price, df_pos, model, forecast_horizon=1)
+    row_neg = generate_full_feature_row(df_price, df_neg, model, forecast_horizon=1)
 
     assert not np.allclose(
         row_pos["pos_minus_neg"], row_neg["pos_minus_neg"]
@@ -241,12 +238,6 @@ def test_model_trainer_fit_and_evaluate(rng):
     results = trainer.evaluate(X, y)
     assert results["rmse"] > 0.0
 
-def test_build_model_wraps_xgboost_in_direct_multistep():
-    m_xgb = build_model("xgboost", horizon=5, random_state=0)
-    m_lr = build_model("linreg", horizon=5, random_state=0, multioutput=True)
-    assert isinstance(m_xgb, DirectMultiStep)
-    assert isinstance(m_lr, LinearElasticNet)
-
 # === Prediction ===
 
 def test_prediction_changes_with_different_prices(config):
@@ -255,8 +246,8 @@ def test_prediction_changes_with_different_prices(config):
 
     model, pre, sentiment_model = init_finbert(config)
 
-    X1 = pre.transform(generate_full_feature_row(price_df1, pd.DataFrame(), sentiment_model, horizon=30))
-    X2 = pre.transform(generate_full_feature_row(price_df2, pd.DataFrame(), sentiment_model, horizon=30))
+    X1 = pre.transform(generate_full_feature_row(price_df1, pd.DataFrame(), sentiment_model, forecast_horizon=30))
+    X2 = pre.transform(generate_full_feature_row(price_df2, pd.DataFrame(), sentiment_model, forecast_horizon=30))
 
     preds1 = model.predict(X1)
     preds2 = model.predict(X2)
@@ -270,25 +261,13 @@ def test_deterministic_prediction_with_seed(config):
 
     model, pre, sentiment_model = init_finbert(config)
 
-    X = pre.transform(generate_full_feature_row(price_df, pd.DataFrame(), sentiment_model, horizon=30))
+    X = pre.transform(generate_full_feature_row(price_df, pd.DataFrame(), sentiment_model, forecast_horizon=30))
 
     preds1 = model.predict(X)
     set_seed(42)
     preds2 = model.predict(X)
 
     assert np.allclose(preds1, preds2), "Predictions with same seed should match"
-
-# === Forecasting ===
-
-def test_recursive_forecaster_forecasts_with_dummy_data():
-    df = mk_price_df(BUSINESS_DATES_60)
-    feat = create_features_and_target(df).dropna(subset=["target"])
-    pre, _ = get_preprocessor(feat.drop(columns=["target"]))
-    model = LinearElasticNet(horizon=1, multioutput=False).fit(pre.fit_transform(feat.drop(columns=["target"])),
-                                                               feat["target"])
-    forecaster = RecursiveForecaster(model=model, preprocessor=pre, sentiment_model=None)
-    forecast = forecaster.forecast(df, news_df=None, horizon=5)
-    assert forecast.shape == (5,)
 
 # === Evaluation ===
 

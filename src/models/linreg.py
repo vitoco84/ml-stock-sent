@@ -53,3 +53,12 @@ class LinearElasticNet(Base):
         if self.multioutput and getattr(yhat, "ndim", 1) == 2:
             return pd.DataFrame(yhat, columns=[f"target_{i}" for i in range(yhat.shape[1])])
         return pd.Series(yhat)
+
+    @staticmethod
+    def search_space(trial):
+        return {
+            "alpha": trial.suggest_float("alpha", 1e-5, 1e-2, log=True),
+            "l1_ratio": trial.suggest_float("l1_ratio", 0.0, 1.0),
+            "max_iter": trial.suggest_int("max_iter", 1000, 4000, step=500),
+            "selection": trial.suggest_categorical("selection", ["cyclic", "random"]),
+        }

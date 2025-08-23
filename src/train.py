@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -6,19 +8,14 @@ import numpy as np
 import optuna
 from sklearn.base import clone
 from sklearn.model_selection import TimeSeriesSplit
+from sklearn.preprocessing import StandardScaler
 
 from src.logger import get_logger
 from src.metrics import metrics
-from src.models.search_spaces import SEARCH_SPACES
 from src.scaler import SafeStandardScaler
 
 
 class ModelTrainer:
-    """
-    High-level training/orchestration wrapper for time-series regression models.
-    Hyperparameter Tuning with Optuna using TimeSeriesSplit.
-    """
-
     def __init__(
             self,
             model: Any,
@@ -32,142 +29,115 @@ class ModelTrainer:
         self.name = name
         self.config = config
         self.output_path = Path(output_path)
-        self.preprocessor = preprocessor or SafeStandardScaler()
+        self.preprocessor = preprocessor
         self.y_scale = y_scale
         self.y_scaler: Optional[SafeStandardScaler] = None
 
         self.logger = get_logger(self.__class__.__name__)
         self.logger.info(f"Initialized ModelTrainer for model: {name}")
 
+    def _prep_X(self, pre, X_tr, X_va=None):
+        pre_ = clone(pre)
+        X_tr_s = pre_.fit_transform(X_tr).astype(np.float32)
+        X_va_s = pre_.transform(X_va).astype(np.float32) if X_va is not None else None
+        return pre_, X_tr_s, X_va_s
+
+    def _prep_y(self, y_tr, y_va=None):
+        if not self.y_scale:
+            return None, y_tr, y_va
+        s = StandardScaler()
+        y_tr_s = s.fit_transform(y_tr)
+        y_va_s = s.transform(y_va) if y_va is not None else None
+        return s, y_tr_s, y_va_s
+
+    def _build_candidate(self, params: Dict[str, Any], trial) -> Any:
+        base_params = self.model.get_params()
+        cand = self.model.__class__(**{**base_params, **params})
+        setattr(cand, "_trial", trial)
+        return cand
+
     def fit(self, X_train, y_train, X_val=None, y_val=None):
         self.logger.info("Starting model training...")
-        scaler: SafeStandardScaler | object = clone(self.preprocessor)
-        X_train_scaled = scaler.fit_transform(X_train).astype(np.float32)
-        X_val_scaled = scaler.transform(X_val).astype(np.float32) if X_val is not None else None
+        pre_, X_tr_s, X_va_s = self._prep_X(self.preprocessor, X_train, X_val)
+        y_s, y_tr_s, y_va_s = self._prep_y(y_train, y_val)
+        self.y_scaler = y_s
+        self.preprocessor = pre_
 
-        if self.y_scale:
-            self.y_scaler = SafeStandardScaler()
-            y_train_scaled = self.y_scaler.fit_transform(y_train)
-            y_val_scaled = self.y_scaler.transform(y_val) if y_val is not None else None
+        if hasattr(self.model, "train") and X_val is not None and y_val is not None:
+            self.model.train(X_tr_s, y_tr_s, X_va_s, y_va_s)
         else:
-            y_train_scaled = y_train
-            y_val_scaled = y_val
+            self.model.fit(X_tr_s, y_tr_s)
+        return self
 
-        if hasattr(self.model, "train"):
-            self.model.train(X_train_scaled, y_train_scaled, X_val_scaled, y_val_scaled)
-        else:
-            self.model.fit(X_train_scaled, y_train_scaled)
-
-        self.preprocessor = scaler
+    def predict(self, X):
+        X_s = self.preprocessor.transform(X).astype(np.float32)
+        pred = self.model.predict(X_s)
+        pred = np.asarray(pred)
+        if self.y_scale and self.y_scaler is not None:
+            pred = self.y_scaler.inverse_transform(pred)
+        return pred
 
     def evaluate(self, X, y):
         self.logger.info("Evaluating model...")
-        X_scaled = self.preprocessor.transform(X).astype(np.float32)
-        preds = self.model.predict(X_scaled)
-        preds = np.asarray(preds)
-        if self.y_scale and self.y_scaler is not None:
-            preds = self.y_scaler.inverse_transform(preds)
-        return metrics(np.asarray(y), preds)
-
-    def predict(self, X):
-        X_scaled = self.preprocessor.transform(X).astype(np.float32)
-        preds = self.model.predict(X_scaled)
-        preds = np.asarray(preds)
-        if self.y_scale and self.y_scaler is not None:
-            preds = self.y_scaler.inverse_transform(preds)
-        return preds
+        preds = self.predict(X)
+        return metrics(np.asarray(y), np.asarray(preds))
 
     def save(self) -> Path:
         self.output_path.mkdir(parents=True, exist_ok=True)
-        model_path = self.output_path / f"{self.name}.pkl"
+        path = self.output_path / f"{self.name}.pkl"
         joblib.dump(
             {
                 "model": self.model,
                 "preprocessor": self.preprocessor,
                 "y_scaler": self.y_scaler,
-                "y_scale": self.y_scale,
-            },
-            str(model_path),
+                "y_scale": self.y_scale
+            }, str(path),
         )
-        return model_path
+        return path
 
     @classmethod
     def load(cls, path: str):
-        obj = joblib.load(path)
-        return obj["model"], obj["preprocessor"], obj.get("y_scaler"), obj.get("y_scale", False)
+        blob = joblib.load(path)
+        return blob["model"], blob["preprocessor"], blob.get("y_scaler"), blob.get("y_scale", False)
 
     def objective(self, trial, X, y, n_splits: int = 3):
-        tune_k = self.config.get("tune_targets", 0)
-        if isinstance(tune_k, list) and hasattr(y, "iloc"):
-            y = y.iloc[:, tune_k]
-        elif isinstance(tune_k, int) and tune_k > 0:
-            y = y.iloc[:, :tune_k]
+        self.logger.info("Starting model tuning...")
 
-        space_key = getattr(self.model, "name", None)
-        if hasattr(self.model, "base_cls"):
-            space_key = getattr(self.model.base_cls, "name", space_key)
-
-        space_fn = SEARCH_SPACES.get(space_key)
-        params = space_fn(trial) if space_fn else {}
+        # ask the model class for its space (if present)
+        space_fn = getattr(self.model.__class__, "search_space", None)
+        params = space_fn(trial) if callable(space_fn) else {}
         params["random_state"] = self.config.get("seed", 42)
 
-        def build(hp):
-            if hasattr(self.model, "base_cls"):
-                base_cls = self.model.base_cls
-                merged = {**getattr(self.model, "base_params", {}), **hp}
-                cand = self.model.__class__(
-                    base_cls=base_cls,
-                    base_params=merged,
-                    horizon=self.model.horizon,
-                    random_state=hp["random_state"],
-                )
-            else:
-                base_params = self.model.get_params()
-                cand = self.model.__class__(**{**base_params, **hp})
-            setattr(cand, "_trial", trial)
-            return cand
-
-        tscv = TimeSeriesSplit(
-            n_splits=n_splits,
-            gap=int(self.config.get("gap", 0)),
-            max_train_size=self.config.get("max_train_size")
-        )
-        metric_name = self.config.get("optimization_metric", "rmse")
-        higher_is_better = metric_name.lower() in {"r2"}
+        tscv = TimeSeriesSplit(n_splits=n_splits, gap=int(self.config.get("gap", 0)))
+        metric = self.config.get("optimization_metric", "rmse")
 
         scores = []
         for tr_idx, va_idx in tscv.split(X):
-            candidate = build(params)
-
             X_tr, X_va = X.iloc[tr_idx], X.iloc[va_idx]
             y_tr, y_va = y.iloc[tr_idx], y.iloc[va_idx]
 
-            pre = clone(self.preprocessor)
-            X_tr_s = pre.fit_transform(X_tr).astype(np.float32)
-            X_va_s = pre.transform(X_va).astype(np.float32)
+            candidate = self._build_candidate(params, trial)
 
-            if self.y_scale:
-                y_sclr = SafeStandardScaler()
-                y_tr_s = y_sclr.fit_transform(y_tr)
-                y_va_s = y_sclr.transform(y_va)
-            else:
-                y_tr_s, y_va_s = y_tr, y_va
+            pre, X_tr_s, X_va_s = self._prep_X(self.preprocessor, X_tr, X_va)
+            y_s, y_tr_s, y_va_s = self._prep_y(y_tr, y_va)
 
             if hasattr(candidate, "train"):
                 candidate.train(X_tr_s, y_tr_s, X_va_s, y_va_s)
             else:
                 candidate.fit(X_tr_s, y_tr_s)
 
-            preds = np.asarray(candidate.predict(X_va_s))
-            if self.y_scale:
-                preds = y_sclr.inverse_transform(preds)
+            pred = candidate.predict(X_va_s)
+            if self.y_scale and y_s is not None:
+                pred = y_s.inverse_transform(pred)
 
-            m = metrics(np.asarray(y_va), preds)[metric_name]
-            scores.append(-m if higher_is_better else m)
+            m = metrics(np.asarray(y_va), np.asarray(pred))[metric]
+            scores.append(m)
 
-            trial.report(scores[-1], step=len(scores))
+            trial.report(m, step=len(scores))
             if trial.should_prune():
                 raise optuna.TrialPruned()
 
+        maximize = metric.lower() in {"r2"}
+        mean_score = float(np.mean(scores))
         trial.set_user_attr("best_params", params)
-        return float(np.mean(scores))
+        return -mean_score if maximize else mean_score
