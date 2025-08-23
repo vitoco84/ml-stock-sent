@@ -25,6 +25,7 @@ from src.data import _rename_columns, time_series_split
 from src.evaluation import SHAPExplainer
 from src.features import create_features_and_target, generate_full_feature_row
 from src.llm import enrich_news_with_generated
+from src.models.factory import build_model
 from src.models.linreg import LinearElasticNet
 from src.preprocessing import get_preprocessor
 from src.sentiment import FinBERT
@@ -232,7 +233,14 @@ def test_linear_elasticnet_singleoutput(rng):
 def test_model_trainer_fit_and_evaluate(rng):
     X = pd.DataFrame(rng.random((30, 5)), columns=[f"x{i}" for i in range(5)])
     y = pd.DataFrame(rng.random((30, 3)), columns=["target_0", "target_1", "target_2"])
-    model = LinearElasticNet(horizon=3, multioutput=True)
+
+    model = build_model(
+        kind="linreg",
+        horizon=3,
+        multioutput=True,
+        tree_method=None,
+        n_jobs=None,
+    )
     trainer = ModelTrainer(model=model, name="test_model", config={"optimization_metric": "rmse"})
     trainer.fit(X, y)
     results = trainer.evaluate(X, y)

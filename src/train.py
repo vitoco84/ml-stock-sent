@@ -29,7 +29,7 @@ class ModelTrainer:
         self.name = name
         self.config = config
         self.output_path = Path(output_path)
-        self.preprocessor = preprocessor
+        self.preprocessor = preprocessor or StandardScaler()
         self.y_scale = y_scale
         self.y_scaler: Optional[SafeStandardScaler] = None
 
@@ -37,7 +37,8 @@ class ModelTrainer:
         self.logger.info(f"Initialized ModelTrainer for model: {name}")
 
     def _prep_X(self, pre, X_tr, X_va=None):
-        pre_ = clone(pre)
+        pre_est = pre or StandardScaler()
+        pre_ = clone(pre_est)
         X_tr_s = pre_.fit_transform(X_tr).astype(np.float32)
         X_va_s = pre_.transform(X_va).astype(np.float32) if X_va is not None else None
         return pre_, X_tr_s, X_va_s
