@@ -1,0 +1,6 @@
+,0
+alpha,0.009311403260660715
+l1_ratio,0.8397646127079323
+max_iter,2000
+selection,random
+random_state,42

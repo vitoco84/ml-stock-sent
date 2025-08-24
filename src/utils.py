@@ -11,6 +11,8 @@ logger = get_logger(__name__)
 def set_seed(seed: int = 42) -> np.random.Generator:
     """Set random seed globally across numpy, random, torch, tensorflow if available."""
     os.environ["PYTHONHASHSEED"] = str(seed)
+    os.environ.setdefault("TF_DETERMINISTIC_OPS", "1")
+
     random.seed(seed)
     np.random.seed(seed)
 
@@ -25,11 +27,16 @@ def set_seed(seed: int = 42) -> np.random.Generator:
     try:
         import torch
         torch.manual_seed(seed)
-        torch.use_deterministic_algorithms(True)
+        if hasattr(torch, "use_deterministic_algorithms"):
+            try:
+                torch.use_deterministic_algorithms(True)
+            except Exception as e:
+                logger.warning(f"torch deterministic algorithms not fully supported: {e}")
         if torch.cuda.is_available():
             torch.cuda.manual_seed_all(seed)
-            torch.backends.cudnn.deterministic = True
-            torch.backends.cudnn.benchmark = False
+            if hasattr(torch.backends, "cudnn"):
+                torch.backends.cudnn.deterministic = True
+                torch.backends.cudnn.benchmark = False
     except ImportError:
         pass
     except Exception as e:
@@ -37,11 +44,3 @@ def set_seed(seed: int = 42) -> np.random.Generator:
 
     logger.info(f"Global random seed set to {seed}")
     return np.random.default_rng(seed)
-
-def is_cuda_available() -> bool:
-    """Check if GPU is available."""
-    try:
-        import torch
-        return torch.cuda.is_available()
-    except Exception:
-        return False

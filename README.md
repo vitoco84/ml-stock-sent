@@ -121,8 +121,8 @@ Fetch recent news headlines via NewsAPI.
 ```json
 {
   "news": [
-    { "date": "2025-01-10", "rank": "top1", "headline": "Apple stock surges" },
-    { "date": "2025-01-11", "rank": "top2", "headline": "Tech sector rallies" }
+    { "date": "2025-01-10", "headline": "Apple stock surges" },
+    { "date": "2025-01-11", "headline": "Tech sector rallies" }
   ]
 }
 ```
@@ -156,8 +156,8 @@ Predict next prices using historical **price** data and optional **news**.
     { "date": "2025-01-09", "open": 104, "high": 106, "low": 103, "close": 105, "adj_close": 105, "volume": 1200000 }
   ],
   "news": [
-    { "date": "2025-01-08", "rank": "top1", "headline": "Apple launches new product" },
-    { "date": "2025-01-09", "rank": "top2", "headline": "Market opens higher" }
+    { "date": "2025-01-08", "headline": "Apple launches new product" },
+    { "date": "2025-01-09", "headline": "Market opens higher" }
   ]
 }
 ```
@@ -197,8 +197,8 @@ curl -X POST "http://localhost:8000/predict-raw?symbol=AAPL&horizon=5&return_pat
           {"date":"2025-01-09","open":104,"high":106,"low":103,"close":105,"adj_close":105,"volume":1200000}
         ],
         "news":[
-          {"date":"2025-01-08","rank":"top1","headline":"Apple launches new product"},
-          {"date":"2025-01-09","rank":"top2","headline":"Market opens higher"}
+          {"date":"2025-01-08","headline":"Apple launches new product"},
+          {"date":"2025-01-09","headline":"Market opens higher"}
         ]
       }'
 ```
@@ -210,10 +210,10 @@ curl -X POST "http://localhost:8000/predict-raw?symbol=AAPL&horizon=5&return_pat
 1. **01_eda.ipynb** – Exploratory Data Analysis
 2. **02_sentiment.ipynb** – Sentiment analysis with FinBERT
 3. **03_feature.ipynb** – Feature engineering
-4. **04_linreg_forecast.ipynb** – Model training & hyperparameter tuning (Optuna)
-5. **05_linreg_recursive_forecast.ipynb** – Recursive forecasting
-6. **06_shap.ipynb** – Model evaluation & interpretability
-7. **07_linreg_wo_sentiment.ipynb** - Model training without Sentiment
+4. **04_linreg.ipynb** – Model training & hyperparameter MultiOutputRegressor
+5. **05_linreg_wo_sent.ipynb** – Model training & hyperparameter MultiOutputRegressor without Sentiment
+6. **06_xgboost.ipynb** – Model training & hyperparameter SingleOutput and Early Stopping
+7. **07_shap.ipynb** - Model evaluation & interpretability
 8. **08_runners.ipynb** - Runners for all Models (Linear Regression, XGBoost, Random Forest, NN MLP, LSTM)
 
 ---
@@ -332,4 +332,5 @@ This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for d
     - [ ] Add rate-limiting
     - [ ] Add request logging
 - [ ] Add monitoring & logging integration (Prometheus/Grafana)
+- [ ] Add Model Tracking MLFlow
 - [ ] Pipeline Orchestration: data -> train -> eval -> register -> deploy -> monitor

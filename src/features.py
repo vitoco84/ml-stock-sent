@@ -2,35 +2,22 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
-import ta
-from ta.momentum import rsi
-from ta.trend import macd_diff
-from ta.volatility import bollinger_hband, bollinger_lband
 
 from src.data import merge_price_news
 from src.sentiment import FinBERT
 
 
-def create_features_and_target(df: pd.DataFrame, forecast_horizon: int = 1) -> pd.DataFrame:
+def create_features_and_target(
+        df: pd.DataFrame,
+        forecast_horizon: int = 1,
+        back_horizon: int = 7,
+) -> pd.DataFrame:
     """
-    Create features and target.
-
-    Technical Indicators:
-    * Relative Strength Index (RSI)
-    * Moving Average Convergence Divergence (MACD)
-    * Bollinger Bands
-
-    Lag Features:
-    Past values used as predictors
-
-    Moving Averages:
-    These smooth out short-term fluctuations
-    * Simple Moving Average (SMA)
-    * Exponential Moving Average (EMA)
-
-    Aggregations:
-    Using mean, standard deviation in different time periods help the model
-    to have additional information
+    Features:
+      - Sliding lagged log returns: lag_1 ... lag_{n_lags}
+      - Calendar: quarter, day-of-week
+    Targets:
+      - Multi-step log return targets (target_1 ... target_H), or 'target' for 1-step
     """
     df = df.copy()
     df["date"] = pd.to_datetime(df["date"])
@@ -38,7 +25,7 @@ def create_features_and_target(df: pd.DataFrame, forecast_horizon: int = 1) -> p
 
     if "adj_close" not in df.columns:
         raise ValueError("Expected 'adj_close' column in df.")
-    price = df["adj_close"]
+    price = df["adj_close"].astype(float)
 
     df["log_return"] = np.log(price / price.shift(1))
 
@@ -48,33 +35,20 @@ def create_features_and_target(df: pd.DataFrame, forecast_horizon: int = 1) -> p
     else:
         df["target"] = df["log_return"].shift(-1)
 
-    df["rsi"] = rsi(price)
-    df["macd"] = macd_diff(price)
-    df["h_bollinger"] = bollinger_hband(price)
-    df["l_bollinger"] = bollinger_lband(price)
+    for k in range(1, back_horizon + 1):
+        df[f"lag_{k}"] = df["log_return"].shift(k)
 
-    lags = [5, 10, 25]
-    for lag in lags:
-        df[f'lag_{lag}'] = df['log_return'].shift(lag)
-        df[f'sma_{lag}'] = ta.trend.sma_indicator(df['log_return'], lag)
-        df[f'ema_{lag}'] = ta.trend.ema_indicator(df['log_return'], lag)
-
-    df['quarter'] = df['date'].dt.quarter.astype(int)
+    df["quarter"] = df["date"].dt.quarter.astype(int)
     df["dow"] = df["date"].dt.dayofweek.astype(int)
 
-    grp = df.groupby('quarter')['log_return']
-    df['q_mean'] = grp.expanding().mean().reset_index(level=0, drop=True).shift(1)
-    df['q_std'] = grp.expanding().std().reset_index(level=0, drop=True).shift(1)
-    df['q_skew'] = grp.expanding().skew().reset_index(level=0, drop=True).shift(1)
-
-    max_lag = max(lags) + 1
-    return df.iloc[max_lag:].copy()
+    return df.iloc[back_horizon:].copy()
 
 def generate_full_feature_row(
         price_df: pd.DataFrame,
         news_df: Optional[pd.DataFrame],
         sentiment_model: Optional[FinBERT],
-        horizon: int = 30,
+        forecast_horizon: int = 30,
+        back_horizon: int = 7,
         max_embedding_dims: int = 17
 ) -> pd.DataFrame:
     """Generate a full feature row."""
@@ -92,12 +66,13 @@ def generate_full_feature_row(
         daily_sentiment.drop(columns=["headline_count"], inplace=True)
 
     merged = merge_price_news(price_df, daily_sentiment)
-    features_df = create_features_and_target(merged, forecast_horizon=horizon)
+    features_df = create_features_and_target(merged, forecast_horizon, back_horizon)
 
     if features_df.empty:
         raise ValueError("Feature DataFrame is empty. Likely due to insufficient price history.")
 
-    target_cols = [f"target_{i}" for i in range(1, horizon + 1)]
+    # Drop Targets, keep only last feature row for inference
+    target_cols = [f"target_{i}" for i in range(1, forecast_horizon + 1)]
     if "target" in features_df.columns:
         target_cols.append("target")
     features_df = features_df.drop(columns=[c for c in target_cols if c in features_df.columns])

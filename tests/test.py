@@ -20,16 +20,15 @@ from fastapi.testclient import TestClient
 from sklearn.pipeline import Pipeline
 
 from app.api.main import app
-from src.config import Config
-from src.data import _rename_columns, time_series_split
+from config.config import Config
+from src.data import _rename_columns, _validate_ratios, time_series_split
 from src.evaluation import SHAPExplainer
 from src.features import create_features_and_target, generate_full_feature_row
 from src.llm import enrich_news_with_generated
-from src.models.direct_multi import DirectMultiStep
-from src.models.factory import build_model
+from src.models.factory import Experiment
 from src.models.linreg import LinearElasticNet
 from src.preprocessing import get_preprocessor
-from src.recursive import RecursiveForecaster
+from src.scaler import SafeStandardScaler
 from src.sentiment import FinBERT
 from src.train import ModelTrainer
 from src.utils import set_seed
@@ -48,7 +47,7 @@ def mk_price_df(dates: pd.DatetimeIndex, start: float = 100.0, stop: float = 150
 
 def init_finbert(config):
     sentiment_model = FinBERT(config, device="cpu")
-    model_path = Path(config.model.path_dir) / config.model.enet_mo_best_30
+    model_path = Path(config.data.models_dir) / "linreg.pkl"
     model, pre, _, _ = ModelTrainer.load(str(model_path))
     return model, pre, sentiment_model
 
@@ -108,15 +107,38 @@ def test_rename_columns():
     _rename_columns(df)
     assert list(df.columns) == ["open", "adj_close", "volume"]
 
-def test_time_series_split():
+def test_time_series_split_with_horizon_tail():
+    n = 100
+    H = 10
     df = pd.DataFrame({
-        "date": pd.date_range("2024-01-01", periods=100),
-        "feature": range(100),
-        "target": range(100)
+        "date": pd.date_range("2020-01-01", periods=n, freq="D"),
+        "adj_close": range(n)
     })
-    train, val, _, forecast = time_series_split(df, horizon=10)
-    assert len(train) > len(val) > 0
-    assert len(forecast) == 10
+    df = create_features_and_target(df, forecast_horizon=H)
+    train, val, test, future = time_series_split(df, train_ratio=0.7, val_ratio=0.2, horizon=H)
+
+    n_feat = len(df)
+
+    # assert sizes add up
+    assert len(train) + len(val) + len(test) + len(future) == n_feat
+    assert len(future) == H
+
+    # assert chronological ordering is preserved
+    assert train["date"].min() < train["date"].max() <= val["date"].min() <= val["date"].max() <= test["date"].max()
+
+    # assert future tail starts right after last test row (positional continuity)
+    effective_n = n_feat - H
+    assert test.index.max() == effective_n - 1
+    assert future.index.min() == effective_n
+
+    # assert first future date is the day after the last test date
+    assert future["date"].iloc[0] == df["date"].iloc[effective_n]
+
+def test_validate_ratios_invalid_bounds():
+    with pytest.raises(ValueError):
+        _validate_ratios(0, 0.2)
+    with pytest.raises(ValueError):
+        _validate_ratios(0.7, 1.0)
 
 # === Feature Engineering ===
 
@@ -145,7 +167,7 @@ def test_get_preprocessor_returns_pipeline_and_features():
 
 def test_generate_full_feature_row_no_sentiment():
     df = mk_price_df(BUSINESS_DATES_40)
-    row = generate_full_feature_row(df, None, None, horizon=5)
+    row = generate_full_feature_row(df, None, None, forecast_horizon=5)
     assert isinstance(row, pd.DataFrame)
     assert row.shape[0] == 1
 
@@ -168,24 +190,24 @@ def test_aggregate_daily_returns_expected_columns():
 
 def test_enrich_news_fills_missing_dates(monkeypatch):
     def fake_generate(symbol, dates, model="llama3", url_llm=None):
-        return [{"date": d, "rank": "top1", "headline": f"{symbol} test headline for {d}"} for d in dates]
+        return [{"date": d, "headline": f"{symbol} test headline for {d}"} for d in dates]
 
     monkeypatch.setattr("src.llm.generate_local_headlines", fake_generate)
     dates = ["2024-08-01", "2024-08-02", "2024-08-03"]
-    real_news = [{"date": "2024-08-01", "rank": "top1", "headline": "Real news"}]
+    real_news = [{"date": "2024-08-01", "headline": "Real news"}]
     enriched = enrich_news_with_generated(dates, real_news, "AAPL", "url", "llama3")
     assert len(enriched) == 3
 
 def test_sentiment_affects_feature_row(config):
     df_price = mk_price_df(BUSINESS_DATES_60)
 
-    df_pos = pd.DataFrame([{"date": "2024-03-01", "rank": "1", "headline": "great earnings results"}])
-    df_neg = pd.DataFrame([{"date": "2024-03-01", "rank": "1", "headline": "lawsuit and fraud scandal"}])
+    df_pos = pd.DataFrame([{"date": "2024-03-01", "headline": "great earnings results"}])
+    df_neg = pd.DataFrame([{"date": "2024-03-01", "headline": "lawsuit and fraud scandal"}])
 
     model = FinBERT(config, device="cpu")
 
-    row_pos = generate_full_feature_row(df_price, df_pos, model, horizon=1)
-    row_neg = generate_full_feature_row(df_price, df_neg, model, horizon=1)
+    row_pos = generate_full_feature_row(df_price, df_pos, model, forecast_horizon=1)
+    row_neg = generate_full_feature_row(df_price, df_neg, model, forecast_horizon=1)
 
     assert not np.allclose(
         row_pos["pos_minus_neg"], row_neg["pos_minus_neg"]
@@ -235,17 +257,34 @@ def test_linear_elasticnet_singleoutput(rng):
 def test_model_trainer_fit_and_evaluate(rng):
     X = pd.DataFrame(rng.random((30, 5)), columns=[f"x{i}" for i in range(5)])
     y = pd.DataFrame(rng.random((30, 3)), columns=["target_0", "target_1", "target_2"])
-    model = LinearElasticNet(horizon=3, multioutput=True)
+
+    linreg_exp = Experiment(
+        name="linreg",
+        build=lambda horizon, seed: LinearElasticNet(horizon=horizon, random_state=seed, multioutput=True),
+        include_sentiment=True
+    )
+    model = linreg_exp.build(3, 7)
+
     trainer = ModelTrainer(model=model, name="test_model", config={"optimization_metric": "rmse"})
     trainer.fit(X, y)
     results = trainer.evaluate(X, y)
     assert results["rmse"] > 0.0
 
-def test_build_model_wraps_xgboost_in_direct_multistep():
-    m_xgb = build_model("xgboost", horizon=5, random_state=0)
-    m_lr = build_model("linreg", horizon=5, random_state=0, multioutput=True)
-    assert isinstance(m_xgb, DirectMultiStep)
-    assert isinstance(m_lr, LinearElasticNet)
+def test_safe_scaler_1d_roundtrip():
+    s = SafeStandardScaler()
+    y = np.array([1.0, 2.0, 3.0])
+    ys = s.fit_transform(y)
+    y_back = s.inverse_transform(ys)
+    assert y_back.shape == (3,)
+    assert np.allclose(y_back, y)
+
+def test_safe_scaler_2d_roundtrip():
+    s = SafeStandardScaler()
+    y = np.array([[1.0, 0.1], [2.0, 0.2], [3.0, 0.3]])
+    ys = s.fit_transform(y)
+    y_back = s.inverse_transform(ys)
+    assert y_back.shape == (3, 2)
+    assert np.allclose(y_back, y)
 
 # === Prediction ===
 
@@ -255,8 +294,8 @@ def test_prediction_changes_with_different_prices(config):
 
     model, pre, sentiment_model = init_finbert(config)
 
-    X1 = pre.transform(generate_full_feature_row(price_df1, pd.DataFrame(), sentiment_model, horizon=30))
-    X2 = pre.transform(generate_full_feature_row(price_df2, pd.DataFrame(), sentiment_model, horizon=30))
+    X1 = pre.transform(generate_full_feature_row(price_df1, pd.DataFrame(), sentiment_model, forecast_horizon=30))
+    X2 = pre.transform(generate_full_feature_row(price_df2, pd.DataFrame(), sentiment_model, forecast_horizon=30))
 
     preds1 = model.predict(X1)
     preds2 = model.predict(X2)
@@ -270,25 +309,13 @@ def test_deterministic_prediction_with_seed(config):
 
     model, pre, sentiment_model = init_finbert(config)
 
-    X = pre.transform(generate_full_feature_row(price_df, pd.DataFrame(), sentiment_model, horizon=30))
+    X = pre.transform(generate_full_feature_row(price_df, pd.DataFrame(), sentiment_model, forecast_horizon=30))
 
     preds1 = model.predict(X)
     set_seed(42)
     preds2 = model.predict(X)
 
     assert np.allclose(preds1, preds2), "Predictions with same seed should match"
-
-# === Forecasting ===
-
-def test_recursive_forecaster_forecasts_with_dummy_data():
-    df = mk_price_df(BUSINESS_DATES_60)
-    feat = create_features_and_target(df).dropna(subset=["target"])
-    pre, _ = get_preprocessor(feat.drop(columns=["target"]))
-    model = LinearElasticNet(horizon=1, multioutput=False).fit(pre.fit_transform(feat.drop(columns=["target"])),
-                                                               feat["target"])
-    forecaster = RecursiveForecaster(model=model, preprocessor=pre, sentiment_model=None)
-    forecast = forecaster.forecast(df, news_df=None, horizon=5)
-    assert forecast.shape == (5,)
 
 # === Evaluation ===
 

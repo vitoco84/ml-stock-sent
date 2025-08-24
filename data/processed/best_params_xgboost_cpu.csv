@@ -1,0 +1,17 @@
+,0
+n_estimators,400
+learning_rate,0.02021492752992564
+max_depth,3
+subsample,0.8387159830688188
+colsample_bytree,0.659725354903265
+min_child_weight,1.7535530911733082
+reg_alpha,0.6920670685089387
+reg_lambda,1.934843389647289
+early_stopping_rounds,100
+max_bin,512
+grow_policy,depthwise
+objective,reg:absoluteerror
+eval_metric,rmse
+tree_method,hist
+max_leaves,0
+random_state,42

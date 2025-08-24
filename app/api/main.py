@@ -3,20 +3,20 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import torch
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.classes import NewsHistoryResponse, PredictionRequest, PredictionResponse, PriceHistoryResponse
 from app.api.settings import get_settings
 from app.api.utils import _ollama_alive, LimitUploadSizeMiddleware, to_dict
-from src.config import Config
+from config.config import Config
 from src.data import get_news_history, get_price_history
 from src.features import generate_full_feature_row
 from src.llm import enrich_news_with_generated
 from src.logger import get_logger
 from src.sentiment import FinBERT
 from src.train import ModelTrainer
-from src.utils import is_cuda_available
 
 
 logger = get_logger(__name__)
@@ -33,12 +33,12 @@ async def lifespan(app: FastAPI):
     - Loads NEWS_API_KEY from .env
     - Stores initialized objects in `app.state` for later access
     """
-    device = "cuda" if is_cuda_available() else "cpu"
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     logger.info(f"Initializing FinBERT on {device}")
 
     sentiment_model = FinBERT(config, device=device)
 
-    model_path = Path(config.model.path_dir) / config.model.enet_mo_best_30
+    model_path = Path(config.data.models_dir) / "linreg.pkl"
     if not model_path.exists():
         raise RuntimeError(f"Model file not found at {model_path}")
     model, preprocessor, y_scaler, y_scale = ModelTrainer.load(str(model_path))
@@ -89,15 +89,13 @@ def fetch_price_history(
     """
     try:
         df = get_price_history(symbol, end_date, days)
-
         if df.empty:
             raise HTTPException(404, "No price data returned. Check the symbol or date range.")
 
         df["date"] = df["date"].dt.strftime("%Y-%m-%d")
         records = df.to_dict(orient="records")
-
         logger.info(f"Head of dataframe:\n{df.head()}")
-        logger.debug(f"Sample record: {df.to_dict(orient='records')[0]}")
+        logger.debug(f"Sample record: {records[0]}")
         return {"price": records}
     except Exception:
         logger.exception("fetch_price_history failed")
@@ -125,10 +123,8 @@ def fetch_news_history(
             raise HTTPException(500, "Missing NEWS_API_KEY environment variable")
 
         df = get_news_history(query, end_date, days, api_key, settings.news_api_base)
-
         if df.empty:
             return {"news": [], "message": "No news found."}
-
         return {"news": df.to_dict(orient="records")}
     except Exception:
         logger.exception("fetch_news_history failed")
@@ -156,13 +152,13 @@ def post_predict_from_raw(
     - **predicted_price**: Predicted next price
     """
     horizon = min(horizon, 30)
-
     logger.info("Received prediction request")
 
     sentiment_model = request.app.state.sentiment_model
     model = request.app.state.model
     preprocessor = request.app.state.preprocessor
 
+    # --- PRICE ---
     try:
         if not getattr(request_body, "price", None):
             raise HTTPException(422, "`price` is required and must be a non-empty list.")
@@ -177,8 +173,13 @@ def post_predict_from_raw(
             "{date, open, high, low, close, adj_close, volume}."
         )
 
-    # --- PRICE ---
     price_df = pd.DataFrame(price_rows)
+
+    required_cols = {"date", "open", "high", "low", "close", "adj_close", "volume"}
+    missing = required_cols - set(price_df.columns)
+    if missing:
+        raise HTTPException(422, f"Missing required price columns: {sorted(missing)}")
+
     price_df["date"] = pd.to_datetime(price_df["date"]).dt.normalize()
     price_df = price_df.sort_values("date").drop_duplicates(subset=["date"], keep="last")
 
@@ -205,10 +206,20 @@ def post_predict_from_raw(
             logger.info(f"News DF:\n{news_df.tail()}")
         except Exception:
             logger.exception("Invalid `news` payload")
-            raise HTTPException(422, "`news` payload malformed. Expect list of {date, rank, headline}.")
+            raise HTTPException(422, "`news` payload malformed. Expect list of {date, headline}.")
     else:
-        news_df = pd.DataFrame(columns=["date", "rank", "headline"])
+        news_df = pd.DataFrame(columns=["date", "headline"])
         logger.info("No initial news provided.")
+
+    # Trim to keep latency bounded
+    if not news_df.empty:
+        number_of_row, amount_per_day = 1000, 20
+        news_df = (
+            news_df
+            .sort_values(["date"])
+            .groupby("date", as_index=False)
+            .head(amount_per_day)
+            .tail(number_of_row))
 
     ollama_base = settings.ollama_base
     ollama_ok = _ollama_alive(ollama_base)
@@ -231,7 +242,7 @@ def post_predict_from_raw(
         else:
             logger.info("Enrichment produced no headlines (continuing with empty news).")
     else:
-        logger.info("Enrich flag is OFF — skipping headline generation")
+        logger.info("Enrich flag is OFF or LLM unavailable — skipping headline generation")
 
     # --- FEATURE GENERATION ---
     try:
@@ -249,7 +260,10 @@ def post_predict_from_raw(
     # --- PREDICTION ---
     try:
         X = preprocessor.transform(feature_row)
-        yhat = model.predict(X)  # shape (1, H) or (1,)
+        yhat = model.predict(X)  # shape (1, H) or (H,) or sometimes (N,H)
+        yhat = np.asarray(yhat, dtype=float)
+        if yhat.ndim == 1:
+            yhat = yhat.reshape(1, -1)
     except Exception:
         logger.exception("Model prediction failed")
         raise HTTPException(500, "Prediction failed.")
@@ -257,7 +271,7 @@ def post_predict_from_raw(
     yhat = np.asarray(yhat).reshape(1, -1)
 
     # Inverse-transform if y was scaled during training
-    if getattr(request.app.state, "y_scaler", None) is not None:
+    if getattr(request.app.state, "y_scale", False) and getattr(request.app.state, "y_scaler", None) is not None:
         yhat = request.app.state.y_scaler.inverse_transform(yhat)
 
     # Clamp horizon to available outputs

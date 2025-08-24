@@ -42,19 +42,20 @@ def clear_csv_state():
     for k in ["price_csv_df", "news_csv_df"]:
         st.session_state.pop(k, None)
 
-def symbol_valid():
+def symbol_valid(symbol: str):
     if not re.fullmatch(r"[A-Za-z0-9_.^-]+", symbol):
         st.error("Invalid symbol format.")
         st.stop()
 
 mode = st.radio("Data source", ["Fetch from API", "Upload CSVs"], horizontal=True)
+h_sel = st.slider("Forecast horizon (days)", 1, 30, 30)
 
 if mode == "Upload CSVs":
     clear_fetch_state()
     st.subheader("Upload CSVs")
 
     # Prices
-    st.markdown("<span style='color:#16a34a; font-weight:700'>💹 Prices CSV</span>", unsafe_allow_html=True)
+    st.markdown("<span style='color:#16a34a; font-weight:700'>Prices CSV</span>", unsafe_allow_html=True)
     price_file = st.file_uploader(
         "Prices CSV (date, open, high, low, close, adj_close, volume)",
         type=["csv"],
@@ -63,9 +64,9 @@ if mode == "Upload CSVs":
     )
 
     # News
-    st.markdown("<span style='color:#2563eb; font-weight:700'>📰 News CSV (optional)</span>", unsafe_allow_html=True)
+    st.markdown("<span style='color:#2563eb; font-weight:700'>News CSV (optional)</span>", unsafe_allow_html=True)
     news_file = st.file_uploader(
-        "News CSV (date, rank, headline)",
+        "News CSV (date, headline)",
         type=["csv"],
         key="news_upl",
         label_visibility="collapsed",
@@ -76,13 +77,11 @@ if mode == "Upload CSVs":
         st.session_state.price_csv_df = load_csv(price_file)
         st.success(f"Loaded {len(st.session_state.price_csv_df)} price rows")
     else:
-        # If user clears the uploader, drop cached DF so Predict can’t run
+        # If user clears the uploader, drop cached Data
         st.session_state.pop("price_csv_df", None)
 
     if news_file:
         news_df = load_csv(news_file)
-        if isinstance(news_df, pd.DataFrame) and "rank" in news_df.columns:
-            news_df["rank"] = news_df["rank"].astype(str)
         st.session_state.news_csv_df = news_df
         st.success(f"Loaded {len(news_df)} news rows")
     else:
@@ -95,6 +94,13 @@ if mode == "Upload CSVs":
         value=False,
     )
 
+    price_df_preview = st.session_state.get("price_csv_df")
+    if isinstance(price_df_preview, pd.DataFrame) and not price_df_preview.empty:
+        need = {"date", "open", "high", "low", "close", "adj_close", "volume"}
+        miss = need - set(price_df_preview.columns)
+        if miss:
+            st.warning(f"Prices CSV missing columns: {sorted(miss)}")
+
     # Only enable Predict when prices are available
     can_predict_csv = (
             isinstance(st.session_state.get("price_csv_df"), pd.DataFrame)
@@ -106,7 +112,7 @@ else:
     clear_csv_state()
     with st.form("fetch_controls"):
         symbol = st.text_input("Ticker Symbol", value=st.session_state.get("symbol", "AAPL"))
-        symbol_valid()
+        symbol_valid(symbol)
         end_date = st.date_input("End Date", value=st.session_state.get("end_date", datetime.today()))
         days = st.slider("Lookback Days", min_value=30, max_value=365, value=int(st.session_state.get("days", 90)))
         st.checkbox("Enrich with LLM if headlines missing", key="enrich_flag", value=False)
@@ -116,7 +122,7 @@ else:
         for i in range(3):
             headline = st.text_input(f"Headline {i + 1}", key=f"headline_{i}")
             if headline:
-                news_input.append({"date": end_date.strftime("%Y-%m-%d"), "rank": str(i + 1), "headline": headline})
+                news_input.append({"date": end_date.strftime("%Y-%m-%d"), "headline": headline})
 
         c1, c2 = st.columns(2)
         with c1:
@@ -157,12 +163,19 @@ if predict_btn:
         if price_df is None or price_df.empty:
             st.warning("Upload a Prices CSV first.")
             st.stop()
+
+        need = {"date", "open", "high", "low", "close", "adj_close", "volume"}
+        miss = need - set(price_df.columns)
+        if miss:
+            st.error(f"Prices CSV missing columns: {sorted(miss)}")
+            st.stop()
+
         news_df = st.session_state.get("news_csv_df")
         news_records = news_df.to_dict(orient="records") if isinstance(news_df, pd.DataFrame) else []
         payload = {"price": price_df.to_dict(orient="records"), "news": news_records}
         params = {
             "enrich": st.session_state.get("enrich_flag", False),
-            "horizon": 30,
+            "horizon": int(h_sel),
             "return_path": True,
             "symbol": "CSV",
         }
@@ -175,7 +188,7 @@ if predict_btn:
         payload = {"price": price_df.to_dict(orient="records"), "news": news_records}
         params = {
             "enrich": st.session_state.get("enrich_flag", False) if "enrich_flag" in st.session_state else False,
-            "horizon": 30,
+            "horizon": int(h_sel),
             "return_path": True,
             "symbol": st.session_state.get("symbol", "AAPL"),
         }
@@ -236,7 +249,8 @@ if predict_btn:
             alt.Chart(path_df.tail(1)).mark_text(dx=8, dy=-8, color="red").encode(
                 x_enc, y_enc, text=alt.Text("price:Q", format="$.2f")
             ),
-        ).properties(width=700, height=380, title="Adj Close: Actual + Predicted Next 30 Business Days")
+        ).properties(width=700, height=380,
+                     title=f"Adj Close: Actual + Predicted Next {int(result.get('horizon', len(path_df)))} Business Days")
         st.subheader("Price Chart")
         st.altair_chart(chart, use_container_width=True)
     else:

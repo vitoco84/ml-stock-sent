@@ -21,15 +21,14 @@ class LinearElasticNet(Base):
 
     horizon: int = 30
     random_state: int = 42
-
     alpha: float = 1e-3
     l1_ratio: float = 0.2
     selection: str = "cyclic"
     max_iter: int = 2000
-
     multioutput: bool = True
 
     def __post_init__(self):
+        super().__init__(horizon=self.horizon, random_state=self.random_state)
         self._build()
 
     def _build(self):
@@ -48,8 +47,15 @@ class LinearElasticNet(Base):
         self.model.fit(X, y)
         return self
 
-    def predict(self, X: pd.DataFrame) -> Any:
+    def predict(self, X: pd.DataFrame) -> np.ndarray:
         yhat = self.model.predict(X)
-        if self.multioutput and getattr(yhat, "ndim", 1) == 2:
-            return pd.DataFrame(yhat, columns=[f"target_{i}" for i in range(yhat.shape[1])])
-        return pd.Series(yhat)
+        return np.asarray(yhat)
+
+    @staticmethod
+    def search_space(trial):
+        return {
+            "alpha": trial.suggest_float("alpha", 1e-5, 1e-2, log=True),
+            "l1_ratio": trial.suggest_float("l1_ratio", 0.0, 1.0),
+            "max_iter": trial.suggest_int("max_iter", 1000, 4000, step=500),
+            "selection": trial.suggest_categorical("selection", ["cyclic", "random"]),
+        }
