@@ -147,7 +147,7 @@ class ModelTrainer:
 
             # Candidate Prep
             candidate = self._build_candidate(params, trial)
-            pre, X_tr_s, X_va_s = self._prep_X(self.preprocessor, X_tr, X_va)
+            _, X_tr_s, X_va_s = self._prep_X(self.preprocessor, X_tr, X_va)
             y_s, y_tr_s, y_va_s = self._prep_y(y_tr, y_va)
 
             # Train

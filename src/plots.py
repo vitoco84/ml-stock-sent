@@ -10,6 +10,7 @@ import seaborn as sns
 from numpy.typing import NDArray
 from statsmodels.graphics.tsaplots import plot_acf
 
+ADJ_CLOSE_LABEL = "Adj Close"
 
 # --- Utilities ---
 
@@ -90,7 +91,7 @@ def plot_price_series(df: pd.DataFrame, path: Path | str) -> None:
     ax.plot(pd.to_datetime(df["date"]), df["adj_close"])
     ax.set_title("Closing Price Over Time")
     ax.set_xlabel("Date")
-    ax.set_ylabel("Adj Close")
+    ax.set_ylabel(ADJ_CLOSE_LABEL)
     ax.grid(True)
     fig.tight_layout()
     fig.savefig(_ensure_path(path), dpi=150)
@@ -114,7 +115,7 @@ def plot_moving_averages(df: pd.DataFrame, path: Path | str) -> None:
     df["ema_10"] = df["adj_close"].ewm(span=10).mean()
 
     fig, ax = plt.subplots(figsize=(10, 4))
-    ax.plot(pd.to_datetime(df["date"]), df["adj_close"], label="Adj Close")
+    ax.plot(pd.to_datetime(df["date"]), df["adj_close"], label=ADJ_CLOSE_LABEL)
     ax.plot(pd.to_datetime(df["date"]), df["sma_10"], label="SMA 10")
     ax.plot(pd.to_datetime(df["date"]), df["ema_10"], label="EMA 10")
     ax.set_title("Moving Averages")
@@ -195,7 +196,7 @@ def plot_test_overlay_h1(
         pred_next_by_model: Dict[str, NDArray[np.float64]],
         path: Path | str,
         title: str = "Actual vs Predicted Adj Close (H=1)",
-        ylabel: str = "Adj Close",
+        ylabel: str = ADJ_CLOSE_LABEL,
 ) -> None:
     dates_next = np.asarray(dates_next)
     y_act = np.asarray(actual_next, float)
