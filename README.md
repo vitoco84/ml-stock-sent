@@ -232,6 +232,10 @@ Integration tests (needs `NEWS_API_KEY`):
 ```bash
 pytest -m integration
 ```
+Tests with coverage HTML report
+```bash
+pytest --cov=src --cov-report=html
+```
 
 ---
 

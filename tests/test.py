@@ -21,7 +21,7 @@ from sklearn.pipeline import Pipeline
 
 from app.api.main import app
 from config.config import Config
-from src.data import _rename_columns, _validate_ratios, time_series_split
+from src.data import _rename_columns, time_series_split
 from src.evaluation import SHAPExplainer
 from src.features import create_features_and_target, generate_full_feature_row
 from src.llm import enrich_news_with_generated
@@ -133,12 +133,6 @@ def test_time_series_split_with_horizon_tail():
 
     # assert first future date is the day after the last test date
     assert future["date"].iloc[0] == df["date"].iloc[effective_n]
-
-def test_validate_ratios_invalid_bounds():
-    with pytest.raises(ValueError):
-        _validate_ratios(0, 0.2)
-    with pytest.raises(ValueError):
-        _validate_ratios(0.7, 1.0)
 
 # === Feature Engineering ===
 

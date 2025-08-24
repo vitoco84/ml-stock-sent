@@ -48,14 +48,6 @@ def merge_price_news(price: pd.DataFrame, news: pd.DataFrame) -> pd.DataFrame:
         .reset_index(drop=True)
     )
 
-def _validate_ratios(train_ratio: float, val_ratio: float):
-    if train_ratio <= 0 or train_ratio >= 1:
-        raise ValueError("train_ratio must be in (0,1).")
-    if val_ratio <= 0 or val_ratio >= 1:
-        raise ValueError("val_ratio must be in (0,1).")
-    if train_ratio + val_ratio >= 1:
-        raise ValueError("train_ratio + val_ratio must be < 1.")
-
 def time_series_split(
         df: pd.DataFrame,
         train_ratio: float = 0.8,
@@ -63,7 +55,6 @@ def time_series_split(
         horizon: int = 30
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Chronologically split DataFrame into train, val, test, and forecast sets. """
-    _validate_ratios(train_ratio, val_ratio)
     df = df.sort_values("date").reset_index(drop=True)
 
     target_cols = [c for c in df.columns if c == "target" or c.startswith("target_")]
