@@ -10,7 +10,7 @@ from src.logger import get_logger
 logger = get_logger(__name__)
 
 def generate_local_headlines(symbol: str, dates: List[str], url: str, model: str = "llama3") -> List[dict]:
-    """Prompts local Ollama to generate fakes news headlines."""
+    """Prompts local Ollama to generate fake news headlines."""
     logger.info(f"Generating {len(dates)} local headlines via LLM ({model}) for {symbol}")
     headlines: List[dict] = []
 
@@ -22,6 +22,7 @@ def generate_local_headlines(symbol: str, dates: List[str], url: str, model: str
             f"Write a realistic financial news headline for '{symbol}' on {date_str}. "
             f"Make it sound like a headline from a business news site."
         )
+
         logger.info(f"Prompting LLM for {date_str}: {prompt}")
 
         try:
@@ -44,7 +45,6 @@ def generate_local_headlines(symbol: str, dates: List[str], url: str, model: str
 
         headlines.append({
             "date": date_str,
-            "rank": "top1",
             "headline": text
         })
 
@@ -62,7 +62,7 @@ def enrich_news_with_generated(
 
     if not real_news:
         logger.warning("No real news provided — generating headlines for all price dates.")
-        real_news_df = pd.DataFrame(columns=["date", "rank", "headline"])
+        real_news_df = pd.DataFrame(columns=["date", "headline"])
     else:
         real_news_df = pd.DataFrame(real_news)
         if "date" not in real_news_df.columns:

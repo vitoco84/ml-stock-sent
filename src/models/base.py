@@ -11,6 +11,7 @@ from sklearn.base import BaseEstimator
 
 
 class Base(ABC, BaseEstimator):
+    """Base Class Interface for TimeSeries Regressors."""
     name = "base"
 
     def __init__(self, horizon: int = 30, random_state: int = 42):
@@ -22,7 +23,7 @@ class Base(ABC, BaseEstimator):
         raise NotImplementedError
 
     @abstractmethod
-    def predict(self, X_test: pd.DataFrame) -> np.ndarray:
+    def predict(self, X_test: pd.DataFrame) -> Any:
         raise NotImplementedError
 
     def fit_with_val(

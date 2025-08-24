@@ -19,14 +19,15 @@ def _rename_columns(df: pd.DataFrame) -> None:
     df.columns = [col.strip().lower().replace(" ", "_") for col in df.columns]
 
 def load_price(path: Path) -> pd.DataFrame:
-    df = pd.read_csv(Path(path))
+    """Loads Price Dataset, only used in Jupyter Notebook."""
+    df = pd.read_csv(path)
     _rename_columns(df)
     df["date"] = pd.to_datetime(df["date"])
     return df.sort_values("date").reset_index(drop=True)
 
 def load_news(path: Path) -> pd.DataFrame:
     """Loads News Dataset, only used in Jupyter Notebook."""
-    df = pd.read_csv(Path(path))
+    df = pd.read_csv(path)
     _rename_columns(df)
     top_cols = [c for c in df.columns if c.startswith("top")]
     df = df.melt(
@@ -37,6 +38,7 @@ def load_news(path: Path) -> pd.DataFrame:
     ).dropna()
     df["headline"] = df["headline"].astype(str).str.strip()
     df["date"] = pd.to_datetime(df["date"])
+    df = df.drop(columns=["rank"])
     return df.sort_values("date").reset_index(drop=True)
 
 def merge_price_news(price: pd.DataFrame, news: pd.DataFrame) -> pd.DataFrame:
@@ -46,6 +48,12 @@ def merge_price_news(price: pd.DataFrame, news: pd.DataFrame) -> pd.DataFrame:
         .reset_index(drop=True)
     )
 
+def _validate_ratios(train_ratio: float, val_ratio: float):
+    if not (0 < train_ratio < 1 and 0 < val_ratio < 1):
+        raise ValueError("train_ratio and val_ratio must be in (0,1).")
+    if train_ratio + val_ratio >= 1:
+        raise ValueError("train_ratio + val_ratio must be < 1.")
+
 def time_series_split(
         df: pd.DataFrame,
         train_ratio: float = 0.8,
@@ -53,6 +61,7 @@ def time_series_split(
         horizon: int = 30
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Chronologically split DataFrame into train, val, test, and forecast sets. """
+    _validate_ratios(train_ratio, val_ratio)
     df = df.sort_values("date").reset_index(drop=True)
 
     target_cols = [c for c in df.columns if c == "target" or c.startswith("target_")]
@@ -84,7 +93,6 @@ def get_price_history(symbol: str, end_date: str, days: int = 90) -> pd.DataFram
         end=end.strftime("%Y-%m-%d"),
         auto_adjust=False
     )
-
     if df.empty:
         raise ValueError(f"No data returned for symbol {symbol}")
 
@@ -135,7 +143,6 @@ def get_news_history(query: str, end_date: str, days: int, api_key: str, url: st
     records = [
         {
             "date": article["publishedAt"][:10],
-            "rank": 1,  # Default value
             "headline": article["title"]
         }
         for article in articles

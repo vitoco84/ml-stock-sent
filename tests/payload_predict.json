@@ -841,202 +841,162 @@
   "news": [
     {
       "date": "2025-04-02",
-      "rank": 1,
       "headline": "Tech sector drives markets higher as investors return to growth stocks"
     },
     {
       "date": "2025-04-02",
-      "rank": 2,
       "headline": "Financials see moderate gains amid steady trading volumes"
     },
     {
       "date": "2025-04-03",
-      "rank": 1,
       "headline": "Markets retreat on profit-taking after strong tech rally"
     },
     {
       "date": "2025-04-03",
-      "rank": 2,
       "headline": "Banking sector dips as bond yields stabilize"
     },
     {
       "date": "2025-04-04",
-      "rank": 1,
       "headline": "Major indices slide as investors brace for economic data"
     },
     {
       "date": "2025-04-04",
-      "rank": 2,
       "headline": "Energy stocks struggle while consumer goods hold steady"
     },
     {
       "date": "2025-04-07",
-      "rank": 1,
       "headline": "Volatility rises as markets test support levels"
     },
     {
       "date": "2025-04-07",
-      "rank": 2,
       "headline": "Healthcare and utilities outperform in a choppy session"
     },
     {
       "date": "2025-04-08",
-      "rank": 1,
       "headline": "Investor sentiment weakens as global growth concerns resurface"
     },
     {
       "date": "2025-04-08",
-      "rank": 2,
       "headline": "Technology stocks face pressure after recent highs"
     },
     {
       "date": "2025-04-09",
-      "rank": 1,
       "headline": "Markets rebound sharply as buyers step in on dip"
     },
     {
       "date": "2025-04-09",
-      "rank": 2,
       "headline": "Financial sector leads recovery amid heavy trading"
     },
     {
       "date": "2025-04-10",
-      "rank": 1,
       "headline": "Indices drift lower ahead of earnings season kickoff"
     },
     {
       "date": "2025-04-10",
-      "rank": 2,
       "headline": "Consumer discretionary stocks lag on weak retail outlook"
     },
     {
       "date": "2025-04-11",
-      "rank": 1,
       "headline": "Tech stocks boost markets despite light trading volume"
     },
     {
       "date": "2025-04-11",
-      "rank": 2,
       "headline": "Financials stabilize as banks prepare earnings reports"
     },
     {
       "date": "2025-04-14",
-      "rank": 1,
       "headline": "Markets edge higher on cautious optimism ahead of data releases"
     },
     {
       "date": "2025-04-14",
-      "rank": 2,
       "headline": "Energy shares support gains as oil prices firm up"
     },
     {
       "date": "2025-04-15",
-      "rank": 1,
       "headline": "Indices stall as traders await corporate earnings guidance"
     },
     {
       "date": "2025-04-15",
-      "rank": 2,
       "headline": "Financial sector mixed ahead of bank results"
     },
     {
       "date": "2025-04-16",
-      "rank": 1,
       "headline": "Markets dip as investors digest mixed earnings reports"
     },
     {
       "date": "2025-04-16",
-      "rank": 2,
       "headline": "Technology stocks underperform while energy sees support"
     },
     {
       "date": "2025-04-17",
-      "rank": 1,
       "headline": "Weak close as growth concerns weigh on equities"
     },
     {
       "date": "2025-04-17",
-      "rank": 2,
       "headline": "Banks and industrials drag markets lower"
     },
     {
       "date": "2025-04-21",
-      "rank": 1,
       "headline": "Markets slip as cautious sentiment dominates post-holiday trade"
     },
     {
       "date": "2025-04-21",
-      "rank": 2,
       "headline": "Defensive sectors attract investor flows amid uncertainty"
     },
     {
       "date": "2025-04-22",
-      "rank": 1,
       "headline": "Indices rebound as corporate earnings beat expectations"
     },
     {
       "date": "2025-04-22",
-      "rank": 2,
       "headline": "Tech and financials drive broad-based market gains"
     },
     {
       "date": "2025-04-23",
-      "rank": 1,
       "headline": "Markets consolidate after recent rebound"
     },
     {
       "date": "2025-04-23",
-      "rank": 2,
       "headline": "Energy sector lags despite positive oil outlook"
     },
     {
       "date": "2025-04-24",
-      "rank": 1,
       "headline": "Equities rise modestly as investors rotate into financials"
     },
     {
       "date": "2025-04-24",
-      "rank": 2,
       "headline": "Tech stocks steady after volatile week"
     },
     {
       "date": "2025-04-25",
-      "rank": 1,
       "headline": "Markets end week on cautious tone ahead of Fed commentary"
     },
     {
       "date": "2025-04-25",
-      "rank": 2,
       "headline": "Banking sector steadies while utilities attract buyers"
     },
     {
       "date": "2025-04-28",
-      "rank": 1,
       "headline": "Investors push markets higher on improving earnings outlook"
     },
     {
       "date": "2025-04-28",
-      "rank": 2,
       "headline": "Technology sector leads early-week rally"
     },
     {
       "date": "2025-04-29",
-      "rank": 1,
       "headline": "Indices extend gains as financial stocks shine"
     },
     {
       "date": "2025-04-29",
-      "rank": 2,
       "headline": "Energy names climb on stronger commodity prices"
     },
     {
       "date": "2025-04-30",
-      "rank": 1,
       "headline": "Markets close April higher despite volatility"
     },
     {
       "date": "2025-04-30",
-      "rank": 2,
       "headline": "Tech and banks support strong month-end performance"
     }
   ]

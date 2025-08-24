@@ -18,7 +18,6 @@ class XGBoost(Base):
     XGBoost with native multi-step support (H>1 trains one estimator per horizon).
     Early stopping + Optuna pruning per step. All params are fixed (not optional).
     """
-
     name = "xgboost"
 
     random_state: int = 42
@@ -43,6 +42,9 @@ class XGBoost(Base):
     max_leaves: int = 0
 
     early_stopping_rounds: int = 50
+
+    horizon: int = 1
+    multioutput: bool = False
 
     _single: Optional[XGBRegressor] = field(default=None, init=False, repr=False)
     _multi: Optional[List[XGBRegressor]] = field(default=None, init=False, repr=False)
@@ -75,6 +77,19 @@ class XGBoost(Base):
         y = np.asarray(y)
         return y.reshape(-1, 1) if y.ndim == 1 else y
 
+    def fit(self, X: pd.DataFrame, y) -> XGBoost:
+        Y = self._as_2d(y)
+        if Y.shape[1] == 1:
+            self._single, self._multi = self._new_estimator(), None
+            self._single.fit(X, Y.ravel())
+        else:
+            self._single, self._multi = None, []
+            for j in range(Y.shape[1]):
+                m = self._new_estimator()
+                self._multi.append(m)
+                m.fit(X, Y[:, j])
+        return self
+
     def _fit_with_val_single(self, model: XGBRegressor, X, y, Xv, yv):
         try:
             cbs = [EarlyStopping(rounds=int(self.early_stopping_rounds), save_best=True, maximize=False)]
@@ -96,19 +111,6 @@ class XGBoost(Base):
         except TypeError:
             pass
         model.fit(X, y)
-
-    def fit(self, X: pd.DataFrame, y) -> XGBoost:
-        Y = self._as_2d(y)
-        if Y.shape[1] == 1:
-            self._single, self._multi = self._new_estimator(), None
-            self._single.fit(X, Y.ravel())
-        else:
-            self._single, self._multi = None, []
-            for j in range(Y.shape[1]):
-                m = self._new_estimator()
-                self._multi.append(m)
-                m.fit(X, Y[:, j])
-        return self
 
     def train(self, X_tr, y_tr, X_val=None, y_val=None) -> XGBoost:
         Ytr = self._as_2d(y_tr)

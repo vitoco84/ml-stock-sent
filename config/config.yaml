@@ -9,24 +9,8 @@ data:
   processed_dir: "../data/processed"
   raw_dir: "../data/raw"
   models_dir: "../data/models"
-  name_news: "djia_combined_news.csv"
-  name_prices: "djia_table.csv"
-  name_prices_sentiment: "prices_with_sentiment_table.csv"
-  name_features_full: "features_full_table.csv"
-  results_direct_multi_step: "results_direct_multi_step.csv"
-  results_direct_multi_step_wo_sent: "results_direct_multi_step_wo_sent.csv"
-  results_recursive_forecast: "results_recursive_forecast.csv"
+  reports_dir: "../data/reports"
 
 runtime:
-  n_jobs: 24
   seed: 42
   horizon: 30
-
-model:
-  path_dir: "../data/models"
-  enet_mo_best_1: "enet_mo_1.pkl"
-  best_params_enet_mo_best_1: "best_params_enet_mo_best_1.csv"
-  enet_mo_best_30: "linreg_h30.pkl"
-  best_params_enet_mo_best_30: "best_params_enet_mo_best_30.csv"
-  enet_mo_best_wo_sent_30: "enet_mo_wo_sent_30.pkl"
-  best_params_enet_mo_best_wo_sent_30: "best_params_enet_mo_best_wo_sent_30.csv"

@@ -1,16 +1,9 @@
-from src.models.base import Base
-from src.models.linreg import LinearElasticNet
-from src.models.xgboost import XGBoost
+from dataclasses import dataclass
+from typing import Any, Callable
 
 
-MODELS = {
-    "linreg": LinearElasticNet,
-    "xgboost": XGBoost
-}
-
-def build_model(kind: str, **params) -> Base:
-    k = kind.lower()
-    if k not in MODELS:
-        raise KeyError(f"Unknown model '{kind}'. Available: {list(MODELS)}")
-    clean = {kk: vv for kk, vv in params.items() if vv is not None}
-    return MODELS[k](**clean)
+@dataclass
+class Experiment:
+    name: str
+    build: Callable[[int, int], Any]
+    include_sentiment: bool

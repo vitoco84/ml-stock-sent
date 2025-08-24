@@ -16,6 +16,8 @@ from src.scaler import SafeStandardScaler
 
 
 class ModelTrainer:
+    """Wrapper Class for Training and Tuning with Optuna."""
+
     def __init__(
             self,
             model: Any,
@@ -46,7 +48,7 @@ class ModelTrainer:
     def _prep_y(self, y_tr, y_va=None):
         if not self.y_scale:
             return None, y_tr, y_va
-        s = StandardScaler()
+        s = SafeStandardScaler()
         y_tr_s = s.fit_transform(y_tr)
         y_va_s = s.transform(y_va) if y_va is not None else None
         return s, y_tr_s, y_va_s

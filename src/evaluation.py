@@ -3,6 +3,7 @@ from sklearn.multioutput import MultiOutputRegressor
 
 
 class SHAPExplainer:
+    """Shapley Explainer."""
 
     def __init__(self, model, preprocessor, background_data, mode: str = "kernel", seed: int = 42):
         self.model = self._unwrap(model)

@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.classes import NewsHistoryResponse, PredictionRequest, PredictionResponse, PriceHistoryResponse
 from app.api.settings import get_settings
 from app.api.utils import _ollama_alive, LimitUploadSizeMiddleware, to_dict
-from src.config import Config
+from config.config import Config
 from src.data import get_news_history, get_price_history
 from src.features import generate_full_feature_row
 from src.llm import enrich_news_with_generated
@@ -38,7 +38,7 @@ async def lifespan(app: FastAPI):
 
     sentiment_model = FinBERT(config, device=device)
 
-    model_path = Path(config.model.path_dir) / config.model.enet_mo_best_30
+    model_path = Path(config.data.models_dir) / "linreg.pkl"
     if not model_path.exists():
         raise RuntimeError(f"Model file not found at {model_path}")
     model, preprocessor, y_scaler, y_scale = ModelTrainer.load(str(model_path))
@@ -205,9 +205,9 @@ def post_predict_from_raw(
             logger.info(f"News DF:\n{news_df.tail()}")
         except Exception:
             logger.exception("Invalid `news` payload")
-            raise HTTPException(422, "`news` payload malformed. Expect list of {date, rank, headline}.")
+            raise HTTPException(422, "`news` payload malformed. Expect list of {date, headline}.")
     else:
-        news_df = pd.DataFrame(columns=["date", "rank", "headline"])
+        news_df = pd.DataFrame(columns=["date", "headline"])
         logger.info("No initial news provided.")
 
     ollama_base = settings.ollama_base
@@ -249,7 +249,10 @@ def post_predict_from_raw(
     # --- PREDICTION ---
     try:
         X = preprocessor.transform(feature_row)
-        yhat = model.predict(X)  # shape (1, H) or (1,)
+        yhat = model.predict(X)  # shape (1, H) or (H,) or sometimes (N,H)
+        yhat = np.asarray(yhat, dtype=float)
+        if yhat.ndim == 1:
+            yhat = yhat.reshape(1, -1)
     except Exception:
         logger.exception("Model prediction failed")
         raise HTTPException(500, "Prediction failed.")

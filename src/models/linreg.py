@@ -21,12 +21,10 @@ class LinearElasticNet(Base):
 
     horizon: int = 30
     random_state: int = 42
-
     alpha: float = 1e-3
     l1_ratio: float = 0.2
     selection: str = "cyclic"
     max_iter: int = 2000
-
     multioutput: bool = True
 
     def __post_init__(self):
