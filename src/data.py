@@ -49,9 +49,9 @@ def merge_price_news(price: pd.DataFrame, news: pd.DataFrame) -> pd.DataFrame:
     )
 
 def _validate_ratios(train_ratio: float, val_ratio: float):
-    if not (0 < train_ratio < 1):
+    if train_ratio <= 0 or train_ratio >= 1:
         raise ValueError("train_ratio must be in (0,1).")
-    if not (0 < val_ratio < 1):
+    if val_ratio <= 0 or val_ratio >= 1:
         raise ValueError("val_ratio must be in (0,1).")
     if train_ratio + val_ratio >= 1:
         raise ValueError("train_ratio + val_ratio must be < 1.")
