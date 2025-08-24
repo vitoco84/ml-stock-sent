@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import Dict, List
 
@@ -80,13 +81,20 @@ def run(
         y_scale=True
     )
 
-    # Optuna (use SQLite storage so the Study itself is reusable)
+    # Optuna
     study = optuna.create_study(
         direction="minimize",
-        sampler=optuna.samplers.TPESampler(seed=random_state),
+        sampler=optuna.samplers.TPESampler(
+            seed=random_state,
+            n_startup_trials=10,
+            multivariate=True,
+            constant_liar=True
+        ),
         pruner=optuna.pruners.SuccessiveHalvingPruner(min_resource=1, reduction_factor=3)
     )
-    study.optimize(lambda tr: trainer.objective(tr, X_train, y_train, n_splits=3), n_trials=n_trials, timeout=1200)
+    study.optimize(lambda tr: trainer.objective(
+        tr, X_train, y_train,n_splits=2
+    ), n_trials=n_trials, timeout=900, n_jobs=min(8, os.cpu_count() or 1)) # Parallel
 
     best_params = study.best_trial.user_attrs.get("best_params", {}) or {}
     best_params.setdefault("random_state", random_state)

@@ -43,7 +43,7 @@ def load_news(path: Path) -> pd.DataFrame:
 
 def merge_price_news(price: pd.DataFrame, news: pd.DataFrame) -> pd.DataFrame:
     return (
-        pd.merge(price, news, on="date", how="left", validate="many_to_many")
+        pd.merge(price, news, on="date", how="left", validate="one_to_many")
         .sort_values("date")
         .reset_index(drop=True)
     )
@@ -66,7 +66,7 @@ def time_series_split(
 
     target_cols = [c for c in df.columns if c == "target" or c.startswith("target_")]
     if not target_cols:
-        raise ValueError("No target columns found. Creat feature Dataset first!")
+        raise ValueError("No target columns found. Create the feature dataset first!")
 
     usable = df[df[target_cols].notna().all(axis=1)].copy()
     forecast = df.tail(horizon).copy()
@@ -83,7 +83,7 @@ def time_series_split(
 
 @memory.cache
 def get_price_history(symbol: str, end_date: str, days: int = 90) -> pd.DataFrame:
-    """Fetch Open, High, Low, Clove, Volume and Adj Close Prices from Yahoo Finance."""
+    """Fetch Open, High, Low, Close, Volume and Adj Close Prices from Yahoo Finance."""
     end = pd.to_datetime(end_date)
     start = end - pd.Timedelta(days=int(days * 2.0))
 
@@ -97,6 +97,10 @@ def get_price_history(symbol: str, end_date: str, days: int = 90) -> pd.DataFram
         raise ValueError(f"No data returned for symbol {symbol}")
 
     df = df.reset_index()
+
+    # Ensure Date column exists
+    if "date" not in df.columns and "Date" in df.columns:
+        df.rename(columns={"Date": "date"}, inplace=True)
 
     # Normalize columns: yfinance sometimes returns a MultiIndex
     df.columns = [col[0].lower() for col in df.columns] \
@@ -135,7 +139,7 @@ def get_news_history(query: str, end_date: str, days: int, api_key: str, url: st
     except RequestException as e:
         logger.error(f"NewsAPI request failed: {e}")
 
-    articles = payload.get("articles", [])
+    articles = (payload or {}).get("articles", []) if isinstance(payload, dict) else []
 
     if not articles:
         logger.warning("No articles returned from NewsAPI.")

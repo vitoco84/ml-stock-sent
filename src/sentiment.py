@@ -117,6 +117,15 @@ class FinBERT:
             except Exception as e:
                 self.logger.error(f"Batch {i}-{i + batch_size} failed: {e}")
 
+        if not embeddings_chunks:
+            sentiment_df = pd.DataFrame(columns=["neu", "pos", "neg", "pos_minus_neg"])
+            if self.max_embedding_dims:
+                emb_cols = [f"emb_{i}" for i in range(self.max_embedding_dims)]
+            else:
+                emb_cols = []
+            embedding_df = pd.DataFrame(columns=emb_cols)
+            return pd.concat([df.reset_index(drop=True), sentiment_df, embedding_df], axis=1)
+
         sentiment_df = pd.DataFrame(sentiment_scores)
         emb_dim = embeddings_chunks[0].shape[1]
         embedding_df = pd.DataFrame(np.vstack(embeddings_chunks), columns=[f"emb_{i}" for i in range(emb_dim)])

@@ -45,12 +45,8 @@ def prep_h1_overlay(
     pred_next_by_model: Dict[str, NDArray[np.float64]] = {}
     for res in results:
         ypred = np.asarray(res["y_pred_test"])
-        if ypred.ndim == 2 and ypred.shape[1] >= 1:
-            lr1 = ypred[valid, 0]
-        else:
-            lr1 = ypred[valid].ravel()
+        lr1 = ypred[valid, 0] if ypred.ndim == 2 else ypred[valid].ravel()
         pred_next_by_model[res["kind"]] = p_t * np.exp(lr1)
-
     return dates_next, actual_next, pred_next_by_model
 
 def prep_h_overlay(
@@ -162,7 +158,7 @@ def plot_autocorrelation(df: pd.DataFrame, path: Path | str, lags: int = 30) -> 
     plt.close(fig)
 
 def plot_ohlc_pairplot(df: pd.DataFrame, path: Path | str) -> None:
-    g = sns.pairplot(df[["open", "high", "low", "close"]].sample(n=1000, random_state=42))
+    g = sns.pairplot(df[["open", "high", "low", "close"]].sample(n=min(len(df), 1000), random_state=42))
     g.fig.suptitle("Pairplot: OHLC", y=1.02)
     g.fig.savefig(_ensure_path(path), dpi=150)
     plt.show()

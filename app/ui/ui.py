@@ -48,6 +48,7 @@ def symbol_valid(symbol: str):
         st.stop()
 
 mode = st.radio("Data source", ["Fetch from API", "Upload CSVs"], horizontal=True)
+h_sel = st.slider("Forecast horizon (days)", 1, 30, 30)
 
 if mode == "Upload CSVs":
     clear_fetch_state()
@@ -92,6 +93,13 @@ if mode == "Upload CSVs":
         key="enrich_flag",
         value=False,
     )
+
+    price_df_preview = st.session_state.get("price_csv_df")
+    if isinstance(price_df_preview, pd.DataFrame) and not price_df_preview.empty:
+        need = {"date", "open", "high", "low", "close", "adj_close", "volume"}
+        miss = need - set(price_df_preview.columns)
+        if miss:
+            st.warning(f"Prices CSV missing columns: {sorted(miss)}")
 
     # Only enable Predict when prices are available
     can_predict_csv = (
@@ -155,12 +163,19 @@ if predict_btn:
         if price_df is None or price_df.empty:
             st.warning("Upload a Prices CSV first.")
             st.stop()
+
+        need = {"date", "open", "high", "low", "close", "adj_close", "volume"}
+        miss = need - set(price_df.columns)
+        if miss:
+            st.error(f"Prices CSV missing columns: {sorted(miss)}")
+            st.stop()
+
         news_df = st.session_state.get("news_csv_df")
         news_records = news_df.to_dict(orient="records") if isinstance(news_df, pd.DataFrame) else []
         payload = {"price": price_df.to_dict(orient="records"), "news": news_records}
         params = {
             "enrich": st.session_state.get("enrich_flag", False),
-            "horizon": 30,
+            "horizon": int(h_sel),
             "return_path": True,
             "symbol": "CSV",
         }
@@ -173,7 +188,7 @@ if predict_btn:
         payload = {"price": price_df.to_dict(orient="records"), "news": news_records}
         params = {
             "enrich": st.session_state.get("enrich_flag", False) if "enrich_flag" in st.session_state else False,
-            "horizon": 30,
+            "horizon": int(h_sel),
             "return_path": True,
             "symbol": st.session_state.get("symbol", "AAPL"),
         }
@@ -234,7 +249,8 @@ if predict_btn:
             alt.Chart(path_df.tail(1)).mark_text(dx=8, dy=-8, color="red").encode(
                 x_enc, y_enc, text=alt.Text("price:Q", format="$.2f")
             ),
-        ).properties(width=700, height=380, title="Adj Close: Actual + Predicted Next 30 Business Days")
+        ).properties(width=700, height=380,
+                     title=f"Adj Close: Actual + Predicted Next {int(result.get('horizon', len(path_df)))} Business Days")
         st.subheader("Price Chart")
         st.altair_chart(chart, use_container_width=True)
     else:

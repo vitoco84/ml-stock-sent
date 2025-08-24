@@ -76,6 +76,8 @@ class ModelTrainer:
         X_s = self.preprocessor.transform(X).astype(np.float32)
         pred = self.model.predict(X_s)
         pred = np.asarray(pred)
+        if pred.ndim == 1:
+            pred = pred.reshape(-1, 1)
         if self.y_scale and self.y_scaler is not None:
             pred = self.y_scaler.inverse_transform(pred)
         return pred
@@ -103,44 +105,68 @@ class ModelTrainer:
         blob = joblib.load(path)
         return blob["model"], blob["preprocessor"], blob.get("y_scaler"), blob.get("y_scale", False)
 
-    def objective(self, trial, X, y, n_splits: int = 3):
-        self.logger.info("Starting model tuning...")
-
-        # ask the model class for its space (if present)
+    def _get_search_params(self, trial) -> Dict[str, Any]:
         space_fn = getattr(self.model.__class__, "search_space", None)
         params = space_fn(trial) if callable(space_fn) else {}
         params["random_state"] = self.config.get("seed", 42)
+        return params
+
+    @staticmethod
+    def _fit_or_train(X_tr_s, X_va_s, candidate, y_tr_s, y_va_s) -> None:
+        if hasattr(candidate, "train"):
+            candidate.train(X_tr_s, y_tr_s, X_va_s, y_va_s)
+        else:
+            candidate.fit(X_tr_s, y_tr_s)
+
+    def _maybe_inverse(self, pred, y_s):
+        if self.y_scale and y_s is not None:
+            pred = y_s.inverse_transform(pred)
+        return pred
+
+    @staticmethod
+    def _score_metric(y_true, y_pred, metric_name: str) -> float:
+        return metrics(np.asarray(y_true), np.asarray(y_pred))[metric_name]
+
+    @staticmethod
+    def _is_maximize(metric_name: str) -> bool:
+        return metric_name.lower() in {"r2"}
+
+    def objective(self, trial, X, y, n_splits: int = 3):
+        self.logger.info("Starting model tuning...")
+
+        params = self._get_search_params(trial)
 
         tscv = TimeSeriesSplit(n_splits=n_splits, gap=int(self.config.get("gap", 0)))
-        metric = self.config.get("optimization_metric", "rmse")
+        metric_name = self.config.get("optimization_metric", "rmse")
 
         scores = []
         for tr_idx, va_idx in tscv.split(X):
+            # Split
             X_tr, X_va = X.iloc[tr_idx], X.iloc[va_idx]
             y_tr, y_va = y.iloc[tr_idx], y.iloc[va_idx]
 
+            # Candidate Prep
             candidate = self._build_candidate(params, trial)
-
             pre, X_tr_s, X_va_s = self._prep_X(self.preprocessor, X_tr, X_va)
             y_s, y_tr_s, y_va_s = self._prep_y(y_tr, y_va)
 
-            if hasattr(candidate, "train"):
-                candidate.train(X_tr_s, y_tr_s, X_va_s, y_va_s)
-            else:
-                candidate.fit(X_tr_s, y_tr_s)
+            # Train
+            self._fit_or_train(X_tr_s, X_va_s, candidate, y_tr_s, y_va_s)
 
+            # Predict and inverse
             pred = candidate.predict(X_va_s)
-            if self.y_scale and y_s is not None:
-                pred = y_s.inverse_transform(pred)
+            pred = self._maybe_inverse(pred, y_s)
 
-            m = metrics(np.asarray(y_va), np.asarray(pred))[metric]
-            scores.append(m)
+            # Score, Report, Prune
+            folde_score = self._score_metric(y_va, pred, metric_name)
+            scores.append(folde_score)
 
-            trial.report(m, step=len(scores))
+            trial.report(folde_score, step=len(scores))
             if trial.should_prune():
                 raise optuna.TrialPruned()
 
-        maximize = metric.lower() in {"r2"}
         mean_score = float(np.mean(scores))
         trial.set_user_attr("best_params", params)
-        return -mean_score if maximize else mean_score
+        trial.set_user_attr("cv_scores", scores)
+
+        return -mean_score if self._is_maximize(metric_name) else mean_score

@@ -28,6 +28,7 @@ class LinearElasticNet(Base):
     multioutput: bool = True
 
     def __post_init__(self):
+        super().__init__(horizon=self.horizon, random_state=self.random_state)
         self._build()
 
     def _build(self):
@@ -46,11 +47,9 @@ class LinearElasticNet(Base):
         self.model.fit(X, y)
         return self
 
-    def predict(self, X: pd.DataFrame) -> Any:
+    def predict(self, X: pd.DataFrame) -> np.ndarray:
         yhat = self.model.predict(X)
-        if self.multioutput and getattr(yhat, "ndim", 1) == 2:
-            return pd.DataFrame(yhat, columns=[f"target_{i}" for i in range(yhat.shape[1])])
-        return pd.Series(yhat)
+        return np.asarray(yhat)
 
     @staticmethod
     def search_space(trial):

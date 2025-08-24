@@ -13,6 +13,9 @@ def get_preprocessor(X: pd.DataFrame) -> Tuple[Pipeline, list[str]]:
     cat_features = [c for c in ["dow", "quarter"] if c in X.columns]
     num_features = [c for c in X.columns if c not in cat_features + ["date"] + target_cols]
 
+    if not (num_features or cat_features):
+        raise ValueError("No feature columns found after filtering (only targets/date present).")
+
     num_tf = Pipeline(steps=[
         ("imputer", SimpleImputer(strategy="median")),
         ("scaler", StandardScaler()),

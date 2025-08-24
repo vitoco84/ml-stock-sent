@@ -89,15 +89,13 @@ def fetch_price_history(
     """
     try:
         df = get_price_history(symbol, end_date, days)
-
         if df.empty:
             raise HTTPException(404, "No price data returned. Check the symbol or date range.")
 
         df["date"] = df["date"].dt.strftime("%Y-%m-%d")
         records = df.to_dict(orient="records")
-
         logger.info(f"Head of dataframe:\n{df.head()}")
-        logger.debug(f"Sample record: {df.to_dict(orient='records')[0]}")
+        logger.debug(f"Sample record: {records[0]}")
         return {"price": records}
     except Exception:
         logger.exception("fetch_price_history failed")
@@ -125,10 +123,8 @@ def fetch_news_history(
             raise HTTPException(500, "Missing NEWS_API_KEY environment variable")
 
         df = get_news_history(query, end_date, days, api_key, settings.news_api_base)
-
         if df.empty:
             return {"news": [], "message": "No news found."}
-
         return {"news": df.to_dict(orient="records")}
     except Exception:
         logger.exception("fetch_news_history failed")
@@ -156,13 +152,13 @@ def post_predict_from_raw(
     - **predicted_price**: Predicted next price
     """
     horizon = min(horizon, 30)
-
     logger.info("Received prediction request")
 
     sentiment_model = request.app.state.sentiment_model
     model = request.app.state.model
     preprocessor = request.app.state.preprocessor
 
+    # --- PRICE ---
     try:
         if not getattr(request_body, "price", None):
             raise HTTPException(422, "`price` is required and must be a non-empty list.")
@@ -177,8 +173,13 @@ def post_predict_from_raw(
             "{date, open, high, low, close, adj_close, volume}."
         )
 
-    # --- PRICE ---
     price_df = pd.DataFrame(price_rows)
+
+    required_cols = {"date", "open", "high", "low", "close", "adj_close", "volume"}
+    missing = required_cols - set(price_df.columns)
+    if missing:
+        raise HTTPException(422, f"Missing required price columns: {sorted(missing)}")
+
     price_df["date"] = pd.to_datetime(price_df["date"]).dt.normalize()
     price_df = price_df.sort_values("date").drop_duplicates(subset=["date"], keep="last")
 
@@ -210,6 +211,16 @@ def post_predict_from_raw(
         news_df = pd.DataFrame(columns=["date", "headline"])
         logger.info("No initial news provided.")
 
+    # Trim to keep latency bounded
+    if not news_df.empty:
+        number_of_row, amount_per_day = 1000, 20
+        news_df = (
+            news_df
+            .sort_values(["date"])
+            .groupby("date", as_index=False)
+            .head(amount_per_day)
+            .tail(number_of_row))
+
     ollama_base = settings.ollama_base
     ollama_ok = _ollama_alive(ollama_base)
 
@@ -231,7 +242,7 @@ def post_predict_from_raw(
         else:
             logger.info("Enrichment produced no headlines (continuing with empty news).")
     else:
-        logger.info("Enrich flag is OFF — skipping headline generation")
+        logger.info("Enrich flag is OFF or LLM unavailable — skipping headline generation")
 
     # --- FEATURE GENERATION ---
     try:
@@ -260,7 +271,7 @@ def post_predict_from_raw(
     yhat = np.asarray(yhat).reshape(1, -1)
 
     # Inverse-transform if y was scaled during training
-    if getattr(request.app.state, "y_scaler", None) is not None:
+    if getattr(request.app.state, "y_scale", False) and getattr(request.app.state, "y_scaler", None) is not None:
         yhat = request.app.state.y_scaler.inverse_transform(yhat)
 
     # Clamp horizon to available outputs
