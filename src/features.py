@@ -15,7 +15,7 @@ def create_features_and_target(
     """
     Features:
       - Sliding lagged log returns: lag_1 ... lag_{n_lags}
-      - Calendar: quarter, day-of-week
+      - Calendar: day-of-week
     Targets:
       - Multi-step log return targets (target_1 ... target_H), or 'target' for 1-step
     """
@@ -25,20 +25,24 @@ def create_features_and_target(
 
     if "adj_close" not in df.columns:
         raise ValueError("Expected 'adj_close' column in df.")
-    price = df["adj_close"].astype(float)
 
+    price = df["adj_close"].astype(float)
     df["log_return"] = np.log(price / price.shift(1))
 
+    # Targets
     if forecast_horizon > 1:
         for h in range(1, forecast_horizon + 1):
             df[f"target_{h}"] = df["log_return"].shift(-h)
     else:
         df["target"] = df["log_return"].shift(-1)
 
+    # Lags of log-returns
     for k in range(1, back_horizon + 1):
         df[f"lag_{k}"] = df["log_return"].shift(k)
 
-    df["quarter"] = df["date"].dt.quarter.astype(int)
+    # Volatility optional
+    # df["ret_std_5"] = df["log_return"].rolling(5, min_periods=5).std()
+
     df["dow"] = df["date"].dt.dayofweek.astype(int)
 
     return df.iloc[back_horizon:].copy()

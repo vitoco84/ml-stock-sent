@@ -74,7 +74,7 @@ def healthz(): return {"ok": True}
 
 @app.get("/price-history", response_model=PriceHistoryResponse)
 def fetch_price_history(
-        symbol: str = Query(..., description="Ticker symbol, e.g., AAPL, ^DJI"),
+        symbol: str = Query("^DJI", description="Ticker symbol, e.g., AAPL, ^DJI"),
         end_date: str = Query(..., description="End date in YYYY-MM-DD format"),
         days: int = Query(90, description="Number of calendar days to look back")
 ):
@@ -137,7 +137,7 @@ def post_predict_from_raw(
         enrich: bool = Query(False, description="Generate missing headlines using local LLM"),
         horizon: int = Query(30, ge=1, description="How many horizons to return"),
         return_path: bool = Query(True, description="Whether to return the full H-step path"),
-        symbol: str = Query(..., description="Ticker symbol for context (e.g., AAPL)")
+        symbol: str = Query("^DJI", description="Ticker symbol for context (e.g., AAPL)")
 ):
     """
     Predict the next stock price using:

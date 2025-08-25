@@ -148,8 +148,6 @@ def test_create_features_and_target_minimal():
 def test_get_preprocessor_returns_pipeline_and_features():
     df = pd.DataFrame({
         "log_return": [0.01, 0.02, None],
-        "rsi": [55, 60, 58],
-        "quarter": [1, 2, 1],
         "dow": [0, 1, 2],
         "date": pd.date_range("2024-01-01", periods=3),
         "target": [0.01, 0.02, 0.03]
@@ -157,7 +155,7 @@ def test_get_preprocessor_returns_pipeline_and_features():
     pipeline, features = get_preprocessor(df)
     assert isinstance(pipeline, Pipeline)
     assert "pre" in pipeline.named_steps
-    assert set(features) == {"log_return", "rsi", "quarter", "dow"}
+    assert set(features) == {"log_return", "dow"}
 
 def test_generate_full_feature_row_no_sentiment():
     df = mk_price_df(BUSINESS_DATES_40)

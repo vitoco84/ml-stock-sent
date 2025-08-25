@@ -62,6 +62,7 @@ def run(
     X_test, y_test = test[feature_cols], test[target_cols]
 
     exp_name = exp.name
+    pd.DataFrame({"feature": feature_cols}).to_csv(Path(out_dir) / f"features_{exp_name}.csv", index=False)
     X_test.to_parquet(Path(out_dir) / f"X_test_{exp_name}.parquet", index=False)
 
     # Preprocessor

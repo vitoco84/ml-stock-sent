@@ -24,7 +24,7 @@ def http():
 
 HTTP = http()
 
-st.title("Stock Prediction App (FinBERT + LLM)")
+st.title("^DJI Stock Prediction App (FinBERT + LLM)")
 
 def load_csv(file, date_col: str = "date") -> Optional[pd.DataFrame]:
     if file is None:
@@ -48,7 +48,6 @@ def symbol_valid(symbol: str):
         st.stop()
 
 mode = st.radio("Data source", ["Fetch from API", "Upload CSVs"], horizontal=True)
-h_sel = st.slider("Forecast horizon (days)", 1, 30, 30)
 
 if mode == "Upload CSVs":
     clear_fetch_state()
@@ -111,10 +110,25 @@ if mode == "Upload CSVs":
 else:
     clear_csv_state()
     with st.form("fetch_controls"):
-        symbol = st.text_input("Ticker Symbol", value=st.session_state.get("symbol", "AAPL"))
+        symbol = st.text_input(
+            "Ticker Symbol",
+            value=st.session_state.get("symbol", "^DJI"),
+            help="Prefilled with ^DJI (Dow Jones). You can change it if needed."
+        )
         symbol_valid(symbol)
+        st.caption("Model is currently trained for **^DJI**. Other tickers may give unreliable results.")
+
         end_date = st.date_input("End Date", value=st.session_state.get("end_date", datetime.today()))
         days = st.slider("Lookback Days", min_value=30, max_value=365, value=int(st.session_state.get("days", 90)))
+
+        h_sel = st.number_input(
+            "Forecast horizon (days)",
+            min_value=1,
+            max_value=30,
+            value=30,
+            step=1
+        )
+
         st.checkbox("Enrich with LLM if headlines missing", key="enrich_flag", value=False)
 
         st.subheader("Optional headlines for today")
