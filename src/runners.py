@@ -42,9 +42,7 @@ def run(
         random_state: int = 42,
         n_trials: int = 30
 ):
-    """
-    Generic training/tuning/eval runner.
-    """
+    """Generic training/tuning/eval runner."""
     # Split and Features
     train, val, test, _ = time_series_split(df_full, train_ratio=0.8, val_ratio=0.1, horizon=forecast_horizon)
 

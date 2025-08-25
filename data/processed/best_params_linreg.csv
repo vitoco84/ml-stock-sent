@@ -1,6 +1,6 @@
 ,0
-alpha,0.008877113332662985
-l1_ratio,0.7790296548565129
-max_iter,3500
-selection,random
+alpha,0.009280654516491571
+l1_ratio,0.6523458381927798
+max_iter,1000
+selection,cyclic
 random_state,42

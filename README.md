@@ -210,11 +210,11 @@ curl -X POST "http://localhost:8000/predict-raw?symbol=AAPL&horizon=5&return_pat
 1. **01_eda.ipynb** – Exploratory Data Analysis
 2. **02_sentiment.ipynb** – Sentiment analysis with FinBERT
 3. **03_feature.ipynb** – Feature engineering
-4. **04_linreg.ipynb** – Model training & hyperparameter MultiOutputRegressor
-5. **05_linreg_wo_sent.ipynb** – Model training & hyperparameter MultiOutputRegressor without Sentiment
-6. **06_xgboost.ipynb** – Model training & hyperparameter SingleOutput and Early Stopping
+4. **04_linreg.ipynb** – Linear Regression Model, HP Tuning
+5. **05_linreg_wo_sent.ipynb** – Linear Regression Model without Sentiment, HP Tuning
+6. **06_xgboost.ipynb** – XGBoost Model, Early Stopping, Non-Deterministic (Parallel), HP Tuning
 7. **07_shap.ipynb** - Model evaluation & interpretability
-8. **08_runners.ipynb** - Runners for all Models (Linear Regression, XGBoost, Random Forest, NN MLP, LSTM)
+8. **08_results_plots.ipynb** - Plots combined of all Models (Linear Regression, XGBoost, Random Forest, NN MLP, LSTM)
 
 ---
 
@@ -335,6 +335,6 @@ This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for d
     - [ ] Add authentication
     - [ ] Add rate-limiting
     - [ ] Add request logging
-- [ ] Add monitoring & logging integration (Prometheus/Grafana)
-- [ ] Add Model Tracking MLFlow
-- [ ] Pipeline Orchestration: data -> train -> eval -> register -> deploy -> monitor
+- [ ] Optional: Add monitoring & logging integration (Prometheus/Grafana)
+- [ ] Optional: Add Model Tracking MLFlow
+- [ ] Optional: Pipeline Orchestration: data -> train -> eval -> register -> deploy -> monitor
