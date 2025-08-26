@@ -325,9 +325,12 @@ This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for d
 
 ## 📝 TODO
 
-- [ ] Implement **Random Forest Regressor**
+- [ ] Implement additional rolling features that help momentum
+- [ ] Implement **SARIMA Baseline**
 - [ ] Implement **Neural Network (MLP)**
+- [ ] Implement **KNN**
 - [ ] Implement **LSTM** for sequential modeling
+- [ ] Implement **Stacking Ensemble**
 - [ ] Write **academic-style report** (thesis-like)
 - [ ] Prepare **PowerPoint** presentation
 - [ ] Optional: Deploy demo API + Streamlit to cloud (Render / Fly.io / AWS)
