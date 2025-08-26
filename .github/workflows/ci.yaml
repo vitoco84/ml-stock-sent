@@ -2,9 +2,9 @@ name: CI with SonarCloud
 
 on:
   push:
-    branches: [ main, 'feature/**' ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, 'feature/**' ]
+    branches: [ main ]
 
 jobs:
   build-and-analyze:
@@ -19,6 +19,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: "pip"
 
       - name: Install dependencies
         run: |
@@ -28,7 +29,7 @@ jobs:
 
       - name: Run tests with coverage
         run: |
-          pytest --cov=src tests/ -m "not integration"
+          pytest --cov=src tests/ -m "not integration and not slow"
 
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@v2

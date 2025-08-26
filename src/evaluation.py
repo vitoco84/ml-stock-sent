@@ -32,8 +32,9 @@ class SHAPExplainer:
         elif self.mode == "deep":
             explainer = shap.DeepExplainer(model, self.X_bg[:50])
         else:
-            explainer = shap.KernelExplainer(model.predict, self.X_bg[:50], seed=self.seed)
+            explainer = shap.KernelExplainer(model.predict, self.X_bg[:50])
         return explainer.shap_values(X_proc)
 
-    def _unwrap(self, model):
+    @staticmethod
+    def _unwrap(model):
         return getattr(model, "model", model)

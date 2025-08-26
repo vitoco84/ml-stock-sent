@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Union
+from typing import Union
 
 import joblib
 import numpy as np
@@ -23,7 +23,7 @@ class Base(ABC, BaseEstimator):
         raise NotImplementedError
 
     @abstractmethod
-    def predict(self, X_test: pd.DataFrame) -> Any:
+    def predict(self, X_test: pd.DataFrame) -> np.ndarray:
         raise NotImplementedError
 
     def fit_with_val(

@@ -24,7 +24,7 @@ def http():
 
 HTTP = http()
 
-st.title("Stock Prediction App (FinBERT + LLM)")
+st.title("^DJI Stock Prediction App (FinBERT + LLM)")
 
 def load_csv(file, date_col: str = "date") -> Optional[pd.DataFrame]:
     if file is None:
@@ -48,8 +48,10 @@ def symbol_valid(symbol: str):
         st.stop()
 
 mode = st.radio("Data source", ["Fetch from API", "Upload CSVs"], horizontal=True)
-h_sel = st.slider("Forecast horizon (days)", 1, 30, 30)
+st.caption("Model is currently trained for **^DJI (Dow Jones)**. "
+           "You can change the ticker, but predictions may be less accurate.")
 
+# --- Upload CSVs mode ---
 if mode == "Upload CSVs":
     clear_fetch_state()
     st.subheader("Upload CSVs")
@@ -87,19 +89,30 @@ if mode == "Upload CSVs":
     else:
         st.session_state.pop("news_csv_df", None)
 
-    # Enrich flag
-    st.checkbox(
-        "Enrich with LLM if headlines missing",
-        key="enrich_flag",
-        value=False,
-    )
-
     price_df_preview = st.session_state.get("price_csv_df")
     if isinstance(price_df_preview, pd.DataFrame) and not price_df_preview.empty:
         need = {"date", "open", "high", "low", "close", "adj_close", "volume"}
         miss = need - set(price_df_preview.columns)
         if miss:
             st.warning(f"Prices CSV missing columns: {sorted(miss)}")
+
+    fill_strategy_csv = st.radio(
+        "Missing-news strategy",
+        ["Do nothing (ignore news)", "Enrich with LLM (needs ≥1)", "Pad with neutral (needs ≥2)"],
+        index=0,
+        help=("Do nothing: ignore all news → neutral every day.\n"
+              "Enrich: use your news (≥1 headline) and generate the missing dates.\n"
+              "Pad: use your news (≥2 headlines) and neutral-fill gaps (no generation).")
+    )
+    enrich_flag_csv = (fill_strategy_csv == "Enrich with LLM (needs ≥1)")
+    pad_neutral_csv = (fill_strategy_csv == "Pad with neutral (needs ≥2)")
+    ignore_news_flag_csv = (fill_strategy_csv == "Do nothing (ignore news)")
+
+    # Horizon for CSV mode
+    h_sel_csv = st.number_input(
+        "Forecast horizon (business days)",
+        min_value=1, max_value=30, value=30, step=1
+    )
 
     # Only enable Predict when prices are available
     can_predict_csv = (
@@ -108,14 +121,39 @@ if mode == "Upload CSVs":
     )
     predict_btn = st.button("Predict Price", disabled=not can_predict_csv)
 
+# --- Fetch from API mode ---
 else:
     clear_csv_state()
     with st.form("fetch_controls"):
-        symbol = st.text_input("Ticker Symbol", value=st.session_state.get("symbol", "AAPL"))
+        symbol = st.text_input(
+            "Ticker Symbol",
+            value=st.session_state.get("symbol", "^DJI"),
+            help="Prefilled with ^DJI (Dow Jones). You can change it if needed."
+        )
         symbol_valid(symbol)
+        st.caption("Model is currently trained for **^DJI**. Other tickers may give unreliable results.")
+
         end_date = st.date_input("End Date", value=st.session_state.get("end_date", datetime.today()))
-        days = st.slider("Lookback Days", min_value=30, max_value=365, value=int(st.session_state.get("days", 90)))
-        st.checkbox("Enrich with LLM if headlines missing", key="enrich_flag", value=False)
+
+        c1, c2 = st.columns([1, 1])
+        with c1:
+            days = st.slider("Lookback Days", min_value=30, max_value=365, value=int(st.session_state.get("days", 90)))
+        with c2:
+            h_sel_fetch = st.number_input(
+                "Forecast horizon (business days)", min_value=1, max_value=30, value=30, step=1
+            )
+
+        fill_strategy = st.radio(
+            "Missing-news strategy",
+            ["Do nothing (ignore news)", "Enrich with LLM (needs ≥1)", "Pad with neutral (needs ≥2)"],
+            index=0,
+            help=("Do nothing: ignore all news → neutral every day.\n"
+                  "Enrich: use your news (≥1 headline) and generate the missing dates.\n"
+                  "Pad: use your news (≥2 headlines) and neutral-fill gaps (no generation).")
+        )
+        enrich_flag = (fill_strategy == "Enrich with LLM (needs ≥1)")
+        pad_neutral_flag = (fill_strategy == "Pad with neutral (needs ≥2)")
+        ignore_news_flag = (fill_strategy == "Do nothing (ignore news)")
 
         st.subheader("Optional headlines for today")
         news_input = []
@@ -124,10 +162,10 @@ else:
             if headline:
                 news_input.append({"date": end_date.strftime("%Y-%m-%d"), "headline": headline})
 
-        c1, c2 = st.columns(2)
-        with c1:
+        c1b, c2b = st.columns(2)
+        with c1b:
             fetch_btn = st.form_submit_button("Fetch Price History")
-        with c2:
+        with c2b:
             predict_btn = st.form_submit_button("Predict Price")
 
     if fetch_btn:
@@ -157,7 +195,8 @@ else:
                     st.session_state.pop("fetched_price_df", None)
                     st.warning("No price data returned.")
 
-if predict_btn:
+# --- Predict action ---
+if 'predict_btn' in locals() and predict_btn:
     if mode == "Upload CSVs":
         price_df = st.session_state.get("price_csv_df")
         if price_df is None or price_df.empty:
@@ -171,11 +210,22 @@ if predict_btn:
             st.stop()
 
         news_df = st.session_state.get("news_csv_df")
+
+        if enrich_flag_csv and (news_df is None or news_df.empty):
+            st.error("Enrich is enabled but no seed headline found. Add ≥1 headline in News CSV.")
+            st.stop()
+        if pad_neutral_csv:
+            if news_df is None or news_df.empty or len(news_df) < 2:
+                st.error("Pad with neutral requires ≥2 headlines in News CSV (no generation).")
+                st.stop()
+
         news_records = news_df.to_dict(orient="records") if isinstance(news_df, pd.DataFrame) else []
         payload = {"price": price_df.to_dict(orient="records"), "news": news_records}
         params = {
-            "enrich": st.session_state.get("enrich_flag", False),
-            "horizon": int(h_sel),
+            "enrich": enrich_flag_csv,
+            "pad_neutral": pad_neutral_csv,
+            "ignore_news": ignore_news_flag_csv,
+            "horizon": int(h_sel_csv),
             "return_path": True,
             "symbol": "CSV",
         }
@@ -184,13 +234,23 @@ if predict_btn:
         if price_df is None or price_df.empty:
             st.warning("Fetch price history first.")
             st.stop()
+
+        if enrich_flag and len(st.session_state.get("news_input", [])) == 0:
+            st.error("Enrich is enabled but no seed headline found. Add ≥1 headline above.")
+            st.stop()
+        if pad_neutral_flag and len(st.session_state.get("news_input", [])) < 2:
+            st.error("Pad with neutral requires ≥2 example headlines above (no generation).")
+            st.stop()
+
         news_records = st.session_state.get("news_input", [])
         payload = {"price": price_df.to_dict(orient="records"), "news": news_records}
         params = {
-            "enrich": st.session_state.get("enrich_flag", False) if "enrich_flag" in st.session_state else False,
-            "horizon": int(h_sel),
+            "enrich": enrich_flag,
+            "pad_neutral": pad_neutral_flag,
+            "ignore_news": ignore_news_flag,
+            "horizon": int(h_sel_fetch),
             "return_path": True,
-            "symbol": st.session_state.get("symbol", "AAPL"),
+            "symbol": st.session_state.get("symbol", "^DJI"),
         }
 
     with st.spinner("Predicting (this may take a while for large CSV/news)…"):

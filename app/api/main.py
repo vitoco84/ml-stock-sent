@@ -36,7 +36,7 @@ async def lifespan(app: FastAPI):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     logger.info(f"Initializing FinBERT on {device}")
 
-    sentiment_model = FinBERT(config, device=device)
+    sentiment_model = FinBERT(config, device=device, max_embedding_dims=17)
 
     model_path = Path(config.data.models_dir) / "linreg.pkl"
     if not model_path.exists():
@@ -74,16 +74,16 @@ def healthz(): return {"ok": True}
 
 @app.get("/price-history", response_model=PriceHistoryResponse)
 def fetch_price_history(
-        symbol: str = Query(..., description="Ticker symbol, e.g., AAPL, ^DJI"),
+        symbol: str = Query("^DJI", description="Ticker symbol, e.g., AAPL, ^DJI"),
         end_date: str = Query(..., description="End date in YYYY-MM-DD format"),
-        days: int = Query(90, description="Number of calendar days to look back")
+        days: int = Query(90, description="Number of business days to look back")
 ):
     """
     Fetch historical stock price data for a given symbol.
 
     - **symbol**: Ticker symbol (AAPL, TSLA, ^DJI, etc.)
     - **end_date**: End date in YYYY-MM-DD format
-    - **days**: Number of calendar days to fetch (default: 90)
+    - **days**: Number of business days to fetch (default: 90)
 
     Returns JSON with price rows or an error message.
     """
@@ -135,9 +135,11 @@ def post_predict_from_raw(
         request_body: PredictionRequest,
         request: Request,
         enrich: bool = Query(False, description="Generate missing headlines using local LLM"),
+        pad_neutral: bool = Query(False, description="Use provided news and neutral-fill gaps (needs ≥2)"),
+        ignore_news: bool = Query(False, description="Ignore all news (neutral every day)"),
         horizon: int = Query(30, ge=1, description="How many horizons to return"),
         return_path: bool = Query(True, description="Whether to return the full H-step path"),
-        symbol: str = Query(..., description="Ticker symbol for context (e.g., AAPL)")
+        symbol: str = Query("^DJI", description="Ticker symbol for context (e.g., AAPL)")
 ):
     """
     Predict the next stock price using:
@@ -153,6 +155,11 @@ def post_predict_from_raw(
     """
     horizon = min(horizon, 30)
     logger.info("Received prediction request")
+
+    if ignore_news and (enrich or pad_neutral):
+        raise HTTPException(400, "Invalid strategy: 'Do nothing' cannot be combined with 'enrich' or 'pad_neutral'.")
+    if enrich and pad_neutral:
+        raise HTTPException(400, "Choose exactly one strategy: 'enrich' OR 'pad_neutral' OR 'ignore_news'.")
 
     sentiment_model = request.app.state.sentiment_model
     model = request.app.state.model
@@ -174,7 +181,6 @@ def post_predict_from_raw(
         )
 
     price_df = pd.DataFrame(price_rows)
-
     required_cols = {"date", "open", "high", "low", "close", "adj_close", "volume"}
     missing = required_cols - set(price_df.columns)
     if missing:
@@ -211,7 +217,11 @@ def post_predict_from_raw(
         news_df = pd.DataFrame(columns=["date", "headline"])
         logger.info("No initial news provided.")
 
-    # Trim to keep latency bounded
+    if ignore_news:
+        logger.info("Strategy: Do nothing (ignore news) neutral every day.")
+        news_df = pd.DataFrame(columns=["date", "headline"])
+
+    # Trim for latency
     if not news_df.empty:
         number_of_row, amount_per_day = 1000, 20
         news_df = (
@@ -219,38 +229,52 @@ def post_predict_from_raw(
             .sort_values(["date"])
             .groupby("date", as_index=False)
             .head(amount_per_day)
-            .tail(number_of_row))
+            .tail(number_of_row)
+        )
 
     ollama_base = settings.ollama_base
     ollama_ok = _ollama_alive(ollama_base)
 
     # --- ENRICH NEWS (if requested) ---
-    if enrich and ollama_ok:
-        logger.info("Enrich flag is ON — generating missing headlines via LLM")
-        real_news = news_df.to_dict(orient="records")
-        enriched_news = enrich_news_with_generated(
-            price_dates=price_dates,
-            real_news=real_news,
-            symbol=symbol,
-            url_llm=f"{ollama_base.rstrip('/')}/api/generate",
-            model_llm=settings.ollama_model
-        )
-        news_df = pd.DataFrame(enriched_news)
-        if not news_df.empty:
+    if enrich and ollama_ok and not ignore_news:
+        if news_df.empty:
+            raise HTTPException(422, "Enrich requires ≥1 seed headline.")
+        logger.info("Strategy: Enrich with LLM generate missing dates based on seeds.")
+        try:
+            real_news = news_df.to_dict(orient="records")
+            enriched_news = enrich_news_with_generated(
+                price_dates=price_dates,
+                real_news=real_news,
+                symbol=symbol,
+                url_llm=f"{ollama_base.rstrip('/')}/api/generate",
+                model_llm=settings.ollama_model
+            )
+            news_df = pd.DataFrame(enriched_news)
             news_df["date"] = pd.to_datetime(news_df["date"]).dt.normalize()
-            logger.info(f"Enriched News DF:\n{news_df.tail()}")
-        else:
-            logger.info("Enrichment produced no headlines (continuing with empty news).")
-    else:
-        logger.info("Enrich flag is OFF or LLM unavailable — skipping headline generation")
+        except Exception as e:
+            logger.exception("Enrichment failed")
+            raise HTTPException(500, f"Enrichment failed: {e}")
+
+    if pad_neutral and not ignore_news and not enrich:
+        if news_df.empty or len(news_df) < 2:
+            raise HTTPException(422, "Pad with neutral requires ≥2 headlines and does not generate news.")
+        logger.info("Strategy: Pad with neutral use provided news and neutral-fill gaps (no generation).")
 
     # --- FEATURE GENERATION ---
     try:
         if news_df.empty:
-            logger.info("Skipping sentiment: no news to process.")
-            feature_row = generate_full_feature_row(price_df, pd.DataFrame(), None, horizon)
+            logger.info("No news in use neutral sentiment for all days.")
+            feature_row = generate_full_feature_row(
+                price_df, pd.DataFrame(), None,
+                forecast_horizon=horizon
+            )
         else:
-            feature_row = generate_full_feature_row(price_df, news_df, sentiment_model, horizon)
+            feature_row = generate_full_feature_row(
+                price_df, news_df, sentiment_model,
+                forecast_horizon=horizon,
+                fill_missing_neutral=bool(pad_neutral),
+                max_embedding_dims=17
+            )
     except Exception:
         logger.exception("Feature generation failed")
         raise HTTPException(500, "Failed to generate features from price/news data.")

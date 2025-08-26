@@ -20,7 +20,7 @@ class XGBoost(Base):
     Early stopping + Optuna pruning per step. Parallelized across horizons on CPU.
 
     Note (XGBoost >= 2.0):
-      - For GPU training use: tree_method="hist", device="cuda" (no gpu_hist).
+    - For GPU training use: tree_method="hist", device="cuda" (no gpu_hist).
     """
     name = "xgboost"
 

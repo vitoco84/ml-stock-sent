@@ -42,9 +42,7 @@ def run(
         random_state: int = 42,
         n_trials: int = 30
 ):
-    """
-    Generic training/tuning/eval runner.
-    """
+    """Generic training/tuning/eval runner."""
     # Split and Features
     train, val, test, _ = time_series_split(df_full, train_ratio=0.8, val_ratio=0.1, horizon=forecast_horizon)
 
@@ -62,6 +60,7 @@ def run(
     X_test, y_test = test[feature_cols], test[target_cols]
 
     exp_name = exp.name
+    pd.DataFrame({"feature": feature_cols}).to_csv(Path(out_dir) / f"features_{exp_name}.csv", index=False)
     X_test.to_parquet(Path(out_dir) / f"X_test_{exp_name}.parquet", index=False)
 
     # Preprocessor

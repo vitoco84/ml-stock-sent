@@ -9,9 +9,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     NUMEXPR_NUM_THREADS=2 \
     TOKENIZERS_PARALLELISM=false
 
-
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential git curl && rm -rf /var/lib/apt/lists/*
+    build-essential curl git && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY app/api/requirements.txt /tmp/requirements.txt

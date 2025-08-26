@@ -158,10 +158,10 @@ class ModelTrainer:
             pred = self._maybe_inverse(pred, y_s)
 
             # Score, Report, Prune
-            folde_score = self._score_metric(y_va, pred, metric_name)
-            scores.append(folde_score)
+            fold_score = self._score_metric(y_va, pred, metric_name)
+            scores.append(fold_score)
+            trial.report(fold_score, step=len(scores))
 
-            trial.report(folde_score, step=len(scores))
             if trial.should_prune():
                 raise optuna.TrialPruned()
 

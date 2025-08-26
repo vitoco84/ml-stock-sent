@@ -5,17 +5,19 @@ from starlette.responses import JSONResponse
 
 
 class LimitUploadSizeMiddleware(BaseHTTPMiddleware):
+    """Limits the upload size of a file to 10 MB."""
     async def dispatch(self, request: Request, call_next):
-        max_body_size = 10 * 1024 * 1024  # 10 MB
+        max_body_size = 10 * 1024 * 1024
         content_length = request.headers.get("content-length")
+
         if content_length and int(content_length) > max_body_size:
             return JSONResponse(content={"detail": "Payload too large"}, status_code=413)
         return await call_next(request)
 
 def _ollama_alive(url: str, timeout: float = 3.0) -> bool:
     try:
-        r = requests.get(url, timeout=timeout)
-        r.raise_for_status()
+        response = requests.get(url, timeout=timeout)
+        response.raise_for_status()
         return True
     except Exception:
         return False

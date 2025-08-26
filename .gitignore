@@ -40,4 +40,5 @@ secrets.*
 
 # Caching
 .cache/
+*.pkl
 *.joblib
