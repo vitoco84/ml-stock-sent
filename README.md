@@ -294,7 +294,7 @@ docker image prune
 ```
 Ollama:
 ```bash
-docker exec -it ollama ollama pull llama3 # first time only
+docker exec -it ollama ollama pull llama3 # first time only pull ollama llama3
 docker exec -it ollama ollama list
 ```
 Logs:

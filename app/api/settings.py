@@ -6,6 +6,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    """Base Settings Class for API."""
+
     env: str = "development"
 
     news_api_base: str = ""

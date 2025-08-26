@@ -35,5 +35,6 @@ class SHAPExplainer:
             explainer = shap.KernelExplainer(model.predict, self.X_bg[:50])
         return explainer.shap_values(X_proc)
 
-    def _unwrap(self, model):
+    @staticmethod
+    def _unwrap(model):
         return getattr(model, "model", model)

@@ -12,7 +12,7 @@ class Experiment:
     build: Callable[[int, int], Any]
     include_sentiment: bool
 
-# e.g.: how to use in run
+# e.g.: how to use in the Jupyter Notebooks for the run_experiments method
 experiments = [
     Experiment(
         name="linreg",
