@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 from src.models.linreg import LinearElasticNet
+from src.models.random_forest import RandomForest
 from src.models.xgboost import XGBoost
 
 
@@ -27,6 +28,11 @@ experiments = [
     Experiment(
         name="xgboost",
         build=lambda horizon, seed: XGBoost(random_state=seed),
+        include_sentiment=True
+    ),
+    Experiment(
+        name="random_forest",
+        build=lambda horizon, seed: RandomForest(horizon=horizon, random_state=seed),
         include_sentiment=True
     )
 ]

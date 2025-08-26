@@ -1,0 +1,9 @@
+,0
+n_estimators,600
+max_depth,6
+min_samples_split,14
+min_samples_leaf,8
+max_features,1.0
+bootstrap,True
+max_samples,0.5000167055832299
+random_state,42

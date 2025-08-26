@@ -40,8 +40,10 @@ def create_features_and_target(
     for k in range(1, back_horizon + 1):
         df[f"lag_{k}"] = df["log_return"].shift(k)
 
-    # Volatility optional
-    # df["ret_std_5"] = df["log_return"].rolling(5, min_periods=5).std()
+    # Rolling Features Optional
+    # df["vol_5"] = df["log_return"].rolling(5, min_periods=5).std()
+    # df["sma_5"] = df["adj_close"].rolling(5, min_periods=5).mean()
+    # df["dist_sma_5"] = df["adj_close"] / df["sma_5"]
 
     df["dow"] = df["date"].dt.dayofweek.astype(int)
 

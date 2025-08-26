@@ -19,7 +19,9 @@ def run_experiments(
         experiments: List[Experiment],
         forecast_horizon: int = 30,
         random_state: int = 42,
-        n_trials: int = 30
+        n_trials: int = 30,
+        n_splits: int = 2,
+        gap: int = 30
 ) -> List[Dict]:
     results = []
     for exp in experiments:
@@ -29,7 +31,9 @@ def run_experiments(
             out_dir=str(out_dir),
             forecast_horizon=forecast_horizon,
             random_state=random_state,
-            n_trials=n_trials
+            n_trials=n_trials,
+            n_splits=n_splits,
+            gap=gap
         )
         results.append(res)
     return results
@@ -40,7 +44,9 @@ def run(
         out_dir: str,
         forecast_horizon: int = 30,
         random_state: int = 42,
-        n_trials: int = 30
+        n_trials: int = 30,
+        n_splits: int = 2,
+        gap: int = 30
 ):
     """Generic training/tuning/eval runner."""
     # Split and Features
@@ -68,7 +74,7 @@ def run(
     joblib.dump(preprocessor, Path(out_dir) / f"preprocessor_{exp_name}.joblib")
 
     # Config
-    model_config = {"optimization_metric": "rmse", "gap": 0, "seed": random_state}
+    model_config = {"optimization_metric": "rmse", "gap": gap, "seed": random_state}
 
     # Base Model and Trainer
     base_model = exp.build(forecast_horizon, random_state)
@@ -91,9 +97,14 @@ def run(
         ),
         pruner=optuna.pruners.SuccessiveHalvingPruner(min_resource=1, reduction_factor=3)
     )
-    study.optimize(lambda tr: trainer.objective(
-        tr, X_train, y_train,n_splits=2
-    ), n_trials=n_trials, timeout=900, n_jobs=min(8, os.cpu_count() or 1)) # Parallel
+    is_xgb = exp.name.lower() in {"xgboost", "xgb"}  # Parallel
+    optuna_n_jobs = min(8, os.cpu_count() or 1) if is_xgb else 1
+    study.optimize(
+        lambda tr: trainer.objective(tr, X_train, y_train, n_splits=n_splits),
+        n_trials=n_trials,
+        timeout=900,
+        n_jobs=optuna_n_jobs,
+    )
 
     best_params = study.best_trial.user_attrs.get("best_params", {}) or {}
     best_params.setdefault("random_state", random_state)
