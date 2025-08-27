@@ -325,10 +325,6 @@ This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for d
 
 ## 📝 TODO
 
-- [ ] Implement additional rolling features that help momentum
-- [ ] Implement **SARIMA Baseline**
-- [ ] Implement **Neural Network (MLP)**
-- [ ] Implement **KNN**
 - [ ] Implement **LSTM** for sequential modeling
 - [ ] Implement **Stacking Ensemble**
 - [ ] Write **academic-style report** (thesis-like)
