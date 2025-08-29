@@ -50,7 +50,7 @@ def run(
 ):
     """Generic training/tuning/eval runner."""
     # Split and Features
-    train, val, test, _ = time_series_split(df_full, train_ratio=0.8, val_ratio=0.1, horizon=forecast_horizon)
+    train, val, test, forecast = time_series_split(df_full, train_ratio=0.7, val_ratio=0.15, horizon=forecast_horizon)
 
     drop_cols = ["open", "high", "low", "close", "volume", "adj_close"]
     target_cols = [c for c in df_full.columns if c == "target" or c.startswith("target_")]
@@ -64,17 +64,22 @@ def run(
     X_train, y_train = train[feature_cols], train[target_cols]
     X_val, y_val = val[feature_cols], val[target_cols]
     X_test, y_test = test[feature_cols], test[target_cols]
+    X_forecast = forecast[feature_cols]
 
     exp_name = exp.name
     pd.DataFrame({"feature": feature_cols}).to_csv(Path(out_dir) / f"features_{exp_name}.csv", index=False)
     X_test.to_parquet(Path(out_dir) / f"X_test_{exp_name}.parquet", index=False)
+    X_train.to_parquet(Path(out_dir) / f"X_train_{exp_name}.parquet", index=False)
+    X_forecast.to_parquet(Path(out_dir) / f"X_forecast_{exp_name}.parquet", index=False)
 
     # Preprocessor
-    preprocessor, _ = get_preprocessor(X_train)
+    preprocessor, _ = get_preprocessor(X_train, exp_name)
     joblib.dump(preprocessor, Path(out_dir) / f"preprocessor_{exp_name}.joblib")
 
     # Config
     model_config = {"optimization_metric": "rmse", "gap": gap, "seed": random_state}
+
+    y_scale_flag = exp_name.lower() not in {"random_forest", "xgboost"}
 
     # Base Model and Trainer
     base_model = exp.build(forecast_horizon, random_state)
@@ -83,7 +88,7 @@ def run(
         name=f"{exp_name}",
         config=model_config,
         preprocessor=preprocessor,
-        y_scale=True
+        y_scale=y_scale_flag
     )
 
     # Optuna
@@ -116,15 +121,21 @@ def run(
         name=f"{exp_name}",
         config=model_config,
         preprocessor=preprocessor,
-        y_scale=True
+        y_scale=y_scale_flag
     )
     trainer.fit(X_train, y_train, X_val, y_val)
 
     # Predictions
+    y_pred_val = np.asarray(trainer.predict(X_val))
     y_pred_test = np.asarray(trainer.predict(X_test))
-    y_pred_last = y_pred_test[-1].ravel()
+    y_pred_last = np.asarray(trainer.predict(X_forecast.iloc[[0]])).ravel()
 
-    np.savez_compressed(Path(out_dir) / f"preds_{exp_name}.npz", y_pred_test=y_pred_test, y_pred_last=y_pred_last)
+    np.savez_compressed(
+        Path(out_dir) / f"preds_{exp_name}.npz",
+        y_pred_val=y_pred_val,
+        y_pred_test=y_pred_test,
+        y_pred_last=y_pred_last
+    )
     np.save(Path(out_dir) / f"test_index_{exp_name}.npy", X_test.index.to_numpy())
 
     # Metrics
@@ -149,6 +160,7 @@ def run(
         "trainer": trainer,
         "paths": {"model": str(model_path), "params_csv": str(params_path), "metrics_csv": str(metrics_path)},
         "test_index": X_test.index.to_numpy(),
+        "y_pred_val": y_pred_val,
         "y_pred_test": y_pred_test,
         "y_pred_last": y_pred_last
     }

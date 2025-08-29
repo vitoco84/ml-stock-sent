@@ -57,20 +57,26 @@ def merge_price_news(price: pd.DataFrame, news: pd.DataFrame) -> pd.DataFrame:
 
 def time_series_split(
         df: pd.DataFrame,
-        train_ratio: float = 0.8,
-        val_ratio: float = 0.1,
+        train_ratio: float = 0.7,
+        val_ratio: float = 0.15,
         horizon: int = 30
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """Chronologically split DataFrame into train, val, test, and forecast sets. """
+    """Chronologically split into train/val/test, and keep the last `horizon` rows as forecast holdout."""
     df = df.sort_values("date").reset_index(drop=True)
 
+    # Target columns (single- or multi-output)
     target_cols = [c for c in df.columns if c == "target" or c.startswith("target_")]
     if not target_cols:
         raise ValueError("No target columns found. Create the feature dataset first!")
 
+    # Rows with fully observed targets
     usable = df[df[target_cols].notna().all(axis=1)].copy()
-    if usable.empty:
-        raise ValueError("No fully observed target rows. Increase history or reduce horizons.")
+    forecast = df.tail(horizon).copy()
+
+    # Making sure forecast rows are NOT part of train/val/test
+    if len(usable) <= horizon:
+        raise ValueError("Not enough usable rows after reserving the forecast horizon.")
+    usable = usable.iloc[:-horizon].copy()
 
     total = len(usable)
     train_end = int(total * train_ratio)
@@ -79,7 +85,6 @@ def time_series_split(
     train = usable.iloc[:train_end].copy()
     val = usable.iloc[train_end:val_end].copy()
     test = usable.iloc[val_end:].copy()
-    forecast = df.tail(horizon).copy()
 
     return train, val, test, forecast
 

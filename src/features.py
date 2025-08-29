@@ -40,16 +40,19 @@ def create_features_and_target(
     for k in range(1, back_horizon + 1):
         df[f"lag_{k}"] = df["log_return"].shift(k)
 
-    # Optional (Volatility, Moving Averages and Distance, Momentum Returns, Month)
-    # df["vol_5"]  = df["log_return"].rolling(5).std().shift(1)
-    # df["sma_5"] = df["adj_close"].rolling(5).mean().shift(1)
-    # df["dist_sma_5"] = (df["adj_close"] / df["sma_5"]).shift(1)
-    # df["ret_5"] = df["adj_close"].pct_change(5).shift(1)
-    # df["month"] = df["date"].dt.month.astype(int)
+    # OHLC Shifted
+    df["open_l"] = df["open"].shift(1)
+    df["high_l"] = df["high"].shift(1)
+    df["low_l"] = df["low"].shift(1)
+    df["close_l"] = df["close"].shift(1)
+    df["adj_close_l"] = df["adj_close"].shift(1)
+    df["volume_l"] = df["volume"].shift(1).astype(float)
 
+    # Calendar
     df["dow"] = df["date"].dt.dayofweek.astype(int)
 
-    return df.iloc[back_horizon:].copy()
+    # Keep only rows with full features and targets
+    return df.iloc[back_horizon: len(df) - forecast_horizon].copy()
 
 def _neutral_sentiment(max_embedding_dims, price_dates_norm):
     daily_sentiment = pd.DataFrame({"date": price_dates_norm})

@@ -28,6 +28,8 @@ class RandomForest(Base):
     bootstrap: bool = True
     n_jobs: int = -1
     max_samples: Optional[int | float] = None
+    criterion: str = "criterion"
+    oob_score: bool = True
 
     def __post_init__(self):
         super().__init__(horizon=self.horizon, random_state=self.random_state)
@@ -44,7 +46,9 @@ class RandomForest(Base):
             bootstrap=self.bootstrap,
             max_samples=max_samples,
             n_jobs=self.n_jobs,
-            random_state=self.random_state
+            random_state=self.random_state,
+            criterion=self.criterion,
+            oob_score=self.oob_score
         )
 
     def fit(self, X: pd.DataFrame, y: Any) -> RandomForest:
@@ -64,10 +68,13 @@ class RandomForest(Base):
             "n_estimators": trial.suggest_int("n_estimators", 600, 2000, step=200),
             "max_depth": trial.suggest_int("max_depth", 6, 40) if use_max_depth else None,
             "min_samples_split": trial.suggest_int("min_samples_split", 2, 20),
-            "min_samples_leaf": trial.suggest_int("min_samples_leaf", 1, 10),
+            "min_samples_leaf": trial.suggest_int("min_samples_leaf", 2, 20),
             "max_features": trial.suggest_categorical(
-                "max_features", ["sqrt", "log2", 1.0, 0.8, 0.5]
+                "max_features", ["sqrt", "log2", 1.0, 0.8, 0.5, 0.3]
             ),
             "bootstrap": bootstrap,
             "max_samples": trial.suggest_float("max_samples", 0.5, 1.0) if bootstrap else None,
+            "criterion": trial.suggest_categorical(
+                "criterion", ["squared_error", "absolute_error"]
+            )
         }

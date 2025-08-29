@@ -325,8 +325,12 @@ This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for d
 
 ## 📝 TODO
 
-- [ ] Implement **LSTM** for sequential modeling
+- [ ] Recursive Forecast
+- [ ] Stationarity with Adfuller
 - [ ] Implement **Stacking Ensemble**
+- [ ] Implement **LSTM** for sequential modeling
+- [ ] Backtesting
+- [ ] Transfer Learning
 - [ ] Write **academic-style report** (thesis-like)
 - [ ] Prepare **PowerPoint** presentation
 - [ ] Optional: Deploy demo API + Streamlit to cloud (Render / Fly.io / AWS)
