@@ -11,6 +11,7 @@ def create_features_and_target(
         df: pd.DataFrame,
         forecast_horizon: int = 1,
         back_horizon: int = 7,
+        training: bool = False
 ) -> pd.DataFrame:
     """
     Features:
@@ -51,8 +52,12 @@ def create_features_and_target(
     # Calendar
     df["dow"] = df["date"].dt.dayofweek.astype(int)
 
-    # Keep only rows with full features and targets
-    return df.iloc[back_horizon: len(df) - forecast_horizon].copy()
+    #  Keep only rows with full features and targets
+    if training:
+        return df.iloc[back_horizon: len(df) - forecast_horizon].copy()
+    else:
+        # Inference: keep latest rows even if targets are NaN
+        return df.iloc[back_horizon:].copy()
 
 def _neutral_sentiment(max_embedding_dims, price_dates_norm):
     daily_sentiment = pd.DataFrame({"date": price_dates_norm})

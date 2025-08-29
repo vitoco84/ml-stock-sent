@@ -76,7 +76,6 @@ def time_series_split(
     # Making sure forecast rows are NOT part of train/val/test
     if len(usable) <= horizon:
         raise ValueError("Not enough usable rows after reserving the forecast horizon.")
-    usable = usable.iloc[:-horizon].copy()
 
     total = len(usable)
     train_end = int(total * train_ratio)
