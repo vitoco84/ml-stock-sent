@@ -45,6 +45,7 @@ class XGBoost(Base):
     max_bin: int = 128
     grow_policy: str = "depthwise"
     max_leaves: int = 0
+    predictor: str = "auto"
 
     # Threading
     n_jobs: int = -1  # global thread budget
@@ -118,6 +119,7 @@ class XGBoost(Base):
             max_leaves=int(self.max_leaves),
             tree_method="hist",
             device="cuda" if self.device == "cuda" else "cpu",
+            predictor=self.predictor
         )
 
     def _fit_with_val_single(self, model: XGBRegressor, X, y, Xv, yv):
@@ -219,24 +221,24 @@ class XGBoost(Base):
     @staticmethod
     def search_space(trial):
         space = {
-            "n_estimators": trial.suggest_int("n_estimators", 400, 1200, step=200),
-            "learning_rate": trial.suggest_float("learning_rate", 0.02, 0.1, log=True),
-            "max_depth": trial.suggest_int("max_depth", 3, 8),
+            "n_estimators": trial.suggest_int("n_estimators", 600, 2000, step=200),
+            "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.1, log=True),
+            "max_depth": trial.suggest_int("max_depth", 3, 10),
             "subsample": trial.suggest_float("subsample", 0.6, 1.0),
             "colsample_bytree": trial.suggest_float("colsample_bytree", 0.6, 1.0),
-            "min_child_weight": trial.suggest_float("min_child_weight", 0.5, 10.0, log=True),
-            "reg_alpha": trial.suggest_float("reg_alpha", 0.0, 1.0),
-            "reg_lambda": trial.suggest_float("reg_lambda", 0.1, 5.0),
+            "min_child_weight": trial.suggest_float("min_child_weight", 0.5, 20.0, log=True),
+            "reg_alpha": trial.suggest_float("reg_alpha", 0.0, 5.0),
+            "reg_lambda": trial.suggest_float("reg_lambda", 0.1, 10.0),
             "gamma": trial.suggest_float("gamma", 0.0, 5.0),
-            "early_stopping_rounds": 100,
-            "max_bin": trial.suggest_int("max_bin", 128, 256, step=64),
+            "early_stopping_rounds": 200,
+            "max_bin": trial.suggest_int("max_bin", 128, 512, step=64),
             "grow_policy": trial.suggest_categorical("grow_policy", ["depthwise", "lossguide"]),
             "objective": trial.suggest_categorical("objective", ["reg:squarederror", "reg:absoluteerror"]),
             "eval_metric": trial.suggest_categorical("eval_metric", ["rmse", "mae"]),
             "tree_method": "hist",
         }
         if space["grow_policy"] == "lossguide":
-            space["max_leaves"] = trial.suggest_int("max_leaves", 64, 512, step=64)
+            space["max_leaves"] = trial.suggest_int("max_leaves", 64, 1024, step=64)
             space["max_depth"] = 0
         else:
             space["max_leaves"] = 0

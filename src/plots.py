@@ -149,6 +149,9 @@ def plot_forecast_overlay(df_test: pd.DataFrame, df_forecast: pd.DataFrame, resu
     if len(fut_dates) and len(actual_path):
         plt.plot(fut_dates, actual_path, label=f"Actual next {len(actual_path)}d", linewidth=2)
 
+    if len(fut_dates):
+        plt.plot(fut_dates[:H], [p0]*min(H, len(fut_dates)), label="Naive baseline", linestyle="--", linewidth=2, alpha=0.7)
+
     for res in results:
         lr_path = _extract_lr(res.get("y_pred_last"))[:H]
         if lr_path.size == 0:

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -39,9 +38,9 @@ class LinearElasticNet(Base):
             random_state=self.random_state,
             max_iter=self.max_iter,
         )
-        self.model = MultiOutputRegressor(base) if self.multioutput else base
+        self.model = MultiOutputRegressor(base, n_jobs=-1) if self.multioutput else base
 
-    def fit(self, X: pd.DataFrame, y: Any) -> LinearElasticNet:
+    def fit(self, X: pd.DataFrame, y: np.ndarray) -> LinearElasticNet:
         if not self.multioutput and getattr(y, "ndim", 1) == 2 and y.shape[1] == 1:
             y = np.asarray(y).ravel()
         self.model.fit(X, y)

@@ -160,6 +160,19 @@ def test_time_series_split_with_horizon_tail():
     # assert first future date is the day after the last test date
     assert future["date"].iloc[0] == df["date"].iloc[effective_n]
 
+def test_time_series_split_no_overlap():
+    n, H = 50, 5
+    df = pd.DataFrame({
+        "date": pd.date_range("2021-01-01", periods=n, freq="D"),
+        "adj_close": np.arange(n, dtype=float),
+        "open": 0.0, "high": 0.0, "low": 0.0, "close": 0.0, "volume": 0.0,
+    })
+    df = create_features_and_target(df, forecast_horizon=H)
+    _, _, test, future = time_series_split(df, train_ratio=0.6, val_ratio=0.2, horizon=H)
+
+    assert test.index.max() < future.index.min(), "Test and future sets overlap"
+    assert test["date"].max() < future["date"].min(), "Dates overlap between test and future"
+
 # --- Feature engineering ---
 
 def test_create_features_and_target_minimal():

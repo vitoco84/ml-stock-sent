@@ -328,11 +328,8 @@ This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for d
 
 ## 📝 TODO
 
-- [ ] Recursive Forecast
-- [ ] Stationarity with Adfuller
 - [ ] Implement **Stacking Ensemble**
 - [ ] Implement **LSTM** for sequential modeling
-- [ ] Backtesting
 - [ ] Transfer Learning
 - [ ] Write **academic-style report** (thesis-like)
 - [ ] Prepare **PowerPoint** presentation

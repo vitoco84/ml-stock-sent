@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Tuple
+from typing import Tuple
 
 import numpy as np
 import pandas as pd
@@ -55,7 +55,7 @@ class MLP(Base):
             random_state=self.random_state,
         )
 
-    def fit(self, X: pd.DataFrame, y: Any) -> MLP:
+    def fit(self, X: pd.DataFrame, y: np.ndarray) -> MLP:
         self.model.fit(X, np.asarray(y))
         return self
 
@@ -79,13 +79,13 @@ class MLP(Base):
             "hidden_layer_sizes": shape,
             "activation": trial.suggest_categorical("activation", ["relu", "tanh"]),
             "solver": solver,
-            "alpha": trial.suggest_float("alpha", 1e-6, 1e-2, log=True),
+            "alpha": trial.suggest_float("alpha", 1e-6, 1e-1, log=True),
             "max_iter": trial.suggest_int("max_iter", 1200, 3000, step=300),
             "tol": trial.suggest_float("tol", 1e-6, 1e-4, log=True)
         }
         if solver == "adam":
             params.update({
-                "learning_rate_init": trial.suggest_float("learning_rate_init", 5e-4, 3e-3, log=True),
+                "learning_rate_init": trial.suggest_float("learning_rate_init", 5e-4, 1e-2, log=True),
                 "learning_rate": trial.suggest_categorical("learning_rate", ["constant", "adaptive"]),
                 "batch_size": trial.suggest_categorical("batch_size", [128, 256, 512]),
                 "early_stopping": True,

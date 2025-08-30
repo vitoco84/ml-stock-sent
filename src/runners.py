@@ -8,6 +8,7 @@ import optuna
 import pandas as pd
 
 from src.data import time_series_split
+from src.metrics import metrics
 from src.models.factory import Experiment
 from src.preprocessing import get_preprocessor
 from src.train import ModelTrainer
@@ -49,8 +50,11 @@ def run(
         gap: int = 30
 ):
     """Generic training/tuning/eval runner."""
+    # Ensure gap
+    gap = max(gap, forecast_horizon)
+
     # Split and Features
-    train, val, test, forecast = time_series_split(df_full, train_ratio=0.7, val_ratio=0.15, horizon=forecast_horizon)
+    train, val, test, forecast = time_series_split(df_full, train_ratio=0.8, val_ratio=0.1, horizon=forecast_horizon)
 
     drop_cols = ["open", "high", "low", "close", "volume", "adj_close"]
     target_cols = [c for c in df_full.columns if c == "target" or c.startswith("target_")]
@@ -67,14 +71,14 @@ def run(
     X_forecast = forecast[feature_cols]
 
     exp_name = exp.name
-    pd.DataFrame({"feature": feature_cols}).to_csv(Path(out_dir) / f"features_{exp_name}.csv", index=False)
-    X_test.to_parquet(Path(out_dir) / f"X_test_{exp_name}.parquet", index=False)
-    X_train.to_parquet(Path(out_dir) / f"X_train_{exp_name}.parquet", index=False)
-    X_forecast.to_parquet(Path(out_dir) / f"X_forecast_{exp_name}.parquet", index=False)
+    pd.DataFrame({"feature": feature_cols}).to_csv(Path(out_dir) / f"{exp_name}_features.csv", index=False)
+    X_test.to_parquet(Path(out_dir) / f"{exp_name}_X_test.parquet", index=False)
+    X_train.to_parquet(Path(out_dir) / f"{exp_name}_X_train.parquet", index=False)
+    X_forecast.to_parquet(Path(out_dir) / f"{exp_name}_X_forecast.parquet", index=False)
 
     # Preprocessor
     preprocessor, _ = get_preprocessor(X_train, exp_name)
-    joblib.dump(preprocessor, Path(out_dir) / f"preprocessor_{exp_name}.joblib")
+    joblib.dump(preprocessor, Path(out_dir) / f"{exp_name}_preprocessor.joblib")
 
     # Config
     model_config = {"optimization_metric": "rmse", "gap": gap, "seed": random_state}
@@ -92,18 +96,27 @@ def run(
     )
 
     # Optuna
+    storage = optuna.storages.RDBStorage(
+        url=f"sqlite:///{Path(out_dir) / f'{exp_name}_optuna.db'}",
+        engine_kwargs={"connect_args": {"timeout": 30}},
+    )
+
     study = optuna.create_study(
+        study_name=f"{exp_name}_study",
+        storage=storage,
+        load_if_exists=True,
         direction="minimize",
         sampler=optuna.samplers.TPESampler(
             seed=random_state,
-            n_startup_trials=10,
+            n_startup_trials=15,
             multivariate=True,
+            group=True,
             constant_liar=True
         ),
         pruner=optuna.pruners.SuccessiveHalvingPruner(min_resource=1, reduction_factor=3)
     )
     is_xgb = exp.name.lower() in {"xgboost", "xgb"}  # Parallel
-    optuna_n_jobs = min(8, os.cpu_count() or 1) if is_xgb else 1
+    optuna_n_jobs = 1 if (is_xgb and base_model.get_params().get("device") == "cuda") else min(24, os.cpu_count() or 1)
     study.optimize(
         lambda tr: trainer.objective(tr, X_train, y_train, n_splits=n_splits),
         n_trials=n_trials,
@@ -129,24 +142,34 @@ def run(
     y_pred_val = np.asarray(trainer.predict(X_val))
     y_pred_test = np.asarray(trainer.predict(X_test))
     y_pred_last = np.asarray(trainer.predict(X_forecast.iloc[[0]])).ravel()
+    # y_pred_last = y_pred_test[-1].ravel()
 
     np.savez_compressed(
-        Path(out_dir) / f"preds_{exp_name}.npz",
+        Path(out_dir) / f"{exp_name}_preds.npz",
         y_pred_val=y_pred_val,
         y_pred_test=y_pred_test,
         y_pred_last=y_pred_last
     )
-    np.save(Path(out_dir) / f"test_index_{exp_name}.npy", X_test.index.to_numpy())
+    np.save(Path(out_dir) / f"{exp_name}_test_index.npy", X_test.index.to_numpy())
 
     # Metrics
     metrics_test = trainer.evaluate(X_test, y_test)
-    metrics_path = Path(out_dir) / f"metrics_test_{exp_name}.csv"
+    metrics_path = Path(out_dir) / f"{exp_name}_metrics_test.csv"
     pd.DataFrame(
         [{"name": exp_name, **{k: float(v) for k, v in metrics_test.items()}}]
     ).to_csv(metrics_path, index=False)
 
+    # Naive Baseline
+    y_test_np = np.asarray(y_test)
+    y_train_np = np.asarray(y_train)
+    y_pred_naive = np.zeros_like(y_test_np)
+
+    baseline_metrics = metrics(y_test_np, y_pred_naive, y_insample=y_train_np)
+    baseline_path = Path(out_dir) / f"{exp_name}_metrics_test_naive.csv"
+    pd.DataFrame([{"name": "naive", **baseline_metrics}]).to_csv(baseline_path, index=False)
+
     # Save artifacts
-    params_path = Path(out_dir) / f"best_params_{exp_name}.csv"
+    params_path = Path(out_dir) / f"{exp_name}_best_params.csv"
     pd.Series(best_params).to_csv(params_path)
     model_path = trainer.save()
 
@@ -156,7 +179,7 @@ def run(
         "horizon": forecast_horizon,
         "include_sentiment": exp.include_sentiment,
         "best_params": best_params,
-        "metrics": {"test": metrics_test},
+        "metrics": {"test": metrics_test, "naive": baseline_metrics},
         "trainer": trainer,
         "paths": {"model": str(model_path), "params_csv": str(params_path), "metrics_csv": str(metrics_path)},
         "test_index": X_test.index.to_numpy(),

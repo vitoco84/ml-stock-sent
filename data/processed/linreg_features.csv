@@ -34,4 +34,7 @@ low_l
 close_l
 adj_close_l
 volume_l
+ret_mean_5
+ret_std_5
+mom_10
 dow

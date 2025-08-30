@@ -49,6 +49,13 @@ def create_features_and_target(
     df["adj_close_l"] = df["adj_close"].shift(1)
     df["volume_l"] = df["volume"].shift(1).astype(float)
 
+    # Rolling
+    df["ret_mean_5"] = df["log_return"].shift(1).rolling(5).mean()
+    df["ret_std_5"]  = df["log_return"].shift(1).rolling(5).std()
+
+    # Momentum
+    df["mom_10"] = np.log(df["adj_close"].shift(1) / df["adj_close"].shift(11))
+
     # Calendar
     df["dow"] = df["date"].dt.dayofweek.astype(int)
 
