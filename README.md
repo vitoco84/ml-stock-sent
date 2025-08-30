@@ -16,6 +16,11 @@ Forecast stock prices by combining:
 - Python **3.10+**
 - (Optional) NVIDIA GPU with CUDA for accelerated FinBERT
 
+### Specs
+- Intel-Core i9-13900K
+- NVIDIA GeForce RTX 4090
+- RAM 64GB
+
 ### Setup
 ```bash
 # Upgrade pip
@@ -213,8 +218,8 @@ curl -X POST "http://localhost:8000/predict-raw?symbol=AAPL&horizon=5&return_pat
 3. **04_adfulller_test.ipynb** – Stationary Test
 4. **05_linreg.ipynb** – Linear Regression Model
 5. **06_linreg_wo_sent.ipynb** – Linear Regression Model without Sentiment
-6. **07_xgboost.ipynb** – XGBoost Model
-6. **08_random_forest.ipynb** – Random Forest Model
+6. **07_xgboost.ipynb** – XGBoost Model (RT: ~20min)
+6. **08_random_forest.ipynb** – Random Forest Model (RT: ~30min)
 6. **09_mlp.ipynb** – Feed Forward Multi Layer Perceptron Model
 7. **10_shap.ipynb** - Model evaluation & interpretability
 8. **11_results_plots.ipynb** - Plots combined of all Models
@@ -328,9 +333,9 @@ This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for d
 
 ## 📝 TODO
 
-- [ ] Implement **Stacking Ensemble**
-- [ ] Implement **LSTM** for sequential modeling
-- [ ] Transfer Learning
+- [ ] Impl CNN, Stacking and LSTM
+- [ ] Train One Model wo Sent but with more Data
+- [ ] Transfer Learning and Fine-Tuning
 - [ ] Write **academic-style report** (thesis-like)
 - [ ] Prepare **PowerPoint** presentation
 - [ ] Optional: Deploy demo API + Streamlit to cloud (Render / Fly.io / AWS)

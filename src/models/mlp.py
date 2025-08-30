@@ -1,4 +1,3 @@
-# src/models/mlp.py
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -13,7 +12,7 @@ from src.models.base import Base
 
 @dataclass
 class MLP(Base):
-    """Feed-forward MLP."""
+    """Feed-forward Multi Layer Perceptron (FF MLP)."""
     name = "mlp"
 
     horizon: int = 30
@@ -65,18 +64,18 @@ class MLP(Base):
 
     @staticmethod
     def search_space(trial):
-        shape = trial.suggest_categorical(
-            "shape",
+        layers = trial.suggest_categorical(
+            "hidden_layers",
             [
-                (128,), (256,),
-                (128, 64), (256, 128),
-                (256, 128, 64), (128, 64, 32),
-                (512, 256)
-            ],
+                [128], [256],
+                [128, 64], [256, 128],
+                [256, 128, 64], [128, 64, 32],
+                [512, 256]
+            ]
         )
         solver = trial.suggest_categorical("solver", ["adam", "lbfgs"])
         params = {
-            "hidden_layer_sizes": shape,
+            "hidden_layer_sizes": tuple(layers),
             "activation": trial.suggest_categorical("activation", ["relu", "tanh"]),
             "solver": solver,
             "alpha": trial.suggest_float("alpha", 1e-6, 1e-1, log=True),

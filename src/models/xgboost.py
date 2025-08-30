@@ -45,7 +45,6 @@ class XGBoost(Base):
     max_bin: int = 128
     grow_policy: str = "depthwise"
     max_leaves: int = 0
-    predictor: str = "auto"
 
     # Threading
     n_jobs: int = -1  # global thread budget
@@ -118,8 +117,7 @@ class XGBoost(Base):
             grow_policy=self.grow_policy,
             max_leaves=int(self.max_leaves),
             tree_method="hist",
-            device="cuda" if self.device == "cuda" else "cpu",
-            predictor=self.predictor
+            device="cuda" if self.device == "cuda" else "cpu"
         )
 
     def _fit_with_val_single(self, model: XGBRegressor, X, y, Xv, yv):

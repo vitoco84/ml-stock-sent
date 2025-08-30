@@ -115,13 +115,13 @@ def run(
         ),
         pruner=optuna.pruners.SuccessiveHalvingPruner(min_resource=1, reduction_factor=3)
     )
-    is_xgb = exp.name.lower() in {"xgboost", "xgb"}  # Parallel
+    is_xgb = exp.name.lower() in {"xgboost", "xgb"}
     optuna_n_jobs = 1 if (is_xgb and base_model.get_params().get("device") == "cuda") else min(24, os.cpu_count() or 1)
     study.optimize(
         lambda tr: trainer.objective(tr, X_train, y_train, n_splits=n_splits),
         n_trials=n_trials,
         timeout=900,
-        n_jobs=optuna_n_jobs,
+        n_jobs=optuna_n_jobs
     )
 
     best_params = study.best_trial.user_attrs.get("best_params", {}) or {}

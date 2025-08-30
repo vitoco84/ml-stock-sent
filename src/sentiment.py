@@ -106,7 +106,7 @@ class FinBERT:
                 scores = result["scores"]
                 embs = result["embeddings"]
 
-                # finbert-tone label order: [neutral, positive, negative]
+                # Finbert-tone label order: [neutral, positive, negative]
                 sentiment_scores += [
                     {"neu": p[0], "pos": p[1], "neg": p[2], "pos_minus_neg": p[1] - p[2]} for p in scores
                 ]
