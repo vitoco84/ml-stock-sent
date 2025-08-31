@@ -28,9 +28,18 @@ class LSTMModel(TorchBaseNN):
     """Long Short-term Memory (LSTM)"""
     name: str = "lstm"
 
+    horizon: int = 30
+    random_state: int = 42
     units: int = 64
     dense_units: int = 64
     dropout: float = 0.2
+    lr: float = 1e-3
+    epochs: int = 50
+    batch_size: int = 64
+    weight_decay: float = 1e-5
+
+    def __post_init__(self):
+        super().__init__(horizon=self.horizon, random_state=self.random_state)
 
     def _build_net(self, input_dim: int, output_dim: int) -> nn.Module:
         return _LSTMNet(

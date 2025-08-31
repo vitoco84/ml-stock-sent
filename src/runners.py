@@ -142,7 +142,6 @@ def run(
     y_pred_val = np.asarray(trainer.predict(X_val))
     y_pred_test = np.asarray(trainer.predict(X_test))
     y_pred_last = np.asarray(trainer.predict(X_forecast.iloc[[0]])).ravel()
-    # y_pred_last = y_pred_test[-1].ravel()
 
     np.savez_compressed(
         Path(out_dir) / f"{exp_name}_preds.npz",

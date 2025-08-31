@@ -1,0 +1,10 @@
+,0
+filters,256.0
+kernel_size,2.0
+dense_units,32.0
+dropout,0.12588499022009844
+lr,0.004820290924242669
+epochs,60.0
+batch_size,64.0
+weight_decay,0.0036234886318729045
+random_state,42.0
