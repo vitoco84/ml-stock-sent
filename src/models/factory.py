@@ -1,8 +1,12 @@
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from src.models.cnn import CNNModel
 from src.models.linreg import LinearElasticNet
+from src.models.lstm import LSTMModel
+from src.models.mlp import MLP
 from src.models.random_forest import RandomForest
+from src.models.stacking import StackingEnsemble
 from src.models.xgboost import XGBoost
 
 
@@ -33,6 +37,26 @@ experiments = [
     Experiment(
         name="random_forest",
         build=lambda horizon, seed: RandomForest(horizon=horizon, random_state=seed),
+        include_sentiment=True
+    ),
+    Experiment(
+        name="mlp",
+        build=lambda horizon, seed: MLP(horizon=horizon, random_state=seed),
+        include_sentiment=True
+    ),
+    Experiment(
+        name="cnn",
+        build=lambda horizon, seed: CNNModel(horizon=horizon, random_state=seed),
+        include_sentiment=True
+    ),
+    Experiment(
+        name="lstm",
+        build=lambda horizon, seed: LSTMModel(horizon=horizon, random_state=seed),
+        include_sentiment=True
+    ),
+    Experiment(
+        name="stacking",
+        build=lambda horizon, seed: StackingEnsemble(horizon=horizon, random_state=seed),
         include_sentiment=True
     )
 ]

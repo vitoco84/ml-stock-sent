@@ -43,11 +43,26 @@ BUSINESS_DATES_40 = bdays("2024-01-01", 40)
 def is_close(a, b=0.0, atol=IS_CLOSE_ATOL):
     return np.isclose(float(a), float(b), atol=atol)
 
-def mk_price_df(dates: pd.DatetimeIndex, start: float = 100.0, stop: float = 150.0) -> pd.DataFrame:
+def mk_price_df(dates: pd.DatetimeIndex, start: float = 100.0, seed: int = 42) -> pd.DataFrame:
+    rng = np.random.default_rng(seed)
+    n = len(dates)
+
+    rets = rng.normal(loc=0.001, scale=0.02, size=n)
+    close = start * np.exp(np.cumsum(rets))
+    open_ = np.r_[close[0], close[:-1]]
+    wiggle = rng.uniform(0.001, 0.01, size=n)
+    high = np.maximum(open_, close) * (1 + wiggle)
+    low = np.minimum(open_, close) * (1 - wiggle)
+    volu = (np.abs(close - open_) / close * 1e6).astype(int)
+
     return pd.DataFrame({
         "date": dates,
-        "adj_close": np.linspace(start, stop, len(dates)),
-        "open": 0.0, "high": 0.0, "low": 0.0, "close": 0.0, "volume": 0.0
+        "adj_close": close,
+        "open": open_,
+        "high": high,
+        "low": low,
+        "close": close,
+        "volume": volu,
     })
 
 def mk_news(dates: Iterable[pd.Timestamp], text: str = "headline") -> List[dict]:
@@ -122,7 +137,8 @@ def test_time_series_split_with_horizon_tail():
     n, H = 100, 10
     df = pd.DataFrame({
         "date": pd.date_range("2020-01-01", periods=n, freq="D"),
-        "adj_close": range(n)
+        "adj_close": range(n),
+        "open": 0.0, "high": 0.0, "low": 0.0, "close": 0.0, "volume": 0.0
     })
     df = create_features_and_target(df, forecast_horizon=H)
     train, val, test, future = time_series_split(df, train_ratio=0.7, val_ratio=0.2, horizon=H)
@@ -144,12 +160,26 @@ def test_time_series_split_with_horizon_tail():
     # assert first future date is the day after the last test date
     assert future["date"].iloc[0] == df["date"].iloc[effective_n]
 
+def test_time_series_split_no_overlap():
+    n, H = 50, 5
+    df = pd.DataFrame({
+        "date": pd.date_range("2021-01-01", periods=n, freq="D"),
+        "adj_close": np.arange(n, dtype=float),
+        "open": 0.0, "high": 0.0, "low": 0.0, "close": 0.0, "volume": 0.0,
+    })
+    df = create_features_and_target(df, forecast_horizon=H)
+    _, _, test, future = time_series_split(df, train_ratio=0.6, val_ratio=0.2, horizon=H)
+
+    assert test.index.max() < future.index.min(), "Test and future sets overlap"
+    assert test["date"].max() < future["date"].min(), "Dates overlap between test and future"
+
 # --- Feature engineering ---
 
 def test_create_features_and_target_minimal():
     df = pd.DataFrame({
         "date": BUSINESS_DATES_60,
-        "adj_close": np.linspace(100, 150, 60)
+        "adj_close": np.linspace(100, 150, 60),
+        "open": 0.0, "high": 0.0, "low": 0.0, "close": 0.0, "volume": 0.0
     })
     features = create_features_and_target(df, forecast_horizon=3)
     assert {"target_1", "log_return"} <= set(features.columns)
@@ -158,10 +188,9 @@ def test_get_preprocessor_returns_pipeline_and_features():
     df = pd.DataFrame({
         "log_return": [0.01, 0.02, None],
         "dow": [0, 1, 2],
-        "date": pd.date_range("2024-01-01", periods=3),
-        "target": [0.01, 0.02, 0.03]
+        "date": pd.date_range("2024-01-01", periods=3)
     })
-    pipeline, features = get_preprocessor(df)
+    pipeline, features = get_preprocessor(df, "linreg")
     assert isinstance(pipeline, Pipeline)
     assert "pre" in pipeline.named_steps
     assert set(features) == {"log_return", "dow"}
@@ -330,7 +359,7 @@ def test_shap_explainer_outputs_values(rng):
     X = pd.DataFrame(rng.random((10, 4)), columns=[f"f{i}" for i in range(4)])
     y = pd.Series(rng.random(10))
     model = LinearElasticNet(horizon=1, multioutput=False).fit(X, y)
-    pre, _ = get_preprocessor(X)
+    pre, _ = get_preprocessor(X, "linreg")
     pre.fit(X)
     explainer = SHAPExplainer(model, pre, X, "linear")
     shap_vals = explainer.explain(X)
@@ -382,7 +411,7 @@ def test_predict_raw_from_file():
 @pytest.mark.integration
 def test_predict_raw_enrich_requires_seed(client):
     price = mk_price_df(pd.date_range("2024-06-03", periods=10, freq="B"))
-    payload = {"price": df_to_payload(price), "news": []}  # JSON-safe
+    payload = {"price": df_to_payload(price), "news": []}
     res = client.post("/predict-raw", params={"enrich": "true", "symbol": "^DJI"}, json=payload)
     assert res.status_code == 422
 
@@ -390,7 +419,7 @@ def test_predict_raw_enrich_requires_seed(client):
 def test_predict_raw_pad_requires_two(client):
     price = mk_price_df(pd.date_range("2024-06-03", periods=10, freq="B"))
     news = [{"date": price["date"].iloc[0].strftime("%Y-%m-%d"), "headline": "seed only one"}]
-    payload = {"price": df_to_payload(price), "news": news}  # JSON-safe
+    payload = {"price": df_to_payload(price), "news": news}
     res = client.post("/predict-raw", params={"pad_neutral": "true", "symbol": "^DJI"}, json=payload)
     assert res.status_code == 422
 
@@ -398,7 +427,6 @@ def test_predict_raw_pad_requires_two(client):
 def test_predict_raw_ignore_news_ok(client):
     price = mk_price_df(pd.date_range("2024-06-03", periods=10, freq="B"))
     news = mk_news(price["date"].iloc[:2], "whatever")
-    payload = {"price": df_to_payload(price), "news": news}  # JSON-safe
+    payload = {"price": df_to_payload(price), "news": news}
     res = client.post("/predict-raw", params={"ignore_news": "true", "symbol": "^DJI"}, json=payload)
-
     assert res.status_code == 200

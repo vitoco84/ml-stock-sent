@@ -61,16 +61,18 @@ def time_series_split(
         val_ratio: float = 0.1,
         horizon: int = 30
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """Chronologically split DataFrame into train, val, test, and forecast sets. """
+    """Chronologically split into train/val/test, and keep the last `horizon` rows as forecast holdout."""
     df = df.sort_values("date").reset_index(drop=True)
 
+    # Target columns (single- or multi-output)
     target_cols = [c for c in df.columns if c == "target" or c.startswith("target_")]
     if not target_cols:
         raise ValueError("No target columns found. Create the feature dataset first!")
 
+    # Rows with fully observed targets and exclude overlap
     usable = df[df[target_cols].notna().all(axis=1)].copy()
-    if usable.empty:
-        raise ValueError("No fully observed target rows. Increase history or reduce horizons.")
+    forecast = df.tail(horizon).copy()
+    usable = usable.loc[usable.index < forecast.index.min()]
 
     total = len(usable)
     train_end = int(total * train_ratio)
@@ -79,7 +81,6 @@ def time_series_split(
     train = usable.iloc[:train_end].copy()
     val = usable.iloc[train_end:val_end].copy()
     test = usable.iloc[val_end:].copy()
-    forecast = df.tail(horizon).copy()
 
     return train, val, test, forecast
 
@@ -111,7 +112,7 @@ def get_price_history(symbol: str, end_date: str, days: int = 90) -> pd.DataFram
     cols = [c[0] if isinstance(c, tuple) else c for c in cols]
     df.columns = [str(c).strip().lower().replace(" ", "_") for c in cols]
 
-    # Mappin of possible adjusted-close variants to 'adj_close'
+    # Mapping of possible adjusted-close variants to 'adj_close'
     if "adjclose" in df.columns and "adj_close" not in df.columns:
         df.rename(columns={"adjclose": "adj_close"}, inplace=True)
     if "adjusted_close" in df.columns and "adj_close" not in df.columns:

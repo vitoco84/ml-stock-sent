@@ -10,6 +10,7 @@ data:
   raw_dir: "../data/raw"
   models_dir: "../data/models"
   reports_dir: "../data/reports"
+  optuna_dir: "../data/optuna"
 
 runtime:
   seed: 42

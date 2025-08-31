@@ -7,20 +7,21 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 
-def get_preprocessor(X: pd.DataFrame) -> Tuple[Pipeline, list[str]]:
+def get_preprocessor(X: pd.DataFrame, model_name: str) -> Tuple[Pipeline, list[str]]:
     """Build Preprocessor Pipeline."""
-    target_cols = [c for c in X.columns if c == "target" or c.startswith("target_")]
-
     cat_features = [c for c in ["dow"] if c in X.columns]
-    num_features = [c for c in X.columns if c not in cat_features + ["date"] + target_cols]
+    num_features = [c for c in X.columns if c not in cat_features + ["date"]]
 
     if not (num_features or cat_features):
         raise ValueError("No feature columns found after filtering (only targets/date present).")
 
-    num_tf = Pipeline(steps=[
-        ("imputer", SimpleImputer(strategy="median")),
-        ("scaler", StandardScaler()),
-    ])
+    if model_name.lower() in {"random_forest", "xgboost"}:
+        num_tf = SimpleImputer(strategy="median")
+    else:
+        num_tf = Pipeline(steps=[
+            ("imputer", SimpleImputer(strategy="median")),
+            ("scaler", StandardScaler())
+        ])
 
     cat_tf = Pipeline(steps=[
         ("imputer", SimpleImputer(strategy="most_frequent")),

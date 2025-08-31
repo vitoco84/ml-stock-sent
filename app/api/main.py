@@ -76,7 +76,7 @@ def healthz(): return {"ok": True}
 def fetch_price_history(
         symbol: str = Query("^DJI", description="Ticker symbol, e.g., AAPL, ^DJI"),
         end_date: str = Query(..., description="End date in YYYY-MM-DD format"),
-        days: int = Query(90, description="Number of business days to look back")
+        days: int = Query(90, ge=1, le=365, description="Number of business days to look back")
 ):
     """
     Fetch historical stock price data for a given symbol.
@@ -88,6 +88,9 @@ def fetch_price_history(
     Returns JSON with price rows or an error message.
     """
     try:
+        if days > 365:
+            raise HTTPException(400, "Max look-back is 365 business days.")
+
         df = get_price_history(symbol, end_date, days)
         if df.empty:
             raise HTTPException(404, "No price data returned. Check the symbol or date range.")
@@ -106,7 +109,7 @@ def fetch_news_history(
         request: Request,
         query: str = Query(..., description="Search keyword, e.g., Apple, Tesla"),
         end_date: str = Query(..., description="End date in YYYY-MM-DD format"),
-        days: int = Query(7, description="Number of calendar days to look back")
+        days: int = Query(7, ge=1, le=29, description="Number of calendar days to look back")
 ):
     """
     Fetch recent news headlines using the NewsAPI.
@@ -118,6 +121,9 @@ def fetch_news_history(
     Returns JSON with news rows or an error message.
     """
     try:
+        if days > 29:
+            raise HTTPException(400, "Max look-back is 29 days.")
+
         api_key = request.app.state.news_api_key
         if not api_key:
             raise HTTPException(500, "Missing NEWS_API_KEY environment variable")
@@ -137,7 +143,7 @@ def post_predict_from_raw(
         enrich: bool = Query(False, description="Generate missing headlines using local LLM"),
         pad_neutral: bool = Query(False, description="Use provided news and neutral-fill gaps (needs ≥2)"),
         ignore_news: bool = Query(False, description="Ignore all news (neutral every day)"),
-        horizon: int = Query(30, ge=1, description="How many horizons to return"),
+        horizon: int = Query(30, ge=1, le=30, description="How many horizons to return"),
         return_path: bool = Query(True, description="Whether to return the full H-step path"),
         symbol: str = Query("^DJI", description="Ticker symbol for context (e.g., AAPL)")
 ):

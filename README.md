@@ -16,6 +16,11 @@ Forecast stock prices by combining:
 - Python **3.10+**
 - (Optional) NVIDIA GPU with CUDA for accelerated FinBERT
 
+### Specs
+- Intel-Core i9-13900K
+- NVIDIA GeForce RTX 4090
+- RAM 64GB
+
 ### Setup
 ```bash
 # Upgrade pip
@@ -210,11 +215,14 @@ curl -X POST "http://localhost:8000/predict-raw?symbol=AAPL&horizon=5&return_pat
 1. **01_eda.ipynb** – Exploratory Data Analysis
 2. **02_sentiment.ipynb** – Sentiment analysis with FinBERT
 3. **03_feature.ipynb** – Feature engineering
-4. **04_linreg.ipynb** – Linear Regression Model, HP Tuning
-5. **05_linreg_wo_sent.ipynb** – Linear Regression Model without Sentiment, HP Tuning
-6. **06_xgboost.ipynb** – XGBoost Model, Early Stopping, Non-Deterministic (Parallel), HP Tuning
-7. **07_shap.ipynb** - Model evaluation & interpretability
-8. **08_results_plots.ipynb** - Plots combined of all Models (Linear Regression, XGBoost, Random Forest, NN MLP, LSTM)
+3. **04_adfulller_test.ipynb** – Stationary Test
+4. **05_linreg.ipynb** – Linear Regression Model
+5. **06_linreg_wo_sent.ipynb** – Linear Regression Model without Sentiment
+6. **07_xgboost.ipynb** – XGBoost Model (RT: ~20min)
+6. **08_random_forest.ipynb** – Random Forest Model (RT: ~30min)
+6. **09_mlp.ipynb** – Feed Forward Multi Layer Perceptron Model
+7. **10_shap.ipynb** - Model evaluation & interpretability
+8. **11_results_plots.ipynb** - Plots combined of all Models
 
 ---
 
@@ -325,8 +333,9 @@ This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for d
 
 ## 📝 TODO
 
-- [ ] Implement **LSTM** for sequential modeling
-- [ ] Implement **Stacking Ensemble**
+- [ ] Impl CNN, Stacking and LSTM
+- [ ] Train One Model wo Sent but with more Data
+- [ ] Transfer Learning and Fine-Tuning
 - [ ] Write **academic-style report** (thesis-like)
 - [ ] Prepare **PowerPoint** presentation
 - [ ] Optional: Deploy demo API + Streamlit to cloud (Render / Fly.io / AWS)
