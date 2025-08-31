@@ -87,11 +87,11 @@ CORS_ORIGINS=["http://localhost:8501","http://localhost:3000"]
 Fetch historical stock data.
 
 **Query params**
-- `symbol` *(str, required)* — e.g. `AAPL`, `^DJI`
+- `symbol` *(str, required)* - e.g. `AAPL`, `^DJI`
 - `end_date` *(YYYY-MM-DD, required)*
-- `days` *(int, default 90)* — calendar days to look back
+- `days` *(int, default 90)* - calendar days to look back
 
-**Response — `PriceHistoryResponse`**
+**Response - `PriceHistoryResponse`**
 ```json
 {
   "price": [
@@ -118,11 +118,11 @@ Fetch historical stock data.
 Fetch recent news headlines via NewsAPI.
 
 **Query params**
-- `query` *(str, required)* — search term, e.g. `Apple`
+- `query` *(str, required)* - search term, e.g. `Apple`
 - `end_date` *(YYYY-MM-DD, required)*
-- `days` *(int, default 7)* — lookback window
+- `days` *(int, default 7)* - lookback window
 
-**Success — `NewsHistoryResponse`**
+**Success - `NewsHistoryResponse`**
 ```json
 {
   "news": [
@@ -148,12 +148,12 @@ Fetch recent news headlines via NewsAPI.
 Predict next prices using historical **price** data and optional **news**.
 
 **Query params**
-- `symbol` *(str, required)* — Ticker symbol for context (e.g., `AAPL`)
-- `enrich` *(bool, default `false`)* — generate missing headlines locally (requires reachable `OLLAMA_URL`)
-- `horizon` *(int, default `30`, min `1`)* — number of steps to return
-- `return_path` *(bool, default `true`)* — whether to return full H‑step paths
+- `symbol` *(str, required)* - Ticker symbol for context (e.g., `AAPL`)
+- `enrich` *(bool, default `false`)* - generate missing headlines locally (requires reachable `OLLAMA_URL`)
+- `horizon` *(int, default `30`, min `1`)* - number of steps to return
+- `return_path` *(bool, default `true`)* - whether to return full H‑step paths
 
-**Request body — `PredictionRequest`**
+**Request body - `PredictionRequest`**
 ```json
 {
   "price": [
@@ -167,7 +167,7 @@ Predict next prices using historical **price** data and optional **news**.
 }
 ```
 
-**Response — `PredictionResponse` (when `return_path=true`)**
+**Response - `PredictionResponse` (when `return_path=true`)**
 ```json
 {
   "horizon": 5,
@@ -180,7 +180,7 @@ Predict next prices using historical **price** data and optional **news**.
   "last_date": "2025-01-09"
 }
 ```
-**Response — `PredictionResponse` (when `return_path=false`)**
+**Response - `PredictionResponse` (when `return_path=false`)**
 ```json
 {
   "horizon": 5,
@@ -215,14 +215,16 @@ curl -X POST "http://localhost:8000/predict-raw?symbol=AAPL&horizon=5&return_pat
 1. **01_eda.ipynb** – Exploratory Data Analysis
 2. **02_sentiment.ipynb** – Sentiment analysis with FinBERT
 3. **03_feature.ipynb** – Feature engineering
-3. **04_adfulller_test.ipynb** – Stationary Test
-4. **05_linreg.ipynb** – Linear Regression Model
-5. **06_linreg_wo_sent.ipynb** – Linear Regression Model without Sentiment
-6. **07_xgboost.ipynb** – XGBoost Model (RT: ~20min)
-6. **08_random_forest.ipynb** – Random Forest Model (RT: ~30min)
-6. **09_mlp.ipynb** – Feed Forward Multi Layer Perceptron Model
-7. **10_shap.ipynb** - Model evaluation & interpretability
-8. **11_results_plots.ipynb** - Plots combined of all Models
+4. **04_adfulller_test.ipynb** – Stationary Test
+5. **05_linreg.ipynb** – Linear Regression Model
+6. **06_linreg_wo_sent.ipynb** – Linear Regression Model without Sentiment
+7. **07_xgboost.ipynb** – XGBoost Model (RT: ~20min)
+8. **08_random_forest.ipynb** – Random Forest Model (RT: ~30min)
+9. **09_mlp.ipynb** – Feed Forward Multi Layer Perceptron Model
+10. **10_cnn.ipynb** – Convolutional Neural Network Model
+11. **11_lstm.ipynb** - Long Short-term Memory Model
+12. **12_results_plots.ipynb** - Plots combined of all Models
+13. **13_shap.ipynb** - Model evaluation & interpretability
 
 ---
 
@@ -333,8 +335,6 @@ This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for d
 
 ## 📝 TODO
 
-- [ ] Impl CNN, Stacking and LSTM
-- [ ] Train One Model wo Sent but with more Data
 - [ ] Transfer Learning and Fine-Tuning
 - [ ] Write **academic-style report** (thesis-like)
 - [ ] Prepare **PowerPoint** presentation

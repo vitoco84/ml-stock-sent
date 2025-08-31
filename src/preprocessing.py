@@ -1,14 +1,30 @@
-from typing import Tuple
+from __future__ import annotations
 
+from typing import Optional, Tuple
+
+import numpy as np
 import pandas as pd
+from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 
+class IdentityTransformer(BaseEstimator, TransformerMixin):
+    def fit(self, X: pd.DataFrame, y: Optional[np.ndarray] = None) -> IdentityTransformer:
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        return X
+
 def get_preprocessor(X: pd.DataFrame, model_name: str) -> Tuple[Pipeline, list[str]]:
     """Build Preprocessor Pipeline."""
+
+    # No-op  Transformer for preserving DatFrames and Column names
+    if model_name.lower() in {"cnn", "lstm"}:
+        return Pipeline([("identity", IdentityTransformer())], memory=None), list(X.columns)
+
     cat_features = [c for c in ["dow"] if c in X.columns]
     num_features = [c for c in X.columns if c not in cat_features + ["date"]]
 
