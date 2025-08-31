@@ -4,13 +4,12 @@ from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import StackingRegressor
-from sklearn.linear_model import Ridge
+from sklearn.ensemble import RandomForestRegressor, StackingRegressor
+from sklearn.linear_model import ElasticNet, Ridge
+from sklearn.multioutput import MultiOutputRegressor
+from xgboost import XGBRegressor
 
 from src.models.base import Base
-from src.models.linreg import LinearElasticNet
-from src.models.random_forest import RandomForest
-from src.models.xgboost import XGBoost
 
 
 @dataclass
@@ -28,18 +27,32 @@ class StackingEnsemble(Base):
 
     def _build(self):
         base_learners = [
-            ("linreg", LinearElasticNet(horizon=self.horizon)),
-            ("rf", RandomForest(horizon=self.horizon)),
-            ("xgb", XGBoost(horizon=self.horizon))
+            ("lin", ElasticNet(
+                alpha=1e-3,
+                l1_ratio=0.2,
+                max_iter=2000,
+                random_state=self.random_state
+            )),
+            ("rf", RandomForestRegressor(
+                n_estimators=600,
+                random_state=self.random_state,
+                n_jobs=-1,
+                min_samples_leaf=2,
+                max_features="sqrt"
+            )),
+            ("xgb", XGBRegressor(
+                n_estimators=800,
+                learning_rate=0.05,
+                max_depth=5,
+                tree_method="hist",
+                device="cpu",
+                random_state=self.random_state, n_jobs=1
+            ))
         ]
 
         meta = Ridge(alpha=1.0, random_state=self.random_state)
-        self.model = StackingRegressor(
-            estimators=[(n, m.model) for n, m in base_learners],
-            final_estimator=meta,
-            passthrough=True,
-            n_jobs=-1
-        )
+        stack = StackingRegressor(estimators=base_learners, final_estimator=meta, passthrough=True, n_jobs=-1)
+        self.model = MultiOutputRegressor(stack)
 
     def fit(self, X: pd.DataFrame, y: np.ndarray) -> StackingEnsemble:
         self.model.fit(X, np.asarray(y))

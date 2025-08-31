@@ -47,7 +47,7 @@ def create_features_and_target(
     df["low_l"] = df["low"].shift(1)
     df["close_l"] = df["close"].shift(1)
     df["adj_close_l"] = df["adj_close"].shift(1)
-    df["volume_l"] = df["volume"].shift(1).astype(float)
+    df["volume_l"] = np.log1p(df["volume"].shift(1).astype(float))
 
     # Rolling
     df["ret_mean_5"] = df["log_return"].shift(1).rolling(5).mean()

@@ -34,15 +34,19 @@ class ModelTrainer:
         self.preprocessor = preprocessor or StandardScaler()
         self.y_scale = y_scale
         self.y_scaler: Optional[SafeStandardScaler] = None
+        self.is_sequence = getattr(model, "input_mode", "tabular") == "sequence"
 
         self.logger = get_logger(self.__class__.__name__)
         self.logger.info(f"Initialized ModelTrainer for model: {name}")
 
     def _prep_X(self, pre, X_tr, X_va=None):
+        if self.is_sequence:
+            return None, X_tr, (X_va if X_va is not None else None)
+
         pre_est = pre or StandardScaler()
         pre_ = clone(pre_est)
-        X_tr_s = pre_.fit_transform(X_tr).astype(np.float32)
-        X_va_s = pre_.transform(X_va).astype(np.float32) if X_va is not None else None
+        X_tr_s = pre_.fit_transform(X_tr)
+        X_va_s = pre_.transform(X_va) if X_va is not None else None
         return pre_, X_tr_s, X_va_s
 
     def _prep_y(self, y_tr, y_va=None):
@@ -60,7 +64,6 @@ class ModelTrainer:
         return cand
 
     def fit(self, X_train, y_train, X_val=None, y_val=None):
-        self.logger.info("Starting model training...")
         pre_, X_tr_s, X_va_s = self._prep_X(self.preprocessor, X_train, X_val)
         y_s, y_tr_s, y_va_s = self._prep_y(y_train, y_val)
         self.y_scaler = y_s
@@ -73,7 +76,7 @@ class ModelTrainer:
         return self
 
     def predict(self, X):
-        X_s = self.preprocessor.transform(X).astype(np.float32)
+        X_s = self.preprocessor.transform(X) if (self.preprocessor is not None and not self.is_sequence) else X
         pred = self.model.predict(X_s)
         pred = np.asarray(pred)
         if pred.ndim == 1:
@@ -132,8 +135,6 @@ class ModelTrainer:
         return metric_name.lower() in {"r2"}
 
     def objective(self, trial, X, y, n_splits: int = 3):
-        self.logger.info("Starting model tuning...")
-
         params = self._get_search_params(trial)
 
         tscv = TimeSeriesSplit(n_splits=n_splits, gap=int(self.config.get("gap", 0)))
@@ -155,6 +156,9 @@ class ModelTrainer:
 
             # Predict and inverse
             pred = candidate.predict(X_va_s)
+            pred = np.asarray(pred)
+            if pred.ndim == 1:
+                pred = pred.reshape(-1, 1)
             pred = self._maybe_inverse(pred, y_s)
 
             # Score, Report, Prune

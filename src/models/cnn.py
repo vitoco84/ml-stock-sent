@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import torch.nn as nn
 
-from src.models.base import TorchBaseNN
+from src.models.basenn import TorchBaseNN
 
 
 class _CNNNet(nn.Module):
@@ -27,6 +27,7 @@ class _CNNNet(nn.Module):
 class CNNModel(TorchBaseNN):
     """Convolutional Neural Network (CNN)."""
     name: str = "cnn"
+    input_mode: str = "sequence"
 
     horizon: int = 30
     random_state: int = 42
@@ -35,9 +36,14 @@ class CNNModel(TorchBaseNN):
     dense_units: int = 64
     dropout: float = 0.2
     lr: float = 1e-3
-    epochs: int = 50
+    epochs: int = 100
     batch_size: int = 64
     weight_decay: float = 1e-5
+    patience: int = 20
+    min_delta: float = 0.0
+    scheduler_patience: int = 5
+    clip_grad_norm: float = 1.0
+    use_amp: bool = True
 
     def __post_init__(self):
         super().__init__(horizon=self.horizon, random_state=self.random_state)

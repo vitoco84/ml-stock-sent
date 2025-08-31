@@ -1,4 +1,5 @@
 from collections import deque
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -10,7 +11,8 @@ def recursive_forecast(
         trainer: ModelTrainer,
         X_last: pd.DataFrame,
         forecast_horizon: int = 30,
-        p0: float | None = None
+        p0: Optional[float] = None,
+        past_prices: Optional[np.ndarray] = None
 ):
     """Recursive H-step forecast in log-returns."""
     if len(X_last) != 1:
@@ -19,8 +21,15 @@ def recursive_forecast(
     X = X_last.copy(deep=True)
     idx = X.index[0]
     price = float(p0 if p0 is not None else X.at[idx, "adj_close_l"])
+
+    # Seed the buffer
+    if past_prices is not None and len(past_prices) >= 11:
+        price_buf = deque(list(past_prices[-11:]), maxlen=11)
+        price = float(past_prices[-1])
+    else:
+        price_buf = deque([price] * 11, maxlen=11)
+
     lag_cols = sorted([c for c in X.columns if c.startswith("lag_")], key=lambda s: int(s.split("_")[1]))
-    price_buf = deque([price], maxlen=11)
     preds = []
 
     for _ in range(forecast_horizon):

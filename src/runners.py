@@ -1,4 +1,5 @@
 import os
+import warnings
 from pathlib import Path
 from typing import Dict, List
 
@@ -26,7 +27,7 @@ def run_experiments(
 ) -> List[Dict]:
     results = []
     for exp in experiments:
-        res = run(
+        res = _run(
             df_full=df,
             exp=exp,
             out_dir=str(out_dir),
@@ -39,7 +40,7 @@ def run_experiments(
         results.append(res)
     return results
 
-def run(
+def _run(
         df_full: pd.DataFrame,
         exp: Experiment,
         out_dir: str,
@@ -50,6 +51,9 @@ def run(
         gap: int = 30
 ):
     """Generic training/tuning/eval runner."""
+    # Ignore experimental warning
+    warnings.filterwarnings("ignore", category=optuna.exceptions.ExperimentalWarning)
+
     # Ensure gap
     gap = max(gap, forecast_horizon)
 
@@ -78,7 +82,6 @@ def run(
 
     # Preprocessor
     preprocessor, _ = get_preprocessor(X_train, exp_name)
-    joblib.dump(preprocessor, Path(out_dir) / f"{exp_name}_preprocessor.joblib")
 
     # Config
     model_config = {"optimization_metric": "rmse", "gap": gap, "seed": random_state}
@@ -87,6 +90,11 @@ def run(
 
     # Base Model and Trainer
     base_model = exp.build(forecast_horizon, random_state)
+
+    if getattr(base_model, "input_mode", "tabular") == "sequence":
+        assert any(c.startswith("lag_") for c in feature_cols), "CNN and LSTM require lag_* features."
+
+    # Training
     trainer = ModelTrainer(
         model=base_model,
         name=f"{exp_name}",
@@ -96,15 +104,8 @@ def run(
     )
 
     # Optuna
-    storage = optuna.storages.RDBStorage(
-        url=f"sqlite:///{Path(out_dir) / f'{exp_name}_optuna.db'}",
-        engine_kwargs={"connect_args": {"timeout": 30}},
-    )
-
+    optuna.logging.set_verbosity(optuna.logging.WARNING)
     study = optuna.create_study(
-        study_name=f"{exp_name}_study",
-        storage=storage,
-        load_if_exists=True,
         direction="minimize",
         sampler=optuna.samplers.TPESampler(
             seed=random_state,
@@ -113,10 +114,11 @@ def run(
             group=True,
             constant_liar=True
         ),
-        pruner=optuna.pruners.SuccessiveHalvingPruner(min_resource=1, reduction_factor=3)
+        pruner=optuna.pruners.HyperbandPruner(min_resource=1, max_resource=n_splits, reduction_factor=3)
     )
-    is_xgb = exp.name.lower() in {"xgboost", "xgb"}
-    optuna_n_jobs = 1 if (is_xgb and base_model.get_params().get("device") == "cuda") else min(24, os.cpu_count() or 1)
+    optuna_n_jobs = 1 \
+        if "cuda" in str(base_model.get_params().get("device", "")).lower() \
+        else min(24, os.cpu_count() or 1)
     study.optimize(
         lambda tr: trainer.objective(tr, X_train, y_train, n_splits=n_splits),
         n_trials=n_trials,
@@ -137,6 +139,7 @@ def run(
         y_scale=y_scale_flag
     )
     trainer.fit(X_train, y_train, X_val, y_val)
+    joblib.dump(trainer.preprocessor, Path(out_dir) / f"{exp_name}_preprocessor.joblib")
 
     # Predictions
     y_pred_val = np.asarray(trainer.predict(X_val))

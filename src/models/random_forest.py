@@ -67,11 +67,11 @@ class RandomForest(Base):
             max_depth = None
 
         return {
-            "n_estimators": trial.suggest_int("n_estimators", 200, 800, step=200),
+            "n_estimators": trial.suggest_int("n_estimators", 300, 1200, step=300),
             "max_depth": max_depth,
             "min_samples_split": trial.suggest_int("min_samples_split", 2, 20),
             "min_samples_leaf": trial.suggest_int("min_samples_leaf", 2, 10),
-            "max_features": trial.suggest_categorical("max_features", ["sqrt", "log2", 0.5]),
+            "max_features": trial.suggest_categorical("max_features", ["sqrt", "log2", 0.3, 0.5, 0.8]),
             "bootstrap": bootstrap,
             "max_samples": trial.suggest_float("max_samples", 0.5, 0.9) if bootstrap else None,
             "criterion": "squared_error",
