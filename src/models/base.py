@@ -67,13 +67,8 @@ class Base(ABC, BaseEstimator):
 class TorchBaseNN(Base):
     """Base class for PyTorch forecasting models."""
 
-    def __init__(self, horizon=30, random_state=42, lr=1e-3, epochs=50, batch_size=64, weight_decay=1e-5, device=None):
+    def __init__(self, horizon=30, random_state=42, device=None):
         super().__init__(horizon=horizon, random_state=random_state)
-        self.horizon = horizon
-        self.lr = lr
-        self.epochs = epochs
-        self.batch_size = batch_size
-        self.weight_decay = weight_decay
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self._net = None
 
@@ -81,7 +76,15 @@ class TorchBaseNN(Base):
     def _build_net(self, input_dim: int, output_dim: int) -> nn.Module:
         raise NotImplementedError
 
-    def fit(self, X: pd.DataFrame, y: np.ndarray):
+    def fit(self, X: pd.DataFrame, y: np.ndarray,
+            lr: float | None = None, epochs: int | None = None,
+            batch_size: int | None = None, weight_decay: float | None = None):
+
+        lr = lr if lr is not None else getattr(self, "lr", 1e-3)
+        epochs = epochs if epochs is not None else getattr(self, "epochs", 50)
+        batch_size = batch_size if batch_size is not None else getattr(self, "batch_size", 64)
+        weight_decay = weight_decay if weight_decay is not None else getattr(self, "weight_decay", 1e-5)
+
         X_t = self._reshape(X).to(self.device)
         y_t = torch.as_tensor(y, dtype=torch.float32).to(self.device)
         if y_t.ndim == 1:
@@ -89,14 +92,14 @@ class TorchBaseNN(Base):
 
         self._net = self._build_net(input_dim=1, output_dim=y_t.shape[1]).to(self.device)
 
-        opt = Adam(self._net.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+        opt = Adam(self._net.parameters(), lr=lr, weight_decay=weight_decay)
         loss_fn = nn.MSELoss()
 
         self._net.train()
-        for _ in range(self.epochs):
-            for i in range(0, len(X_t), self.batch_size):
-                xb = X_t[i:i + self.batch_size]
-                yb = y_t[i:i + self.batch_size]
+        for _ in range(epochs):
+            for i in range(0, len(X_t), batch_size):
+                xb = X_t[i:i + batch_size]
+                yb = y_t[i:i + batch_size]
                 opt.zero_grad()
                 loss = loss_fn(self._net(xb), yb)
                 loss.backward()

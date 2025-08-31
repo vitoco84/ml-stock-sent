@@ -12,6 +12,7 @@ def set_seed(seed: int = 42) -> np.random.Generator:
     """Set random seed globally across numpy, random, torch, tensorflow if available."""
     os.environ["PYTHONHASHSEED"] = str(seed)
     os.environ.setdefault("TF_DETERMINISTIC_OPS", "1")
+    os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
 
     random.seed(seed)
     np.random.seed(seed)
