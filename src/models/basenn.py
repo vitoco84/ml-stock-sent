@@ -30,6 +30,7 @@ class TorchBaseNN(Base):
 
     @abstractmethod
     def _build_net(self, input_dim: int, output_dim: int) -> nn.Module:
+        """Return an nn.Module mapping (N, D, 1) -> (N, output_dim)."""
         raise NotImplementedError
 
     def fit(
@@ -58,8 +59,10 @@ class TorchBaseNN(Base):
             weight_decay: Optional[float] = None
     ) -> Base:
         hp = self._resolve_hparams(lr, epochs, batch_size, weight_decay)
+
         X_tr_t, y_tr_t = self._to_tensor(X_train), self._to_target(y_train)
         X_va_t, y_va_t = self._to_tensor(X_val), self._to_target(y_val)
+
         self._init_net(output_dim=y_tr_t.shape[1])
         self._train_loop(X_tr_t, y_tr_t, X_va_t, y_va_t, hp)
         return self
@@ -226,7 +229,6 @@ class TorchBaseNN(Base):
             lag_cols = [c for c in X.columns if c.startswith("lag_")]
             if not lag_cols:
                 raise ValueError("sequence mode requires lag_* columns in X.")
-            # oldest -> most recent: lag_T, ..., lag_1
             lag_cols = sorted(lag_cols, key=lambda s: int(s.split("_")[1]), reverse=True)
             arr = X[lag_cols].to_numpy(dtype=np.float32)  # (N, T)
             return torch.from_numpy(arr[:, :, None])  # (N, T, 1)
