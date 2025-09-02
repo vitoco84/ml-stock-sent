@@ -15,6 +15,7 @@ from src.models.base import Base
 
 class PartitionedTimeSeriesSplit(BaseCrossValidator):
     """Partition Time Series Split for Stacking CV Issues."""
+
     def __init__(self, n_splits: int):
         if n_splits < 2:
             raise ValueError("n_splits must be >= 2")
@@ -45,17 +46,19 @@ class StackingEnsemble(Base):
     multioutput: bool = True
 
     cv_n_splits: int = 2
-    mo_n_jobs: int = -1
-    n_jobs_inner: int = -1
     ridge_alpha: float = 1.0
 
+    # Parallelism
+    mo_n_jobs: int = -1
+    n_jobs_inner: int = -1
+
     # Random Forest
-    rf_estimators: int = 100
-    rf_max_depth: int | None = 16
-    rf_max_samples: float = 0.7
+    rf_estimators: int = 50
+    rf_max_depth: int | None = 12
+    rf_max_samples: float = 0.6
 
     # XGBoost
-    xgb_estimators: int = 160
+    xgb_estimators: int = 80
     xgb_max_depth: int = 5
     xgb_learning_rate: float = 0.08
     xgb_subsample: float = 0.9
@@ -73,7 +76,7 @@ class StackingEnsemble(Base):
         lin = ElasticNet(
             alpha=1e-3,
             l1_ratio=0.2,
-            max_iter=1500,
+            max_iter=800,
             random_state=self.random_state
         )
         rf = RandomForestRegressor(
@@ -133,7 +136,7 @@ class StackingEnsemble(Base):
         return {
             "ridge_alpha": trial.suggest_float("ridge_alpha", 1e-3, 10.0, log=True),
             "rf_estimators": trial.suggest_int("rf_estimators", 50, 200, step=25),
-            "xgb_estimators": trial.suggest_int("xgb_estimators", 80, 240, step=20),
+            "xgb_estimators": trial.suggest_int("xgb_estimators", 60, 200, step=20),
             "xgb_max_depth": trial.suggest_int("xgb_max_depth", 3, 7),
             "xgb_learning_rate": trial.suggest_float("xgb_learning_rate", 0.05, 0.2, log=True),
             "drop_rf": trial.suggest_categorical("drop_rf", [False, True]),
