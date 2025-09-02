@@ -223,8 +223,9 @@ curl -X POST "http://localhost:8000/predict-raw?symbol=AAPL&horizon=5&return_pat
 9. **09_mlp.ipynb** – Feed Forward Multi Layer Perceptron Model
 10. **10_cnn.ipynb** – Convolutional Neural Network Model
 11. **11_lstm.ipynb** - Long Short-term Memory Model
-12. **12_results_plots.ipynb** - Plots combined of all Models
-13. **13_shap.ipynb** - Model evaluation & interpretability
+12. **12_stacking.ipynb** - Stacking Model
+13. **13_results_plots.ipynb** - Plots combined of all Models
+14. **14_shap.ipynb** - Model evaluation & interpretability
 
 ---
 
