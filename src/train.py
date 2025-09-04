@@ -130,15 +130,11 @@ class ModelTrainer:
     def _score_metric(y_true, y_pred, metric_name: str) -> float:
         return metrics(np.asarray(y_true), np.asarray(y_pred))[metric_name]
 
-    @staticmethod
-    def _is_maximize(metric_name: str) -> bool:
-        return metric_name.lower() in {"r2"}
-
     def objective(self, trial, X, y, n_splits: int = 3):
         params = self._get_search_params(trial)
 
         tscv = TimeSeriesSplit(n_splits=n_splits, gap=int(self.config.get("gap", 0)))
-        metric_name = self.config.get("optimization_metric", "rmse")
+        metric_name = self.config.get("optimization_metric", "mae")
 
         scores = []
         for tr_idx, va_idx in tscv.split(X):
@@ -173,4 +169,4 @@ class ModelTrainer:
         trial.set_user_attr("best_params", params)
         trial.set_user_attr("cv_scores", scores)
 
-        return -mean_score if self._is_maximize(metric_name) else mean_score
+        return mean_score

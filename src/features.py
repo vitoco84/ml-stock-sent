@@ -15,10 +15,13 @@ def create_features_and_target(
 ) -> pd.DataFrame:
     """
     Features:
-      - Sliding lagged log returns: lag_1 ... lag_{n_lags}
+      - Price delta features (delta_1, delta_5, delta_10)
+      - OHLC shifted features (open_l, high_l, ...)
       - Calendar: day-of-week
+      - Lagged log returns: lag_1 ... lag_{n_lags}
     Targets:
-      - Multi-step log return targets (target_1 ... target_H), or 'target' for 1-step
+      - Multi-step price delta targets (target_1 ... target_H), or 'target' for 1-step
+        where delta price_t+1 = AdjClose_{t+1} − AdjClose_t
     """
     df = df.copy()
     df["date"] = pd.to_datetime(df["date"])
@@ -27,34 +30,30 @@ def create_features_and_target(
     if "adj_close" not in df.columns:
         raise ValueError("Expected 'adj_close' column in df.")
 
-    price = df["adj_close"].astype(float)
-    df["log_return"] = np.log(price / price.shift(1))
-
     # Targets
     if forecast_horizon > 1:
         for h in range(1, forecast_horizon + 1):
-            df[f"target_{h}"] = df["log_return"].shift(-h)
+            df[f"target_{h}"] = df["adj_close"].shift(-h) - df["adj_close"]
     else:
-        df["target"] = df["log_return"].shift(-1)
+        df["target"] = df["adj_close"].shift(-1) - df["adj_close"]
 
     # Lags of log-returns
+    df["log_return"] = np.log(df["adj_close"] / df["adj_close"].shift(1))
     for k in range(1, back_horizon + 1):
         df[f"lag_{k}"] = df["log_return"].shift(k)
 
+    # Delta Price features
+    df["delta_1"] = df["adj_close"] - df["adj_close"].shift(1)
+    df["delta_5"] = df["adj_close"] - df["adj_close"].shift(5)
+    df["delta_10"] = df["adj_close"] - df["adj_close"].shift(10)
+
+    # Rolling and Momentum
+    df["mom_10"] = np.log(df["adj_close"] / df["adj_close"].shift(10))
+
     # OHLC Shifted
-    df["open_l"] = df["open"].shift(1)
-    df["high_l"] = df["high"].shift(1)
-    df["low_l"] = df["low"].shift(1)
-    df["close_l"] = df["close"].shift(1)
-    df["adj_close_l"] = df["adj_close"].shift(1)
-    df["volume_l"] = np.log1p(df["volume"].shift(1).astype(float))
-
-    # Rolling
-    df["ret_mean_5"] = df["log_return"].shift(1).rolling(5).mean()
-    df["ret_std_5"]  = df["log_return"].shift(1).rolling(5).std()
-
-    # Momentum
-    df["mom_10"] = np.log(df["adj_close"].shift(1) / df["adj_close"].shift(11))
+    for c in ["open", "high", "low", "close", "adj_close", "volume"]:
+        if c in df.columns:
+            df[f"{c}_l"] = (np.log1p(df[c]) if c == "volume" else df[c]).shift(1)
 
     # Calendar
     df["dow"] = df["date"].dt.dayofweek.astype(int)

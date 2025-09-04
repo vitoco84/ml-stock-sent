@@ -48,8 +48,10 @@ def symbol_valid(symbol: str):
         st.stop()
 
 mode = st.radio("Data source", ["Fetch from API", "Upload CSVs"], horizontal=True)
-st.caption("Model is currently trained for **^DJI (Dow Jones)**. "
-           "You can change the ticker, but predictions may be less accurate.")
+st.caption(
+    "Model is currently trained for **^DJI (Dow Jones)**. "
+    "You can change the ticker, but predictions may be less accurate."
+)
 
 # --- Upload CSVs mode ---
 if mode == "Upload CSVs":
@@ -100,25 +102,23 @@ if mode == "Upload CSVs":
         "Missing-news strategy",
         ["Do nothing (ignore news)", "Enrich with LLM (needs ≥1)", "Pad with neutral (needs ≥2)"],
         index=0,
-        help=("Do nothing: ignore all news → neutral every day.\n"
-              "Enrich: use your news (≥1 headline) and generate the missing dates.\n"
-              "Pad: use your news (≥2 headlines) and neutral-fill gaps (no generation).")
+        help=(
+            "Do nothing: ignore all news → neutral every day.\n"
+            "Enrich: use your news (≥1 headline) and generate the missing dates.\n"
+            "Pad: use your news (≥2 headlines) and neutral-fill gaps (no generation)."
+        )
     )
-    enrich_flag_csv = (fill_strategy_csv == "Enrich with LLM (needs ≥1)")
-    pad_neutral_csv = (fill_strategy_csv == "Pad with neutral (needs ≥2)")
-    ignore_news_flag_csv = (fill_strategy_csv == "Do nothing (ignore news)")
+    enrich_flag_csv = fill_strategy_csv == "Enrich with LLM (needs ≥1)"
+    pad_neutral_csv = fill_strategy_csv == "Pad with neutral (needs ≥2)"
+    ignore_news_flag_csv = fill_strategy_csv == "Do nothing (ignore news)"
 
     # Horizon for CSV mode
-    h_sel_csv = st.number_input(
-        "Forecast horizon (business days)",
-        min_value=1, max_value=30, value=30, step=1
-    )
+    h_sel_csv = st.number_input("Forecast horizon (business days)", min_value=1, max_value=30, value=30, step=1)
 
     # Only enable Predict when prices are available
-    can_predict_csv = (
-            isinstance(st.session_state.get("price_csv_df"), pd.DataFrame)
-            and not st.session_state["price_csv_df"].empty
-    )
+    can_predict_csv = isinstance(
+        st.session_state.get("price_csv_df"), pd.DataFrame
+    ) and not st.session_state["price_csv_df"].empty
     predict_btn = st.button("Predict Price", disabled=not can_predict_csv)
 
 # --- Fetch from API mode ---
@@ -147,13 +147,15 @@ else:
             "Missing-news strategy",
             ["Do nothing (ignore news)", "Enrich with LLM (needs ≥1)", "Pad with neutral (needs ≥2)"],
             index=0,
-            help=("Do nothing: ignore all news → neutral every day.\n"
-                  "Enrich: use your news (≥1 headline) and generate the missing dates.\n"
-                  "Pad: use your news (≥2 headlines) and neutral-fill gaps (no generation).")
+            help=(
+                "Do nothing: ignore all news → neutral every day.\n"
+                "Enrich: use your news (≥1 headline) and generate the missing dates.\n"
+                "Pad: use your news (≥2 headlines) and neutral-fill gaps (no generation)."
+            ),
         )
-        enrich_flag = (fill_strategy == "Enrich with LLM (needs ≥1)")
-        pad_neutral_flag = (fill_strategy == "Pad with neutral (needs ≥2)")
-        ignore_news_flag = (fill_strategy == "Do nothing (ignore news)")
+        enrich_flag = fill_strategy == "Enrich with LLM (needs ≥1)"
+        pad_neutral_flag = fill_strategy == "Pad with neutral (needs ≥2)"
+        ignore_news_flag = fill_strategy == "Do nothing (ignore news)"
 
         st.subheader("Optional headlines for today")
         news_input = []
@@ -196,7 +198,7 @@ else:
                     st.warning("No price data returned.")
 
 # --- Predict action ---
-if 'predict_btn' in locals() and predict_btn:
+if "predict_btn" in locals() and predict_btn:
     if mode == "Upload CSVs":
         price_df = st.session_state.get("price_csv_df")
         if price_df is None or price_df.empty:
@@ -281,10 +283,10 @@ if 'predict_btn' in locals() and predict_btn:
     st.success("Prediction Complete")
     current_price = float(result.get("current_price", float("nan")))
     predicted_price = float(result.get("predicted_price", float("nan")))
-    log_return = float(result.get("log_return", float("nan")))
+    delta_price = float(result.get("delta_price", float("nan")))
     st.write(f"**Current Price:** ${current_price:.2f}")
-    st.write(f"**Next-day Price (h=1):** ${predicted_price:.2f}")
-    st.write(f"**Next-day Log Return:** {log_return:.6f}")
+    st.write(f"**Next-day Predicted Price (h=1):** ${predicted_price:.2f}")
+    st.write(f"**Next-day delta Price:** {delta_price:.4f}")
 
     df_prices = price_df.copy()
 
@@ -306,11 +308,14 @@ if 'predict_btn' in locals() and predict_btn:
             alt.Chart(actual_df).mark_line().encode(x_enc, y_enc),
             alt.Chart(path_df).mark_line(strokeDash=[6, 6]).encode(x_enc, y_enc),
             alt.Chart(path_df.tail(1)).mark_point(size=70, color="red").encode(x_enc, y_enc),
-            alt.Chart(path_df.tail(1)).mark_text(dx=8, dy=-8, color="red").encode(
-                x_enc, y_enc, text=alt.Text("price:Q", format="$.2f")
-            ),
-        ).properties(width=700, height=380,
-                     title=f"Adj Close: Actual + Predicted Next {int(result.get('horizon', len(path_df)))} Business Days")
+            alt.Chart(path_df.tail(1))
+            .mark_text(dx=8, dy=-8, color="red")
+            .encode(x_enc, y_enc, text=alt.Text("price:Q", format="$.2f"))
+        ).properties(
+            width=700,
+            height=380,
+            title=f"Adj Close: Actual + Predicted Next {int(result.get('horizon', len(path_df)))} Business Days"
+        )
         st.subheader("Price Chart")
         st.altair_chart(chart, use_container_width=True)
     else:

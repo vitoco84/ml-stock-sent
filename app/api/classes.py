@@ -42,10 +42,10 @@ class NewsHistoryResponse(BaseModel):
 class PredictionResponse(BaseModel):
     """Full schema for prediction response."""
     horizon: int
-    log_return: float
     current_price: float
-    predicted_price: float
-    log_return_path: Optional[List[float]] = None
+    delta_price: float  # delta price for the next step (AdjClose_{t+1} − AdjClose_t)
+    predicted_price: float  # Current + delta
+    delta_price_path: Optional[List[float]] = None
     predicted_price_path: Optional[List[float]] = None
     predicted_dates: Optional[List[date]] = None
     last_date: Optional[date] = None

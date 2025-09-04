@@ -6,8 +6,14 @@ import pandas as pd
 import torch
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from pandas.tseries.offsets import BDay
 
-from app.api.classes import NewsHistoryResponse, PredictionRequest, PredictionResponse, PriceHistoryResponse
+from app.api.classes import (
+    NewsHistoryResponse,
+    PredictionRequest,
+    PredictionResponse,
+    PriceHistoryResponse,
+)
 from app.api.settings import get_settings
 from app.api.utils import _ollama_alive, LimitUploadSizeMiddleware, to_dict
 from config.config import Config
@@ -26,7 +32,8 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan context.
+    """
+    Application lifespan context.
     - Loads configuration
     - Initializes FinBERT sentiment model
     - Loads trained prediction model and preprocessor
@@ -55,7 +62,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     root_path=settings.api_root_path,
     title="Stock Prediction API",
-    description="Predict stock prices using historical prices, news sentiment, and FinBERT.",
+    description="Predict stock price deltas (delta price = AdjClose_{t+1} − AdjClose_t) using historical prices, news sentiment, and FinBERT.",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -70,7 +77,8 @@ app.add_middleware(
 app.add_middleware(LimitUploadSizeMiddleware)
 
 @app.get("/healthz")
-def healthz(): return {"ok": True}
+def healthz():
+    return {"ok": True}
 
 @app.get("/price-history", response_model=PriceHistoryResponse)
 def fetch_price_history(
@@ -80,12 +88,6 @@ def fetch_price_history(
 ):
     """
     Fetch historical stock price data for a given symbol.
-
-    - **symbol**: Ticker symbol (AAPL, TSLA, ^DJI, etc.)
-    - **end_date**: End date in YYYY-MM-DD format
-    - **days**: Number of business days to fetch (default: 90)
-
-    Returns JSON with price rows or an error message.
     """
     try:
         if days > 365:
@@ -113,12 +115,6 @@ def fetch_news_history(
 ):
     """
     Fetch recent news headlines using the NewsAPI.
-
-    - **query**: Keyword to search (e.g., 'Apple')
-    - **end_date**: End date in YYYY-MM-DD format
-    - **days**: Number of days to look back
-
-    Returns JSON with news rows or an error message.
     """
     try:
         if days > 29:
@@ -130,7 +126,7 @@ def fetch_news_history(
 
         df = get_news_history(query, end_date, days, api_key, settings.news_api_base)
         if df.empty:
-            return {"news": [], "message": "No news found."}
+            return {"news": [], "message": "No articles found."}
         return {"news": df.to_dict(orient="records")}
     except Exception:
         logger.exception("fetch_news_history failed")
@@ -148,16 +144,17 @@ def post_predict_from_raw(
         symbol: str = Query("^DJI", description="Ticker symbol for context (e.g., AAPL)")
 ):
     """
-    Predict the next stock price using:
+    Predict next **price deltas** (delta price = AdjClose_{t+1} − AdjClose_t) using:
     - Historical price data
     - News headlines (optionally enriched with an LLM)
     - FinBERT sentiment analysis
     - A pre-trained regression model
 
-    Returns
-    - **log_return**: Predicted log return
-    - **current_price**: Latest price
-    - **predicted_price**: Predicted next price
+    Response:
+    - current_price
+    - delta_price (h=1)
+    - predicted_price (current_price + delta_price)
+    - Optional: delta_price_path, predicted_price_path, predicted_dates
     """
     horizon = min(horizon, 30)
     logger.info("Received prediction request")
@@ -271,12 +268,16 @@ def post_predict_from_raw(
         if news_df.empty:
             logger.info("No news in use neutral sentiment for all days.")
             feature_row = generate_full_feature_row(
-                price_df, pd.DataFrame(), None,
+                price_df,
+                pd.DataFrame(),
+                None,
                 forecast_horizon=horizon
             )
         else:
             feature_row = generate_full_feature_row(
-                price_df, news_df, sentiment_model,
+                price_df,
+                news_df,
+                sentiment_model,
                 forecast_horizon=horizon,
                 fill_missing_neutral=bool(pad_neutral),
                 max_embedding_dims=17
@@ -308,28 +309,29 @@ def post_predict_from_raw(
     H = int(min(horizon, yhat.shape[1]))
     current_price = float(price_df["adj_close"].iloc[-1])
 
-    # Headline (next day) stays for compatibility
-    log_return = float(yhat[0, 0])
-    predicted_price = current_price * float(np.exp(log_return))
+    # delta price for next day
+    delta_1 = float(yhat[0, 0])
+    predicted_price = current_price + delta_1
 
     response_kwargs = {
         "horizon": H,
-        "log_return": log_return,
         "current_price": current_price,
-        "predicted_price": predicted_price
+        "delta_price": delta_1,
+        "predicted_price": predicted_price,
     }
 
     if return_path:
-        lr_path = yhat[0, :H]
-        price_path = current_price * np.exp(np.cumsum(lr_path))
-        from pandas.tseries.offsets import BDay
+        delta_path = yhat[0, :H]
+        price_path = current_price + delta_path
         future_dates = pd.bdate_range(price_df["date"].iloc[-1] + BDay(1), periods=H)
 
-        response_kwargs.update({
-            "log_return_path": lr_path.tolist(),
-            "predicted_price_path": [float(x) for x in price_path],
-            "predicted_dates": future_dates.strftime("%Y-%m-%d").tolist(),
-            "last_date": pd.to_datetime(price_df["date"].iloc[-1]).date(),
-        })
+        response_kwargs.update(
+            {
+                "delta_price_path": delta_path.tolist(),
+                "predicted_price_path": [float(x) for x in price_path],
+                "predicted_dates": future_dates.strftime("%Y-%m-%d").tolist(),
+                "last_date": pd.to_datetime(price_df["date"].iloc[-1]).date(),
+            }
+        )
 
     return PredictionResponse(**response_kwargs)

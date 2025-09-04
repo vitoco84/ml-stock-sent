@@ -43,7 +43,7 @@ def _dates_np(s: pd.Series) -> NDArray[np.datetime64]:
     dt = pd.to_datetime(s, utc=True, errors="coerce").dt.tz_convert(None)
     return dt.to_numpy(dtype="datetime64[ns]")
 
-def _extract_lr(y_pred: Iterable[float] | None) -> NDArray[np.float64]:
+def _extract_delta(y_pred: Iterable[float] | None) -> NDArray[np.float64]:
     """Extract a 1D float array of log-returns."""
     if y_pred is None:
         return np.array([], dtype=float)
@@ -61,11 +61,11 @@ def _extract_lr(y_pred: Iterable[float] | None) -> NDArray[np.float64]:
     return arr[np.isfinite(arr)]
 
 def _align_price_path(base_today: NDArray[np.float64], logret_t1: NDArray[np.float64]) -> NDArray[np.float64]:
-    """Given today's base prices and (t+1) log-returns, align lengths and build price path."""
+    """Given today's base prices and (t+1) **deltas**, align lengths and build price path."""
     n = min(len(base_today), len(logret_t1))
     if n <= 0:
         return np.array([], dtype=float)
-    return base_today[:n] * np.exp(logret_t1[:n])
+    return base_today[:n] + logret_t1[:n]
 
 def _next_step_arrays(df: pd.DataFrame) -> Tuple[NDArray[np.datetime64], NDArray[np.float64], NDArray[np.float64]]:
     """
@@ -96,8 +96,8 @@ def plot_val_test_overlay(
     ax.plot(dates_all, actual_all, "--", label="Actual (t+1)", linewidth=2)
 
     for res in results:
-        lr_val = _extract_lr(res.get("y_pred_val"))
-        lr_test = _extract_lr(res.get("y_pred_test"))
+        lr_val = _extract_delta(res.get("y_pred_val"))
+        lr_test = _extract_delta(res.get("y_pred_test"))
         if lr_val.size == 0 and lr_test.size == 0:
             continue
         lr_all = np.concatenate([lr_val, lr_test]) if lr_test.size else lr_val
@@ -131,7 +131,7 @@ def plot_overlay(
 
     pred_key = f"y_pred_{phase}"
     for res in results:
-        lr = _extract_lr(res.get(pred_key))
+        lr = _extract_delta(res.get(pred_key))
         yhat = _align_price_path(base_today, lr)
         n = min(len(dates_next), len(yhat))
         if n > 0:
@@ -209,10 +209,10 @@ def plot_forecast_overlay(
         )
 
     for res in results:
-        lr_path = _extract_lr(res.get("y_pred_last"))[:H]
-        if lr_path.size == 0:
+        delta_path = _extract_delta(res.get("y_pred_last"))[:H]
+        if delta_path.size == 0:
             continue
-        forecast_prices = p0 * np.exp(np.cumsum(lr_path))
+        forecast_prices = p0 + delta_path
         n = min(len(fut_dates), len(forecast_prices))
         if n > 0:
             ax.plot(
@@ -251,9 +251,10 @@ def plot_forecast_diagnostics(
     p0 = pd.to_numeric(df_test["adj_close"], errors="coerce").to_numpy(dtype=float)[-1]
 
     preds: Dict[str, NDArray[np.float64]] = {
-        str(res.get("kind", "model")): p0 * np.exp(np.cumsum(np.asarray(res.get("y_pred_last")).ravel()[:H]))
+        str(res.get("kind", "model")): p0 + np.asarray(res.get("y_pred_last")).ravel()[:H]
         for res in results
     }
+
 
     fig, (ax_res, ax_clr, ax_pr) = plt.subplots(3, 1, figsize=(12, 10), sharex=True)
 
@@ -338,40 +339,43 @@ def plot_moving_averages(df: pd.DataFrame, path: Path | str) -> None:
     ax.legend()
     _finalize_figure(fig, path)
 
-def plot_log_return_distribution(
+def plot_delta_distribution(
         df: pd.DataFrame,
         path: Path | str,
-        bins: int = 50,
-        log_scale: bool = False,
+        bins: int = 50
 ) -> None:
-    """Histogram + KDE of log-returns."""
-    ser = pd.to_numeric(df["log_return"], errors="coerce").dropna()
+    """Histogram + KDE of daily delta-Price (1-day price change)."""
+    ser = pd.to_numeric(df["delta_1"], errors="coerce").dropna()
     fig, ax = plt.subplots(figsize=(6, 4))
-    sns.histplot(ser, bins=bins, kde=True, log_scale=log_scale, ax=ax)
-    ax.set_title("Log-Returns Distribution")
+    sns.histplot(ser, bins=bins, kde=True, ax=ax)
+    ax.set_title("delta-Price Distribution (1-Day Change)")
+    ax.set_xlabel("delta-Price")
+    ax.set_ylabel("Frequency")
     _finalize_figure(fig, path)
 
-def plot_rolling_volatility(df: pd.DataFrame, path: Path | str) -> None:
-    """20-day rolling volatility of log-returns."""
+def plot_rolling_delta_volatility(
+        df: pd.DataFrame,
+        path: Path | str,
+        window: int = 20
+) -> None:
+    """Rolling volatility (std) of delta-Price."""
     df_ = df.copy()
-    ser = pd.to_numeric(df_["log_return"], errors="coerce")
-    df_["volatility_rolling"] = ser.rolling(window=20).std()
+    df_["volatility_delta"] = pd.to_numeric(df_["delta_1"], errors="coerce").rolling(window=window).std()
 
     fig, ax = plt.subplots(figsize=_FIGSIZE_STD)
-    ax.plot(pd.to_datetime(df_["date"]), df_["volatility_rolling"])
-    ax.set_title("Rolling Volatility (20-Day)")
+    ax.plot(pd.to_datetime(df_["date"]), df_["volatility_delta"])
+    ax.set_title(f"Rolling Volatility (delta-Price, {window}-Day Window)")
+    ax.set_xlabel("Date")
+    ax.set_ylabel("Std of delta-Price")
+    ax.grid(True)
     _finalize_figure(fig, path)
 
-def plot_autocorrelation(
-        df: pd.DataFrame,
-        path: Path | str,
-        lags: int = 30,
-) -> None:
-    """Autocorrelation of log-returns (ACF)."""
-    ser = pd.to_numeric(df["log_return"], errors="coerce").dropna()
+def plot_delta_autocorrelation(df: pd.DataFrame, path: Path | str, lags: int = 30) -> None:
+    """Autocorrelation of delta-Price (ACF)."""
+    ser = pd.to_numeric(df["delta_1"], errors="coerce").dropna()
     fig, ax = plt.subplots(figsize=(8, 3))
     plot_acf(ser, lags=lags, zero=False, ax=ax)
-    ax.set_title("ACF: Log Returns")
+    ax.set_title(f"ACF: delta-Price (lags={lags})")
     _finalize_figure(fig, path)
 
 def plot_ohlc_pairplot(df: pd.DataFrame, path: Path | str) -> None:
@@ -385,6 +389,32 @@ def plot_ohlc_pairplot(df: pd.DataFrame, path: Path | str) -> None:
     g.fig.savefig(path, dpi=_DPI_DEFAULT)
     plt.show()
     plt.close(g.fig)
+
+def plot_seasonality_dow(df: pd.DataFrame, path: Path | str) -> None:
+    """Average delta-Price by day-of-week."""
+    df_ = df.copy()
+    df_["dow"] = pd.to_datetime(df_["date"]).dt.dayofweek
+    df_["delta_1"] = pd.to_numeric(df_["delta_1"], errors="coerce")
+    avg = df_.groupby("dow")["delta_1"].mean()
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.bar(["Mon", "Tue", "Wed", "Thu", "Fri"], avg)
+    ax.set_title("Average delta-Price by Day of Week")
+    ax.set_ylabel("Mean delta-Price")
+    _finalize_figure(fig, path)
+
+def plot_feature_vs_delta(df: pd.DataFrame, feature: str, path: Path | str) -> None:
+    """Scatterplot of a feature vs. delta-Price."""
+    df_ = df.copy()
+    df_["delta_1"] = pd.to_numeric(df_["delta_1"], errors="coerce")
+    df_[feature] = pd.to_numeric(df_[feature], errors="coerce")
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+    sns.scatterplot(x=df_[feature], y=df_["delta_1"], alpha=0.6, ax=ax)
+    ax.set_title(f"{feature} vs delta-Price (1-Day)")
+    ax.set_xlabel(feature)
+    ax.set_ylabel("delta-Price")
+    _finalize_figure(fig, path)
 
 def plot_sentiment_trend(
         df: pd.DataFrame,

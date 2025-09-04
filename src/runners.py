@@ -64,6 +64,9 @@ def _run(
     target_cols = [c for c in df_full.columns if c == "target" or c.startswith("target_")]
     feature_cols = [c for c in df_full.columns if c not in target_cols + ["date"] + drop_cols]
 
+    if "cnn" not in exp.name.lower() and "lstm" not in exp.name.lower():
+        feature_cols = [c for c in feature_cols if not c.startswith("lag_") and c != "log_return"]
+
     if not exp.include_sentiment:
         sent = {"pos", "neg", "neu", "pos_minus_neg", "headline_count", "headline", "title"}
         sent |= {c for c in df_full.columns if c.startswith("emb_")}
@@ -84,7 +87,7 @@ def _run(
     preprocessor, _ = get_preprocessor(X_train, exp_name)
 
     # Config
-    model_config = {"optimization_metric": "rmse", "gap": gap, "seed": random_state}
+    model_config = {"optimization_metric": "mae", "gap": gap, "seed": random_state}
 
     y_scale_flag = exp_name.lower() not in {"random_forest", "xgboost"}
 
@@ -106,7 +109,7 @@ def _run(
     # Optuna
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     study = optuna.create_study(
-        direction="minimize",
+        direction="minimize", # minimize for mae, rmse, mse, smape, maximize for r2, accuracy
         sampler=optuna.samplers.TPESampler(
             seed=random_state,
             n_startup_trials=15,
