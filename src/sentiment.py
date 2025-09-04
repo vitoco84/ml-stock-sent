@@ -30,6 +30,20 @@ class FinBERT:
         self.device = device if torch.cuda.is_available() and device == "cuda" else "cpu"
         self.max_embedding_dims = max_embedding_dims
 
+        # Torch deterministic settings
+        try:
+            torch.set_num_threads(1)
+            torch.manual_seed(int(config.runtime.seed))
+            if hasattr(torch, "use_deterministic_algorithms"):
+                torch.use_deterministic_algorithms(True)
+            if torch.cuda.is_available() and self.device == "cuda":
+                torch.cuda.manual_seed_all(int(config.runtime.seed))
+                if hasattr(torch.backends, "cudnn"):
+                    torch.backends.cudnn.deterministic = True
+                    torch.backends.cudnn.benchmark = False
+        except Exception:
+            pass
+
         self.tokenizer = AutoTokenizer.from_pretrained(DEFAULT_FINBERT_MODEL)
         self.classifier = AutoModelForSequenceClassification.from_pretrained(
             DEFAULT_FINBERT_MODEL,

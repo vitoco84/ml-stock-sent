@@ -44,13 +44,9 @@ class StackingEnsemble(Base):
     horizon: int = 30
     random_state: int = 42
     multioutput: bool = True
-
     cv_n_splits: int = 2
     ridge_alpha: float = 1.0
-
-    # Parallelism
-    mo_n_jobs: int = -1
-    n_jobs_inner: int = -1
+    n_jobs: int = 1
 
     # Random Forest
     rf_estimators: int = 50
@@ -61,8 +57,8 @@ class StackingEnsemble(Base):
     xgb_estimators: int = 80
     xgb_max_depth: int = 5
     xgb_learning_rate: float = 0.08
-    xgb_subsample: float = 0.9
-    xgb_colsample_bytree: float = 0.8
+    xgb_subsample: float = 1.0
+    xgb_colsample_bytree: float = 1.0
 
     drop_rf: bool = False
     drop_lin: bool = False
@@ -82,7 +78,7 @@ class StackingEnsemble(Base):
         rf = RandomForestRegressor(
             n_estimators=self.rf_estimators,
             random_state=self.random_state,
-            n_jobs=-1,
+            n_jobs=self.n_jobs,
             min_samples_leaf=2,
             max_features="sqrt",
             max_depth=self.rf_max_depth,
@@ -95,9 +91,9 @@ class StackingEnsemble(Base):
             subsample=self.xgb_subsample,
             colsample_bytree=self.xgb_colsample_bytree,
             tree_method="hist",
-            device="cuda",
+            device="cpu",
             random_state=self.random_state,
-            n_jobs=1
+            n_jobs=self.n_jobs
         )
 
         base_learners = []
@@ -114,11 +110,11 @@ class StackingEnsemble(Base):
             estimators=base_learners,
             final_estimator=meta,
             passthrough=self.passthrough,
-            n_jobs=self.n_jobs_inner,
+            n_jobs=self.n_jobs,
             cv=cv
         )
 
-        self.model = MultiOutputRegressor(stack, n_jobs=self.mo_n_jobs) if self.multioutput else stack
+        self.model = MultiOutputRegressor(stack, n_jobs=self.n_jobs) if self.multioutput else stack
 
     def fit(self, X: pd.DataFrame, y: np.ndarray) -> StackingEnsemble:
         y = np.asarray(y)

@@ -26,7 +26,7 @@ class RandomForest(Base):
     min_samples_leaf: int = 2
     max_features: str | float | int | None = "sqrt"
     bootstrap: bool = True
-    n_jobs: int = -1
+    n_jobs: int = 1
     max_samples: Optional[int | float] = None
     criterion: str = "squared_error"
 
@@ -74,5 +74,5 @@ class RandomForest(Base):
             "max_features": trial.suggest_categorical("max_features", ["sqrt", "log2", 0.3, 0.5, 0.8]),
             "bootstrap": bootstrap,
             "max_samples": trial.suggest_float("max_samples", 0.5, 0.9) if bootstrap else None,
-            "criterion": "squared_error",
+            "criterion": "squared_error"
         }

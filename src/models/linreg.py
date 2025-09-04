@@ -38,7 +38,7 @@ class LinearElasticNet(Base):
             random_state=self.random_state,
             max_iter=self.max_iter,
         )
-        self.model = MultiOutputRegressor(base, n_jobs=-1) if self.multioutput else base
+        self.model = MultiOutputRegressor(base, n_jobs=1) if self.multioutput else base
 
     def fit(self, X: pd.DataFrame, y: np.ndarray) -> LinearElasticNet:
         if not self.multioutput and getattr(y, "ndim", 1) == 2 and y.shape[1] == 1:
@@ -56,5 +56,5 @@ class LinearElasticNet(Base):
             "alpha": trial.suggest_float("alpha", 1e-5, 1e-2, log=True),
             "l1_ratio": trial.suggest_float("l1_ratio", 0.0, 1.0),
             "max_iter": trial.suggest_int("max_iter", 1000, 4000, step=500),
-            "selection": trial.suggest_categorical("selection", ["cyclic", "random"])
+            "selection": trial.suggest_categorical("selection", ["cyclic"])
         }

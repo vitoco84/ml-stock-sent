@@ -91,7 +91,7 @@ class TorchBaseNN(Base):
             "min_delta": float(getattr(self, "min_delta", 0.0)),
             "scheduler_patience": int(getattr(self, "scheduler_patience", 5)),
             "clip_grad_norm": float(getattr(self, "clip_grad_norm", 1.0)),
-            "use_amp": bool(getattr(self, "use_amp", self.device.startswith("cuda"))),
+            "use_amp": bool(getattr(self, "use_amp", False))
         }
 
     def _init_net(self, output_dim: int) -> None:
@@ -187,7 +187,7 @@ class TorchBaseNN(Base):
         n_batches = 0
         for xb, yb in self._batch_iter(X_t, y_t, batch_size):
             opt.zero_grad(set_to_none=True)
-            with torch.amp.autocast("cuda", enabled=scaler.is_enabled()):
+            with torch.amp.autocast("cuda", enabled=scaler.is_enabled() and self.device.startswith("cuda")):
                 pred = self._net(xb)
                 loss = loss_fn(pred, yb)
             scaler.scale(loss).backward()
@@ -209,7 +209,7 @@ class TorchBaseNN(Base):
             scaler: torch.amp.GradScaler,
     ) -> float:
         self._net.eval()
-        with torch.amp.autocast("cuda", enabled=scaler.is_enabled()):
+        with torch.amp.autocast("cuda", enabled=scaler.is_enabled() and self.device.startswith("cuda")):
             loss = loss_fn(self._net(Xv), yv).item()
         return float(loss)
 

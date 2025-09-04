@@ -43,7 +43,7 @@ class CNNModel(TorchBaseNN):
     min_delta: float = 0.0
     scheduler_patience: int = 5
     clip_grad_norm: float = 1.0
-    use_amp: bool = True
+    use_amp: bool = False
 
     def __post_init__(self):
         super().__init__(horizon=self.horizon, random_state=self.random_state)

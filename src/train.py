@@ -59,7 +59,11 @@ class ModelTrainer:
 
     def _build_candidate(self, params: Dict[str, Any], trial) -> Any:
         base_params = self.model.get_params()
-        cand = self.model.__class__(**{**base_params, **params})
+        cand_params = {**base_params, **params}
+        # Force single-threaded candidates when supported (e.g., RF, XGB, linear)
+        if "n_jobs" in cand_params and cand_params["n_jobs"] != 1:
+            cand_params["n_jobs"] = 1
+        cand = self.model.__class__(**cand_params)
         setattr(cand, "_trial", trial)
         return cand
 

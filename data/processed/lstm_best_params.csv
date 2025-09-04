@@ -1,9 +1,0 @@
-,0
-units,96.0
-dense_units,192.0
-dropout,0.14648055086233636
-lr,0.0008479027042211734
-epochs,40.0
-batch_size,64.0
-weight_decay,1.8923055868843003e-06
-random_state,42.0
