@@ -55,7 +55,7 @@ def mk_price_df(dates: pd.DatetimeIndex, start: float = 100.0, seed: int = 42) -
     low = np.minimum(open_, close) * (1 - wiggle)
     volu = (np.abs(close - open_) / close * 1e6).astype(int)
 
-    df = pd.DataFrame({
+    return pd.DataFrame({
         "date": dates,
         "adj_close": close,
         "open": open_,
@@ -64,11 +64,6 @@ def mk_price_df(dates: pd.DatetimeIndex, start: float = 100.0, seed: int = 42) -
         "close": close,
         "volume": volu,
     })
-
-    df["delta_1"] = df["adj_close"] - df["adj_close"].shift(1)
-    df["delta_5"] = df["adj_close"] - df["adj_close"].shift(5)
-    df["delta_10"] = df["adj_close"] - df["adj_close"].shift(10)
-    return df
 
 def mk_news(dates: Iterable[pd.Timestamp], text: str = "headline") -> List[dict]:
     return [{"date": d.strftime("%Y-%m-%d"), "headline": text} for d in dates]
@@ -411,7 +406,7 @@ def test_predict_raw_from_file():
         r = c.post("/predict-raw?enrich=false&symbol=DJIA", json=payload)
         assert r.status_code == 200, r.text
         data = r.json()
-        assert {"log_return", "current_price", "predicted_price"} <= data.keys()
+        assert {"delta_price", "current_price", "predicted_price"} <= data.keys()
 
 @pytest.mark.integration
 def test_predict_raw_enrich_requires_seed(client):
