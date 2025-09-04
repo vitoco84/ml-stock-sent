@@ -14,12 +14,7 @@ Forecast stock prices by combining:
 
 ### Prerequisites
 - Python **3.10+**
-- (Optional) NVIDIA GPU with CUDA for accelerated FinBERT
-
-### Specs
-- Intel-Core i9-13900K
-- NVIDIA GeForce RTX 4090
-- RAM 64GB
+- (Optional) NVIDIA GPU with CUDA for accelerated FinBERT and training/tuning
 
 ### Setup
 ```bash
@@ -28,13 +23,12 @@ python -m pip install --upgrade pip
 
 # Install dependencies
 pip install -r requirements.txt
-# or, with Poetry:
-poetry install
 ```
 
 ### Verify CUDA (optional)
 ```bash
-nvidia-smi          # confirm driver & CUDA runtime
+# confirm driver and CUDA runtime
+nvidia-smi
 # Example: install PyTorch for CUDA 12.1
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 ```
@@ -43,10 +37,13 @@ pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 
 ## 📂 Project Structure
 
-- `src/` – data processing, feature engineering, model training
-- `app/api/` – FastAPI application
-- `app/ui/` – Streamlit dashboard
-- `notebooks/` – Jupyter notebooks for exploration & training
+- `src/` - models, data processing, feature engineering, model training
+- `app/api/` - FastAPI application
+- `app/ui/` - Streamlit dashboard
+- `notebooks/` - Jupyter notebooks for exploration and training
+- `data/` - figures, processed, models, raw
+- `config/` - configuration
+- `scripts/` - freeze requirements
 
 ---
 
@@ -62,18 +59,24 @@ uvicorn app.api.main:app --reload
 ### Environment Variables
 Create `.env` (do not commit). See [.env.example](.env.example) for all keys.
 ```
+# External news provider (optional if you won’t call /news-history)
+NEWS_API_BASE=your_news_apy_base_url
 NEWS_API_KEY=your_newsapi_key
-OLLAMA_URL=http://localhost:11434      # optional
-OLLAMA_MODEL=llama3                    # optional
+
+# Optional LLM for news enrichment (used when enrich=true)
+OLLAMA_URL=http://localhost:11434
+OLLAMA_MODEL=llama3
+
+# API runtime
 API_ROOT_PATH=/
 CORS_ORIGINS=["http://localhost:8501","http://localhost:3000"]
 ```
 
-> Note: your code checks a live endpoint when `enrich=true`. Ensure `OLLAMA_URL` is reachable.
+> Note: The API checks reachability when enrich=true. Ensure OLLAMA_BASE is live (native or Docker).
 
 ---
 
-## 📡 API Endpoints & Schemas
+## 📡 API Endpoints and Schemas
 
 ### `GET /healthz`
 **Response**
@@ -87,9 +90,9 @@ CORS_ORIGINS=["http://localhost:8501","http://localhost:3000"]
 Fetch historical stock data.
 
 **Query params**
-- `symbol` *(str, required)* - e.g. `AAPL`, `^DJI`
+- `symbol` *(str, default ^DJI)*
 - `end_date` *(YYYY-MM-DD, required)*
-- `days` *(int, default 90)* - calendar days to look back
+- `days` *(int, default 90)* - business days to look back
 
 **Response - `PriceHistoryResponse`**
 ```json
@@ -109,7 +112,8 @@ Fetch historical stock data.
 ```
 
 **Error cases**
-- `404` if no data returned for the symbol/date range
+- `400` if lookback > 365 business days
+- `404` if no data for symbol/date range
 - `500` on unexpected failure
 
 ---
@@ -139,6 +143,7 @@ Fetch recent news headlines via NewsAPI.
 }
 ```
 **Error cases**
+- `400` if lookback > 365 business days
 - `500` with message `"Missing NEWS_API_KEY environment variable"` if the key is not configured
 - `500` on unexpected failure
 
@@ -149,9 +154,13 @@ Predict next prices using historical **price** data and optional **news**.
 
 **Query params**
 - `symbol` *(str, required)* - Ticker symbol for context (e.g., `AAPL`)
-- `enrich` *(bool, default `false`)* - generate missing headlines locally (requires reachable `OLLAMA_URL`)
-- `horizon` *(int, default `30`, min `1`)* - number of steps to return
+- `horizon` *(int, default `30`, min `1`, max `30`)* - number of steps to return
 - `return_path` *(bool, default `true`)* - whether to return full H‑step paths
+- `enrich` *(bool, default `false`)* - generate missing headlines locally (requires reachable `OLLAMA_URL`)
+- `pad_neutral` *(bool, default `false`)* - Use provided headlines and fill missing days with neutral sentiment (requires ≥2 headlines, no generation)
+- `ignore_news` *(bool, default `false`)* - Ignore all news (neutral sentiment every day)
+
+> Note: Choose exactly one strategy: ignore_news OR enrich OR pad_neutral.
 
 **Request body - `PredictionRequest`**
 ```json
@@ -190,13 +199,16 @@ Predict next prices using historical **price** data and optional **news**.
 }
 ```
 
-**Validation & errors**
-- `422` if `price` is missing/empty
-- `500` on feature generation or model errors
+**Validation and errors**
+- `400` if price or news rows > 2000, span > 5 years, or invalid flag combination
+- `422` if `price` is missing/empty, malformed payloads, or pad_neutral with <2 headlines
+- `500` on feature generation/model errors or enrichment failure
 
 **cURL example**
 ```bash
-curl -X POST "http://localhost:8000/predict-raw?symbol=AAPL&horizon=5&return_path=true&enrich=false"   -H "Content-Type: application/json"   -d '{
+curl -X POST "http://localhost:8000/predict-raw?symbol=AAPL&horizon=5&return_path=true&ignore_news=false&enrich=false&pad_neutral=true" \
+  -H "Content-Type: application/json" \
+  -d '{
         "price":[
           {"date":"2025-01-08","open":100,"high":105,"low":99,"close":104,"adj_close":104,"volume":1000000},
           {"date":"2025-01-09","open":104,"high":106,"low":103,"close":105,"adj_close":105,"volume":1200000}
@@ -212,19 +224,20 @@ curl -X POST "http://localhost:8000/predict-raw?symbol=AAPL&horizon=5&return_pat
 
 ## 📓 Notebooks (Pipeline)
 
-1. **01_eda.ipynb** – Exploratory Data Analysis
-2. **02_sentiment.ipynb** – Sentiment analysis with FinBERT
-3. **03_feature.ipynb** – Feature engineering
-4. **04_adfulller_test.ipynb** – Stationary Test
-5. **05_linreg.ipynb** – Linear Regression Model
-6. **06_linreg_wo_sent.ipynb** – Linear Regression Model without Sentiment
-7. **07_xgboost.ipynb** – XGBoost Model (RT: ~20min)
-8. **08_random_forest.ipynb** – Random Forest Model (RT: ~30min)
-9. **09_mlp.ipynb** – Feed Forward Multi Layer Perceptron Model
-10. **10_cnn.ipynb** – Convolutional Neural Network Model
-11. **11_lstm.ipynb** - Long Short-term Memory Model
-12. **12_results_plots.ipynb** - Plots combined of all Models
-13. **13_shap.ipynb** - Model evaluation & interpretability
+1. **01_eda.ipynb** - Exploratory Data Analysis
+2. **02_sentiment.ipynb** - Sentiment analysis with FinBERT
+3. **03_feature.ipynb** - Feature engineering
+4. **04_adfulller_test.ipynb** - Stationarity test (Augmented Dickey–Fuller)
+5. **05_linreg.ipynb** - Linear Regression Model
+6. **06_linreg_wo_sent.ipynb** - Linear Regression without Sentiment
+7. **07_xgboost.ipynb** - XGBoost Model (RT: ~20min)
+8. **08_random_forest.ipynb** - Random Forest Model (RT: ~30min)
+9. **09_mlp.ipynb** - Feed Forward Multi Layer Perceptron
+10. **10_cnn.ipynb** - Convolutional Neural Network
+11. **11_lstm.ipynb** - Long Short-term Memory
+12. **12_stacking.ipynb** - Stacking Model (RT: ~1h)
+13. **13_results_plots.ipynb** - Combined Plots
+14. **14_shap.ipynb** - Model evaluation and interpretability (SHAP)
 
 ---
 
@@ -252,6 +265,8 @@ pytest --cov=src --cov-report=html
 ## 📰 Ollama (Optional LLM)
 
 Generate synthetic news for testing:
+
+Local (native)
 ```bash
 ollama list
 ollama pull llama3
@@ -261,6 +276,12 @@ Set `.env`:
 ```
 OLLAMA_URL=http://localhost:11434
 OLLAMA_MODEL=llama3
+```
+
+Docker Compose (service-to-service)
+```
+# The API resolves Ollama by service name
+OLLAMA_BASE=http://ollama:11434
 ```
 
 ---
@@ -283,7 +304,7 @@ pipreqs app/api --force --savepath app/api/requirements.txt
 pipreqs app/ui  --force --savepath app/ui/requirements.txt
 pipreqs src     --force --savepath app/api/req-src.txt
 ```
-Build & run:
+Build and run:
 ```bash
 docker compose build --no-cache # clean rebuild
 docker compose up --build # reuse images
@@ -318,14 +339,13 @@ docker compose logs ui --tail=200
 ## 📌 Notes
 
 - Keep `.env` (with secrets like `NEWS_API_KEY`) **out of version control**.
-- Commit a `.env.example` so others know what to set.
 - Tail logs: `tail -f ollama.log uvicorn.log`
 
 ---
 
 ## 🤝 Contributing
 
--- Thanks for considering a contribution! This project welcomes issues, PRs, and ideas.
+- Thanks for considering a contribution! Issues, PRs, and ideas are welcome.
 
 ---
 
@@ -343,6 +363,6 @@ This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for d
     - [ ] Add authentication
     - [ ] Add rate-limiting
     - [ ] Add request logging
-- [ ] Optional: Add monitoring & logging integration (Prometheus/Grafana)
+- [ ] Optional: Add monitoring and logging integration (Prometheus/Grafana)
 - [ ] Optional: Add Model Tracking MLFlow
 - [ ] Optional: Pipeline Orchestration: data -> train -> eval -> register -> deploy -> monitor
