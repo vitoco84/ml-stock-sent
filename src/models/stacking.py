@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Self
 
 import numpy as np
 import pandas as pd
@@ -14,7 +15,10 @@ from src.models.base import Base
 
 
 class PartitionedTimeSeriesSplit(BaseCrossValidator):
-    """Partition Time Series Split for Stacking CV Issues."""
+    """
+    Partitioned (non-overlapping) time series split for stacking CV.
+    Unlike rolling splits, this partitions the dataset into consecutive chunks.
+    """
 
     def __init__(self, n_splits: int):
         if n_splits < 2:
@@ -39,7 +43,8 @@ class PartitionedTimeSeriesSplit(BaseCrossValidator):
 @dataclass
 class StackingEnsemble(Base):
     """Stacking ensemble of base regressors with Ridge meta-learner."""
-    name = "stacking"
+
+    name: str = "stacking"
 
     horizon: int = 30
     random_state: int = 42
@@ -59,16 +64,19 @@ class StackingEnsemble(Base):
     xgb_learning_rate: float = 0.08
     xgb_subsample: float = 1.0
     xgb_colsample_bytree: float = 1.0
+    xgb_device: str = "cpu"
 
     drop_rf: bool = False
     drop_lin: bool = False
     passthrough: bool = True
 
-    def __post_init__(self):
+    model: StackingRegressor | MultiOutputRegressor = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
         super().__init__(horizon=self.horizon, random_state=self.random_state)
         self._build()
 
-    def _build(self):
+    def _build(self) -> None:
         lin = ElasticNet(
             alpha=1e-3,
             l1_ratio=0.2,
@@ -91,12 +99,12 @@ class StackingEnsemble(Base):
             subsample=self.xgb_subsample,
             colsample_bytree=self.xgb_colsample_bytree,
             tree_method="hist",
-            device="cpu",
+            device=self.xgb_device,
             random_state=self.random_state,
             n_jobs=self.n_jobs
         )
 
-        base_learners = []
+        base_learners: list[tuple[str, object]] = []
         if not self.drop_lin:
             base_learners.append(("lin", lin))
         if not self.drop_rf:
@@ -116,7 +124,7 @@ class StackingEnsemble(Base):
 
         self.model = MultiOutputRegressor(stack, n_jobs=self.n_jobs) if self.multioutput else stack
 
-    def fit(self, X: pd.DataFrame, y: np.ndarray) -> StackingEnsemble:
+    def fit(self, X: pd.DataFrame, y: np.ndarray) -> Self:
         y = np.asarray(y)
         if not self.multioutput and y.ndim == 2 and y.shape[1] == 1:
             y = y.ravel()
@@ -128,7 +136,7 @@ class StackingEnsemble(Base):
         return np.asarray(yhat)
 
     @staticmethod
-    def search_space(trial):
+    def search_space(trial) -> dict:
         return {
             "ridge_alpha": trial.suggest_float("ridge_alpha", 1e-3, 10.0, log=True),
             "rf_estimators": trial.suggest_int("rf_estimators", 50, 200, step=25),

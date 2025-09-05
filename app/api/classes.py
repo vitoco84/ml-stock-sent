@@ -1,8 +1,7 @@
 from datetime import date
-from typing import List, Optional
+from typing import Optional
 
 from pydantic import BaseModel, Field
-from typing_extensions import Annotated
 
 
 class PriceRow(BaseModel):
@@ -21,31 +20,26 @@ class NewsRow(BaseModel):
     headline: str
 
 class PredictionRequest(BaseModel):
-    """
-    Schema for prediction request.
-    Contains:
-    - A list of price rows
-    - A list of news headlines
-    """
-    price: Annotated[list[PriceRow], Field(max_length=2000)]
-    news: Optional[Annotated[list[NewsRow], Field(max_length=2000)]] = None
+    """Schema for prediction request with prices and optional news."""
+    price: list[PriceRow] = Field(..., max_length=2000)
+    news: Optional[list[NewsRow]] = Field(default=None, max_length=2000)
 
 class PriceHistoryResponse(BaseModel):
     """Schema for price history response."""
-    price: List[PriceRow]
+    price: list[PriceRow]
 
 class NewsHistoryResponse(BaseModel):
     """Schema for news history response."""
-    news: List[NewsRow]
+    news: list[NewsRow]
     message: Optional[str] = None
 
 class PredictionResponse(BaseModel):
-    """Full schema for prediction response."""
+    """Schema for prediction response."""
     horizon: int
     current_price: float
-    delta_price: float  # delta price for the next step (AdjClose_{t+1} − AdjClose_t)
-    predicted_price: float  # Current + delta
-    delta_price_path: Optional[List[float]] = None
-    predicted_price_path: Optional[List[float]] = None
-    predicted_dates: Optional[List[date]] = None
+    delta_price: float
+    predicted_price: float
+    delta_price_path: Optional[list[float]] = None
+    predicted_price_path: Optional[list[float]] = None
+    predicted_dates: Optional[list[date]] = None
     last_date: Optional[date] = None

@@ -1,7 +1,7 @@
 import os
 import re
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
 import altair as alt
 import pandas as pd
@@ -9,24 +9,24 @@ import requests
 import streamlit as st
 
 
-st.set_page_config(page_title="Stock Prediction App", layout="centered")
+API_URL: str = os.getenv("API_URL", "http://localhost:8000")
+CONNECT_TIMEOUT: float = 5.0
+READ_TIMEOUT_FETCH: float = 15.0
+READ_TIMEOUT_PREDICT: float = 180.0
 
-API_URL = os.getenv("API_URL", "http://localhost:8000")
-CONNECT_TIMEOUT = 5.0
-READ_TIMEOUT_FETCH = 15.0
-READ_TIMEOUT_PREDICT = 180.0
+st.set_page_config(page_title="Stock Prediction App", layout="centered")
+st.title("^DJI Stock Prediction App (FinBERT + LLM)")
 
 @st.cache_resource
-def http():
+def get_http() -> requests.Session:
     s = requests.Session()
     s.headers.update({"Connection": "keep-alive"})
     return s
 
-HTTP = http()
+HTTP: requests.Session = get_http()
 
-st.title("^DJI Stock Prediction App (FinBERT + LLM)")
-
-def load_csv(file, date_col: str = "date") -> Optional[pd.DataFrame]:
+def load_csv(file: Any, date_col: str = "date") -> Optional[pd.DataFrame]:
+    """Load a CSV file into a DataFrame and normalize the date column."""
     if file is None:
         return None
     df = pd.read_csv(file)
@@ -34,15 +34,16 @@ def load_csv(file, date_col: str = "date") -> Optional[pd.DataFrame]:
         df[date_col] = pd.to_datetime(df[date_col], errors="coerce").dt.strftime("%Y-%m-%d")
     return df
 
-def clear_fetch_state():
+def clear_fetch_state() -> None:
     for k in ["symbol", "end_date", "days", "news_input", "fetched_price_df"]:
         st.session_state.pop(k, None)
 
-def clear_csv_state():
+def clear_csv_state() -> None:
     for k in ["price_csv_df", "news_csv_df"]:
         st.session_state.pop(k, None)
 
-def symbol_valid(symbol: str):
+def validate_symbol(symbol: str) -> None:
+    """Ensure ticker symbol matches allowed regex."""
     if not re.fullmatch(r"[A-Za-z0-9_.^-]+", symbol):
         st.error("Invalid symbol format.")
         st.stop()
@@ -53,51 +54,50 @@ st.caption(
     "You can change the ticker, but predictions may be less accurate."
 )
 
-# --- Upload CSVs mode ---
+#  Mode: Upload CSVs
 if mode == "Upload CSVs":
     clear_fetch_state()
     st.subheader("Upload CSVs")
 
-    # Prices
+    # Price uploader
     st.markdown("<span style='color:#16a34a; font-weight:700'>Prices CSV</span>", unsafe_allow_html=True)
     price_file = st.file_uploader(
         "Prices CSV (date, open, high, low, close, adj_close, volume)",
         type=["csv"],
         key="price_upl",
-        label_visibility="collapsed",
+        label_visibility="collapsed"
     )
 
-    # News
+    if price_file:
+        st.session_state.price_csv_df = load_csv(price_file)
+        st.success(f"Loaded {len(st.session_state.price_csv_df)} price rows")
+    else:
+        st.session_state.pop("price_csv_df", None)
+
+    # News uploader
     st.markdown("<span style='color:#2563eb; font-weight:700'>News CSV (optional)</span>", unsafe_allow_html=True)
     news_file = st.file_uploader(
         "News CSV (date, headline)",
         type=["csv"],
         key="news_upl",
-        label_visibility="collapsed",
+        label_visibility="collapsed"
     )
 
-    # Keep session_state in sync with uploaders
-    if price_file:
-        st.session_state.price_csv_df = load_csv(price_file)
-        st.success(f"Loaded {len(st.session_state.price_csv_df)} price rows")
-    else:
-        # If user clears the uploader, drop cached Data
-        st.session_state.pop("price_csv_df", None)
-
     if news_file:
-        news_df = load_csv(news_file)
-        st.session_state.news_csv_df = news_df
-        st.success(f"Loaded {len(news_df)} news rows")
+        st.session_state.news_csv_df = load_csv(news_file)
+        st.success(f"Loaded {len(st.session_state.news_csv_df)} news rows")
     else:
         st.session_state.pop("news_csv_df", None)
 
+    # Validate price CSV columns
     price_df_preview = st.session_state.get("price_csv_df")
     if isinstance(price_df_preview, pd.DataFrame) and not price_df_preview.empty:
-        need = {"date", "open", "high", "low", "close", "adj_close", "volume"}
-        miss = need - set(price_df_preview.columns)
-        if miss:
-            st.warning(f"Prices CSV missing columns: {sorted(miss)}")
+        required = {"date", "open", "high", "low", "close", "adj_close", "volume"}
+        missing = required - set(price_df_preview.columns)
+        if missing:
+            st.warning(f"Prices CSV missing columns: {sorted(missing)}")
 
+    # Missing-news strategy
     fill_strategy_csv = st.radio(
         "Missing-news strategy",
         ["Do nothing (ignore news)", "Enrich with LLM (needs ≥1)", "Pad with neutral (needs ≥2)"],
@@ -110,31 +110,28 @@ if mode == "Upload CSVs":
     )
     enrich_flag_csv = fill_strategy_csv == "Enrich with LLM (needs ≥1)"
     pad_neutral_csv = fill_strategy_csv == "Pad with neutral (needs ≥2)"
-    ignore_news_flag_csv = fill_strategy_csv == "Do nothing (ignore news)"
+    ignore_news_csv = fill_strategy_csv == "Do nothing (ignore news)"
 
-    # Horizon for CSV mode
     h_sel_csv = st.number_input("Forecast horizon (business days)", min_value=1, max_value=30, value=30, step=1)
 
-    # Only enable Predict when prices are available
-    can_predict_csv = isinstance(
-        st.session_state.get("price_csv_df"), pd.DataFrame
-    ) and not st.session_state["price_csv_df"].empty
+    can_predict_csv = isinstance(st.session_state.get("price_csv_df"), pd.DataFrame) and not st.session_state[
+        "price_csv_df"
+    ].empty
     predict_btn = st.button("Predict Price", disabled=not can_predict_csv)
 
-# --- Fetch from API mode ---
+
+#  Mode: Fetch from API
 else:
     clear_csv_state()
     with st.form("fetch_controls"):
         symbol = st.text_input(
             "Ticker Symbol",
             value=st.session_state.get("symbol", "^DJI"),
-            help="Prefilled with ^DJI (Dow Jones). You can change it if needed."
+            help="Prefilled with ^DJI (Dow Jones). You can change it if needed.",
         )
-        symbol_valid(symbol)
-        st.caption("Model is currently trained for **^DJI**. Other tickers may give unreliable results.")
+        validate_symbol(symbol)
 
         end_date = st.date_input("End Date", value=st.session_state.get("end_date", datetime.today()))
-
         c1, c2 = st.columns([1, 1])
         with c1:
             days = st.slider("Lookback Days", min_value=30, max_value=365, value=int(st.session_state.get("days", 90)))
@@ -146,19 +143,14 @@ else:
         fill_strategy = st.radio(
             "Missing-news strategy",
             ["Do nothing (ignore news)", "Enrich with LLM (needs ≥1)", "Pad with neutral (needs ≥2)"],
-            index=0,
-            help=(
-                "Do nothing: ignore all news → neutral every day.\n"
-                "Enrich: use your news (≥1 headline) and generate the missing dates.\n"
-                "Pad: use your news (≥2 headlines) and neutral-fill gaps (no generation)."
-            ),
+            index=0
         )
         enrich_flag = fill_strategy == "Enrich with LLM (needs ≥1)"
         pad_neutral_flag = fill_strategy == "Pad with neutral (needs ≥2)"
         ignore_news_flag = fill_strategy == "Do nothing (ignore news)"
 
         st.subheader("Optional headlines for today")
-        news_input = []
+        news_input: list[dict[str, str]] = []
         for i in range(3):
             headline = st.text_input(f"Headline {i + 1}", key=f"headline_{i}")
             if headline:
@@ -176,7 +168,7 @@ else:
                 r = HTTP.get(
                     f"{API_URL}/price-history",
                     params={"symbol": symbol, "end_date": end_date.strftime("%Y-%m-%d"), "days": int(days)},
-                    timeout=(CONNECT_TIMEOUT, READ_TIMEOUT_FETCH),
+                    timeout=(CONNECT_TIMEOUT, READ_TIMEOUT_FETCH)
                 )
                 r.raise_for_status()
                 data = r.json()
@@ -197,54 +189,60 @@ else:
                     st.session_state.pop("fetched_price_df", None)
                     st.warning("No price data returned.")
 
-# --- Predict action ---
+#  Prediction logic
 if "predict_btn" in locals() and predict_btn:
+    # Prepare payload
     if mode == "Upload CSVs":
         price_df = st.session_state.get("price_csv_df")
         if price_df is None or price_df.empty:
             st.warning("Upload a Prices CSV first.")
             st.stop()
 
-        need = {"date", "open", "high", "low", "close", "adj_close", "volume"}
-        miss = need - set(price_df.columns)
-        if miss:
-            st.error(f"Prices CSV missing columns: {sorted(miss)}")
+        required = {"date", "open", "high", "low", "close", "adj_close", "volume"}
+        missing = required - set(price_df.columns)
+        if missing:
+            st.error(f"Prices CSV missing columns: {sorted(missing)}")
             st.stop()
 
         news_df = st.session_state.get("news_csv_df")
-
         if enrich_flag_csv and (news_df is None or news_df.empty):
-            st.error("Enrich is enabled but no seed headline found. Add ≥1 headline in News CSV.")
+            st.error("Enrich requires ≥1 headline in News CSV.")
             st.stop()
-        if pad_neutral_csv:
-            if news_df is None or news_df.empty or len(news_df) < 2:
-                st.error("Pad with neutral requires ≥2 headlines in News CSV (no generation).")
-                st.stop()
+        if pad_neutral_csv and (news_df is None or len(news_df) < 2):
+            st.error("Pad with neutral requires ≥2 headlines in News CSV.")
+            st.stop()
 
-        news_records = news_df.to_dict(orient="records") if isinstance(news_df, pd.DataFrame) else []
+        news_records: list[dict[str, str]] = (
+            [{str(k): str(v) for k, v in row.items()} for row in news_df.to_dict(orient="records")]
+            if isinstance(news_df, pd.DataFrame)
+            else []
+        )
         payload = {"price": price_df.to_dict(orient="records"), "news": news_records}
         params = {
             "enrich": enrich_flag_csv,
             "pad_neutral": pad_neutral_csv,
-            "ignore_news": ignore_news_flag_csv,
+            "ignore_news": ignore_news_csv,
             "horizon": int(h_sel_csv),
             "return_path": True,
-            "symbol": "CSV",
+            "symbol": "CSV"
         }
+
     else:
         price_df = st.session_state.get("fetched_price_df")
         if price_df is None or price_df.empty:
             st.warning("Fetch price history first.")
             st.stop()
 
-        if enrich_flag and len(st.session_state.get("news_input", [])) == 0:
-            st.error("Enrich is enabled but no seed headline found. Add ≥1 headline above.")
+        if enrich_flag and not st.session_state.get("news_input"):
+            st.error("Enrich requires ≥1 headline above.")
             st.stop()
         if pad_neutral_flag and len(st.session_state.get("news_input", [])) < 2:
-            st.error("Pad with neutral requires ≥2 example headlines above (no generation).")
+            st.error("Pad with neutral requires ≥2 example headlines above.")
             st.stop()
 
-        news_records = st.session_state.get("news_input", [])
+        news_records: list[dict[str, str]] = [
+            {str(k): str(v) for k, v in row.items()} for row in st.session_state.get("news_input", [])
+        ]
         payload = {"price": price_df.to_dict(orient="records"), "news": news_records}
         params = {
             "enrich": enrich_flag,
@@ -252,71 +250,62 @@ if "predict_btn" in locals() and predict_btn:
             "ignore_news": ignore_news_flag,
             "horizon": int(h_sel_fetch),
             "return_path": True,
-            "symbol": st.session_state.get("symbol", "^DJI"),
+            "symbol": st.session_state.get("symbol", "^DJI")
         }
 
-    with st.spinner("Predicting (this may take a while for large CSV/news)…"):
+    # Call API
+    with st.spinner("Predicting (may take a while for large CSV/news)…"):
         try:
             r = HTTP.post(
                 f"{API_URL}/predict-raw",
                 params=params,
                 json=payload,
-                timeout=(CONNECT_TIMEOUT, READ_TIMEOUT_PREDICT),
+                timeout=(CONNECT_TIMEOUT, READ_TIMEOUT_PREDICT)
             )
             r.raise_for_status()
             result = r.json()
         except requests.ReadTimeout:
-            st.error(
-                "Prediction timed out while waiting for the server. Increase the read timeout or reduce CSV/news size."
-            )
+            st.error("Prediction timed out. Try smaller input or increase timeout.")
             st.stop()
         except requests.RequestException as e:
             status = getattr(getattr(e, "response", None), "status_code", None)
-            body = None
-            try:
-                body = e.response.json() if e.response is not None else None
-            except Exception:
-                body = getattr(e.response, "text", None)
+            body = getattr(getattr(e, "response", None), "text", None)
             st.error(f"Prediction failed [{status}]: {body or e}")
             st.stop()
 
+    # Display results
     st.success("Prediction Complete")
     current_price = float(result.get("current_price", float("nan")))
     predicted_price = float(result.get("predicted_price", float("nan")))
     delta_price = float(result.get("delta_price", float("nan")))
+
     st.write(f"**Current Price:** ${current_price:.2f}")
     st.write(f"**Next-day Predicted Price (h=1):** ${predicted_price:.2f}")
     st.write(f"**Next-day delta Price:** {delta_price:.4f}")
 
+    # Plot
     df_prices = price_df.copy()
+    if {"adj_close", "date"} <= set(df_prices.columns):
+        df_prices["date"] = pd.to_datetime(df_prices["date"])
+        actual_df = df_prices.rename(columns={"adj_close": "price"})[["date", "price"]].copy()
 
-    if "adj_close" not in df_prices.columns or "date" not in df_prices.columns:
-        st.info("Cannot plot history: 'date' or 'adj_close' missing in price data.")
-        st.stop()
+        pred_dates = [pd.to_datetime(d) for d in result.get("predicted_dates", [])]
+        pred_prices = [float(x) for x in result.get("predicted_price_path", [])]
 
-    df_prices["date"] = pd.to_datetime(df_prices["date"])
-    df_prices = df_prices.sort_values("date")
-    actual_df = df_prices.rename(columns={"adj_close": "price"})[["date", "price"]].copy()
-
-    pred_dates = [pd.to_datetime(d) for d in list(result.get("predicted_dates", []))]
-    pred_prices = [float(x) for x in list(result.get("predicted_price_path", []))]
-
-    if pred_dates and pred_prices and len(pred_dates) == len(pred_prices):
-        path_df = pd.DataFrame({"date": pred_dates, "price": pred_prices})
-        x_enc, y_enc = alt.X("date:T", title="Date"), alt.Y("price:Q", title="Adj Close (USD)")
-        chart = alt.layer(
-            alt.Chart(actual_df).mark_line().encode(x_enc, y_enc),
-            alt.Chart(path_df).mark_line(strokeDash=[6, 6]).encode(x_enc, y_enc),
-            alt.Chart(path_df.tail(1)).mark_point(size=70, color="red").encode(x_enc, y_enc),
-            alt.Chart(path_df.tail(1))
-            .mark_text(dx=8, dy=-8, color="red")
-            .encode(x_enc, y_enc, text=alt.Text("price:Q", format="$.2f"))
-        ).properties(
-            width=700,
-            height=380,
-            title=f"Adj Close: Actual + Predicted Next {int(result.get('horizon', len(path_df)))} Business Days"
-        )
-        st.subheader("Price Chart")
-        st.altair_chart(chart, use_container_width=True)
+        if pred_dates and pred_prices and len(pred_dates) == len(pred_prices):
+            path_df = pd.DataFrame({"date": pred_dates, "price": pred_prices})
+            chart = alt.layer(
+                alt.Chart(actual_df).mark_line().encode(x="date:T", y="price:Q"),
+                alt.Chart(path_df).mark_line(strokeDash=[6, 6]).encode(x="date:T", y="price:Q"),
+                alt.Chart(path_df.tail(1)).mark_point(size=70, color="red").encode(x="date:T", y="price:Q"),
+                alt.Chart(path_df.tail(1))
+                .mark_text(dx=8, dy=-8, color="red")
+                .encode(x="date:T", y="price:Q", text=alt.Text("price:Q", format="$.2f")),
+            ).properties(width=700, height=380,
+                         title=f"Adj Close: Actual + Predicted Next {result.get('horizon', 0)} Days")
+            st.subheader("Price Chart")
+            st.altair_chart(chart, use_container_width=True)
+        else:
+            st.info("No forecast path returned.")
     else:
-        st.info("No forecast path returned.")
+        st.info("Cannot plot history: missing 'date' or 'adj_close'.")

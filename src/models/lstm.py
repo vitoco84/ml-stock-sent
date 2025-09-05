@@ -3,12 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import torch.nn as nn
+from torch import Tensor
 
 from src.models.basenn import TorchBaseNN
 
 
 class _LSTMNet(nn.Module):
-    def __init__(self, output_dim, units, dense_units, dropout):
+    """Simple LSTM forecaster head."""
+
+    def __init__(self, output_dim: int, units: int, dense_units: int, dropout: float) -> None:
         super().__init__()
         self.lstm = nn.LSTM(input_size=1, hidden_size=units, batch_first=True)
         self.dropout = nn.Dropout(dropout)
@@ -16,7 +19,8 @@ class _LSTMNet(nn.Module):
         self.fc2 = nn.Linear(dense_units, output_dim)
         self.relu = nn.ReLU()
 
-    def forward(self, x):
+    def forward(self, x: Tensor) -> Tensor:
+        # input (N, T, 1)
         out, _ = self.lstm(x)
         out = out[:, -1, :]
         out = self.dropout(out)
@@ -25,7 +29,8 @@ class _LSTMNet(nn.Module):
 
 @dataclass
 class LSTMModel(TorchBaseNN):
-    """Long Short-term Memory (LSTM)"""
+    """Long Short-term Memory (LSTM) forecaster."""
+
     name: str = "lstm"
     input_mode: str = "sequence"
 
@@ -44,7 +49,7 @@ class LSTMModel(TorchBaseNN):
     clip_grad_norm: float = 1.0
     use_amp: bool = False
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         super().__init__(horizon=self.horizon, random_state=self.random_state)
 
     def _build_net(self, input_dim: int, output_dim: int) -> nn.Module:
@@ -56,7 +61,7 @@ class LSTMModel(TorchBaseNN):
         )
 
     @staticmethod
-    def search_space(trial):
+    def search_space(trial) -> dict:
         return {
             "units": trial.suggest_int("units", 32, 256, step=32),
             "dense_units": trial.suggest_int("dense_units", 32, 256, step=32),

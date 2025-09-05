@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Optional
+from dataclasses import dataclass, field
+from typing import Optional, Self
 
 import numpy as np
 import pandas as pd
@@ -13,10 +13,11 @@ from src.models.base import Base
 @dataclass
 class RandomForest(Base):
     """
-    RandomForestRegressor with native multi-output support.
-    y can be shape (n,) or (n, H)
+    Wrapper around sklearn's RandomForestRegressor.
+    Supports single-output or multi-output regression.
     """
-    name = "random_forest"
+
+    name: str = "random_forest"
 
     horizon: int = 30
     random_state: int = 42
@@ -30,12 +31,14 @@ class RandomForest(Base):
     max_samples: Optional[int | float] = None
     criterion: str = "squared_error"
 
-    def __post_init__(self):
+    model: RandomForestRegressor = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
         super().__init__(horizon=self.horizon, random_state=self.random_state)
         self._build()
 
-    def _build(self):
-        max_samples = self.max_samples if self.bootstrap else None
+    def _build(self) -> None:
+        """Initialize the underlying sklearn RandomForest model."""
         self.model = RandomForestRegressor(
             n_estimators=self.n_estimators,
             max_depth=self.max_depth,
@@ -43,13 +46,13 @@ class RandomForest(Base):
             min_samples_leaf=self.min_samples_leaf,
             max_features=self.max_features,
             bootstrap=self.bootstrap,
-            max_samples=max_samples,
+            max_samples=self.max_samples if self.bootstrap else None,
             n_jobs=self.n_jobs,
             random_state=self.random_state,
             criterion=self.criterion
         )
 
-    def fit(self, X: pd.DataFrame, y: np.ndarray) -> RandomForest:
+    def fit(self, X: pd.DataFrame, y: np.ndarray) -> Self:
         self.model.fit(X, np.asarray(y))
         return self
 
@@ -58,12 +61,11 @@ class RandomForest(Base):
         return np.asarray(yhat)
 
     @staticmethod
-    def search_space(trial):
+    def search_space(trial) -> dict:
         bootstrap = trial.suggest_categorical("bootstrap", [True, False])
 
         max_depth = trial.suggest_int("max_depth", 6, 20)
-        use_max_depth = trial.suggest_categorical("use_max_depth", [True, False])
-        if not use_max_depth:
+        if trial.suggest_categorical("use_max_depth", [True, False]) is False:
             max_depth = None
 
         return {
@@ -74,5 +76,5 @@ class RandomForest(Base):
             "max_features": trial.suggest_categorical("max_features", ["sqrt", "log2", 0.3, 0.5, 0.8]),
             "bootstrap": bootstrap,
             "max_samples": trial.suggest_float("max_samples", 0.5, 0.9) if bootstrap else None,
-            "criterion": "squared_error"
+            "criterion": trial.suggest_categorical("criterion", ["squared_error", "absolute_error"]),
         }

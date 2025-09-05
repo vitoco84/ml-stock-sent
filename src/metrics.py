@@ -1,11 +1,14 @@
-from typing import Any, Dict
+from typing import Any
 
 import numpy as np
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 
 def _smape(y_true: np.ndarray, y_pred: np.ndarray) -> float:
-    """Symmetric mean absolute percentage error."""
+    """
+    Symmetric mean absolute percentage error (SMAPE).
+    Formula: 2 * |y_pred - y_true| / (|y_true| + |y_pred|)
+    """
     y_true = np.asarray(y_true)
     y_pred = np.asarray(y_pred)
     denom = (np.abs(y_true) + np.abs(y_pred)) + 1e-12
@@ -13,8 +16,8 @@ def _smape(y_true: np.ndarray, y_pred: np.ndarray) -> float:
 
 def _mase(y_true: np.ndarray, y_pred: np.ndarray, y_insample: np.ndarray) -> float:
     """
-    Mean Absolute Scaled Error.
-    y_insample: Historical target values (before forecast window) used to compute MASE.
+    Mean Absolute Scaled Error (MASE).
+    y_insample: Historical target values (before forecast window).
     """
     y_insample = np.asarray(y_insample)
     if y_insample.size < 2:
@@ -23,8 +26,14 @@ def _mase(y_true: np.ndarray, y_pred: np.ndarray, y_insample: np.ndarray) -> flo
     naive = np.maximum(naive, 1e-8)
     return float(np.mean(np.abs(y_true - y_pred)) / naive)
 
-def metrics(y_true: np.ndarray, y_pred: np.ndarray, y_insample: np.ndarray = None) -> Dict[str, Any]:
-    """Aggregate metrics. Accepts shapes (n,) or (n, H); flattens if needed."""
+def metrics(y_true: np.ndarray, y_pred: np.ndarray, y_insample: np.ndarray = None) -> dict[str, Any]:
+    """
+    Aggregate regression/forecasting metrics.
+    Flattens arrays if multi-output (n, H).
+
+    Returns:
+        Dict of metrics: MAE, MSE, RMSE, SMAPE, R², [MASE if y_insample].
+    """
     yt = np.asarray(y_true)
     yp = np.asarray(y_pred)
     if yt.shape != yp.shape:

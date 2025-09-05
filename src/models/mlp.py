@@ -9,28 +9,37 @@ from torch import nn
 from src.models.basenn import TorchBaseNN
 
 
+def _mlp_block(fin: int, fout: int, dropout: float, use_bn: bool) -> list[nn.Module]:
+    """Helper to build one MLP block."""
+    layers: list[nn.Module] = [nn.Linear(fin, fout)]
+    if use_bn:
+        layers.append(nn.BatchNorm1d(fout))
+    layers.append(nn.ReLU())
+    if dropout > 0:
+        layers.append(nn.Dropout(dropout))
+    return layers
+
 class _MLPNet(nn.Module):
-    def __init__(self, input_dim: int, out_dim: int, hidden: Tuple[int, ...], dropout: float, use_bn: bool = True):
+    """Flexible feed-forward network with variable hidden layers."""
+
+    def __init__(
+            self,
+            input_dim: int,
+            out_dim: int,
+            hidden: Tuple[int, ...],
+            dropout: float,
+            use_bn: bool = True
+    ) -> None:
         super().__init__()
         layers: list[nn.Module] = [nn.Flatten(start_dim=1)]  # (N, F, 1) -> (N, F)
 
-        # First hidden layer: LazyLinear infers in_features (so we don't care about input_dim=1)
+        # First hidden layer
         h0 = hidden[0]
-        layers.append(nn.LazyLinear(h0))
-        if use_bn:
-            layers.append(nn.BatchNorm1d(h0))
-        layers.append(nn.ReLU())
-        if dropout > 0:
-            layers.append(nn.Dropout(dropout))
+        layers += _mlp_block(input_dim, h0, dropout, use_bn)
 
         # Remaining hidden layers
         for fin, fout in zip(hidden[:-1], hidden[1:]):
-            layers.append(nn.Linear(fin, fout))
-            if use_bn:
-                layers.append(nn.BatchNorm1d(fout))
-            layers.append(nn.ReLU())
-            if dropout > 0:
-                layers.append(nn.Dropout(dropout))
+            layers += _mlp_block(fin, fout, dropout, use_bn)
 
         # Output layer
         layers.append(nn.Linear(hidden[-1], out_dim))
@@ -43,6 +52,7 @@ class _MLPNet(nn.Module):
 @dataclass
 class MLP(TorchBaseNN):
     """Feed-forward Multi Layer Perceptron using tabular data."""
+
     name: str = "mlp"
     input_mode: str = "tabular"
 
@@ -61,7 +71,7 @@ class MLP(TorchBaseNN):
     clip_grad_norm: float = 1.0
     use_amp: bool = False
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         super().__init__(horizon=self.horizon, random_state=self.random_state)
 
     def _build_net(self, input_dim: int, output_dim: int) -> nn.Module:
@@ -74,19 +84,24 @@ class MLP(TorchBaseNN):
         )
 
     @staticmethod
-    def search_space(trial):
+    def search_space(trial) -> dict:
         hidden_key = trial.suggest_categorical(
             "hidden_key",
-            ["128", "256",
-             "256,128", "128,64",
-             "256,128,64", "128,64,32",
-             "512,256"]
+            [
+                "128",
+                "256",
+                "256,128",
+                "128,64",
+                "256,128,64",
+                "128,64,32",
+                "512,256"
+             ]
         )
         layers = tuple(int(x) for x in hidden_key.split(","))
         return {
             "hidden": layers,
             "dropout": trial.suggest_float("dropout", 0.0, 0.3),
-            "use_bn": True,
+            "use_bn": trial.suggest_categorical("use_bn", [True, False]),
             "lr": trial.suggest_float("lr", 5e-4, 3e-3, log=True),
             "epochs": trial.suggest_int("epochs", 80, 200, step=20),
             "batch_size": trial.suggest_categorical("batch_size", [128, 256, 512]),

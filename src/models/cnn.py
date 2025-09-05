@@ -3,29 +3,35 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import torch.nn as nn
+from torch import Tensor
 
 from src.models.basenn import TorchBaseNN
 
 
 class _CNNNet(nn.Module):
-    def __init__(self, output_dim, filters, kernel_size, dense_units, dropout):
+    """1D CNN for time series forecasting."""
+
+    def __init__(self, output_dim: int, filters: int, kernel_size: int, dense_units: int, dropout: float) -> None:
         super().__init__()
         self.conv = nn.Conv1d(in_channels=1, out_channels=filters, kernel_size=kernel_size)
+        self.pool = nn.AdaptiveAvgPool1d(1)
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(dropout)
         self.fc1 = nn.Linear(filters, dense_units)
         self.fc2 = nn.Linear(dense_units, output_dim)
 
-    def forward(self, x):
+    def forward(self, x: Tensor) -> Tensor:
+        # input (N, T, 1) -> Conv1d expects (N, C, T), so transpose
         x = x.transpose(1, 2)
-        out = self.conv(x)
-        out = out.mean(dim=2)
-        out = self.dropout(self.relu(self.fc1(out)))
-        return self.fc2(out)
+        x = self.conv(x)
+        x = self.pool(x).squeeze(-1)
+        x = self.dropout(self.relu(self.fc1(x)))
+        return self.fc2(x)
 
 @dataclass
 class CNNModel(TorchBaseNN):
-    """Convolutional Neural Network (CNN)."""
+    """Convolutional Neural Network (CNN) forecaster."""
+
     name: str = "cnn"
     input_mode: str = "sequence"
 
@@ -45,7 +51,7 @@ class CNNModel(TorchBaseNN):
     clip_grad_norm: float = 1.0
     use_amp: bool = False
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         super().__init__(horizon=self.horizon, random_state=self.random_state)
 
     def _build_net(self, input_dim: int, output_dim: int) -> nn.Module:
@@ -58,7 +64,7 @@ class CNNModel(TorchBaseNN):
         )
 
     @staticmethod
-    def search_space(trial):
+    def search_space(trial) -> dict:
         return {
             "filters": trial.suggest_int("filters", 32, 256, step=32),
             "kernel_size": trial.suggest_int("kernel_size", 2, 5),

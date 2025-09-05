@@ -12,25 +12,38 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 
 class IdentityTransformer(BaseEstimator, TransformerMixin):
+    """No-op transformer for models expecting raw DataFrames (e.g. CNN/LSTM)."""
+
+    def __init__(self, copy: bool = False) -> None:
+        self.copy = copy
+
     def fit(self, X: pd.DataFrame, y: Optional[np.ndarray] = None) -> IdentityTransformer:
         return self
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
-        return X
+        return X.copy() if self.copy else X
 
-def get_preprocessor(X: pd.DataFrame, model_name: str) -> Tuple[Pipeline, list[str]]:
-    """Build Preprocessor Pipeline."""
+def get_preprocessor(X: pd.DataFrame, model_name: str) -> Tuple[Pipeline, list[str] | None]:
+    """
+    Build preprocessing pipeline for a given model type.
 
-    # No-op  Transformer for preserving DatFrames and Column names
+    - CNN/LSTM: no-op (preserve DataFrame)
+    - RandomForest/XGBoost: imputation only
+    - Others (linear/MLP): imputation + scaling
+    """
+
+    # Torch sequence models expect raw lag_* features, no preprocessing
     if model_name.lower() in {"cnn", "lstm"}:
         return Pipeline([("identity", IdentityTransformer())], memory=None), list(X.columns)
 
+    # Separate numeric vs categorical
     cat_features = [c for c in ["dow"] if c in X.columns]
     num_features = [c for c in X.columns if c not in cat_features + ["date"]]
 
     if not (num_features or cat_features):
         raise ValueError("No feature columns found after filtering (only targets/date present).")
 
+    # Preprocessors
     if model_name.lower() in {"random_forest", "xgboost"}:
         num_tf = SimpleImputer(strategy="median")
     else:

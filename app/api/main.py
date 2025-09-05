@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -26,20 +27,12 @@ from src.train import ModelTrainer
 
 
 logger = get_logger(__name__)
-
 config = Config(Path("config/config.yaml"))
 settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Application lifespan context.
-    - Loads configuration
-    - Initializes FinBERT sentiment model
-    - Loads trained prediction model and preprocessor
-    - Loads NEWS_API_KEY from .env
-    - Stores initialized objects in `app.state` for later access
-    """
+    """Initialize and tear down global resources (FinBERT, model, preprocessor)."""
     device = "cuda" if torch.cuda.is_available() else "cpu"
     logger.info(f"Initializing FinBERT on {device}")
 
@@ -48,6 +41,7 @@ async def lifespan(app: FastAPI):
     model_path = Path(config.data.models_dir) / "linreg.pkl"
     if not model_path.exists():
         raise RuntimeError(f"Model file not found at {model_path}")
+
     model, preprocessor, y_scaler, y_scale = ModelTrainer.load(str(model_path))
 
     app.state.news_api_key = settings.news_api_key
@@ -62,7 +56,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     root_path=settings.api_root_path,
     title="Stock Prediction API",
-    description="Predict stock price deltas (delta price = AdjClose_{t+1} − AdjClose_t) using historical prices, news sentiment, and FinBERT.",
+    description="Predict stock price deltas (AdjClose_{t+1} − AdjClose_t) using prices, news, and FinBERT sentiment.",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -72,9 +66,174 @@ app.add_middleware(
     allow_origins=[str(o) for o in settings.cors_origins],
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["*"],
+    allow_headers=["*"]
 )
 app.add_middleware(LimitUploadSizeMiddleware)
+
+def _process_price_df(request_body: PredictionRequest) -> pd.DataFrame:
+    """Validate and normalize price data from request."""
+    if not getattr(request_body, "price", None):
+        raise HTTPException(422, "`price` is required and must be a non-empty list.")
+
+    try:
+        price_rows = [to_dict(row) for row in request_body.price]
+        df = pd.DataFrame(price_rows)
+    except Exception:
+        logger.exception("Invalid `price` payload")
+        raise HTTPException(
+            422,
+            "`price` payload malformed. Expect rows with {date, open, high, low, close, adj_close, volume}."
+        )
+
+    required = {"date", "open", "high", "low", "close", "adj_close", "volume"}
+    missing = required - set(df.columns)
+    if missing:
+        raise HTTPException(422, f"Missing required price columns: {sorted(missing)}")
+
+    df["date"] = pd.to_datetime(df["date"]).dt.normalize()
+    df = df.sort_values("date").drop_duplicates(subset=["date"], keep="last")
+
+    if df.empty:
+        raise HTTPException(422, "Price data is empty or invalid.")
+    if len(df) > 2000:
+        raise HTTPException(400, "Price data exceeds 2000-row limit.")
+    if (df["date"].max() - df["date"].min()).days > 365 * 5:
+        raise HTTPException(400, "Price data spans more than 5 years.")
+
+    return df
+
+def _process_news_df(
+        request_body: PredictionRequest,
+        price_dates: list[str],
+        *,
+        enrich: bool,
+        pad_neutral: bool,
+        ignore_news: bool,
+        symbol: str
+) -> pd.DataFrame:
+    """Validate and normalize news data, optionally enrich or pad."""
+    news_payload = getattr(request_body, "news", None) or []
+    if len(news_payload) > 2000:
+        raise HTTPException(400, "News data exceeds 2000-row limit.")
+
+    if news_payload:
+        try:
+            df = pd.DataFrame([to_dict(row) for row in news_payload])
+            df["date"] = pd.to_datetime(df["date"]).dt.normalize()
+        except Exception:
+            logger.exception("Invalid `news` payload")
+            raise HTTPException(422, "`news` payload malformed. Expect list of {date, headline}.")
+    else:
+        df = pd.DataFrame(columns=["date", "headline"])
+
+    if ignore_news:
+        return pd.DataFrame(columns=["date", "headline"])
+
+    if not df.empty:
+        df = (
+            df.sort_values(["date"])
+            .groupby("date", as_index=False)
+            .head(20)
+            .tail(1000)
+        )
+
+    ollama_base = settings.ollama_base
+    ollama_ok = _ollama_alive(ollama_base)
+
+    if enrich and ollama_ok:
+        if df.empty:
+            raise HTTPException(422, "Enrich requires ≥1 seed headline.")
+
+        real_news: list[dict[str, str]] = [
+            {str(k): str(v) for k, v in row.items()} for row in df.to_dict(orient="records")
+        ]
+
+        enriched = enrich_news_with_generated(
+            price_dates=price_dates,
+            real_news=real_news,
+            symbol=symbol,
+            url_llm=f"{ollama_base.rstrip('/')}/api/generate",
+            model_llm=settings.ollama_model
+        )
+        df = pd.DataFrame(enriched)
+        df["date"] = pd.to_datetime(df["date"]).dt.normalize()
+
+    if pad_neutral and (df.empty or len(df) < 2):
+        raise HTTPException(422, "Pad-neutral requires ≥2 headlines and does not generate news.")
+
+    return df
+
+def _generate_features(
+        price_df: pd.DataFrame,
+        news_df: pd.DataFrame,
+        sentiment_model: Any,
+        horizon: int,
+        pad_neutral: bool
+) -> pd.DataFrame:
+    """Generate model-ready feature row."""
+    try:
+        if news_df.empty:
+            return generate_full_feature_row(price_df, pd.DataFrame(), None, forecast_horizon=horizon)
+
+        return generate_full_feature_row(
+            price_df,
+            news_df,
+            sentiment_model,
+            forecast_horizon=horizon,
+            fill_missing_neutral=pad_neutral,
+            max_embedding_dims=17
+        )
+    except Exception:
+        logger.exception("Feature generation failed")
+        raise HTTPException(500, "Failed to generate features from price/news data.")
+
+def _make_prediction(
+        feature_row: pd.DataFrame,
+        model: Any,
+        preprocessor: Any,
+        y_scaler: Any,
+        y_scale: bool,
+        price_df: pd.DataFrame,
+        horizon: int,
+        return_path: bool
+) -> PredictionResponse:
+    """Run model prediction and build response (aligned with direct-delta training)."""
+    try:
+        X = preprocessor.transform(feature_row)
+        yhat = np.asarray(model.predict(X), dtype=float)
+        if yhat.ndim == 1:
+            yhat = yhat.reshape(1, -1)
+    except Exception:
+        logger.exception("Model prediction failed")
+        raise HTTPException(500, "Prediction failed.")
+
+    H = min(horizon, yhat.shape[1])
+    current_price = float(price_df["adj_close"].iloc[-1])
+
+    # Horizon=1 is just the first direct delta
+    delta_1 = float(yhat[0, 0])
+    predicted_price = current_price + delta_1
+
+    response_kwargs: dict[str, Any] = {
+        "horizon": H,
+        "current_price": current_price,
+        "delta_price": delta_1,
+        "predicted_price": predicted_price,
+    }
+
+    if return_path:
+        delta_path = yhat[0, :H]
+        price_path = current_price + delta_path
+        future_dates = pd.bdate_range(price_df["date"].iloc[-1] + BDay(1), periods=H)
+
+        response_kwargs.update(
+            delta_price_path=delta_path.tolist(),
+            predicted_price_path=price_path.tolist(),
+            predicted_dates=future_dates.strftime("%Y-%m-%d").tolist(),
+            last_date=pd.to_datetime(price_df["date"].iloc[-1]).date(),
+        )
+
+    return PredictionResponse(**response_kwargs)
 
 @app.get("/healthz")
 def healthz():
@@ -86,9 +245,7 @@ def fetch_price_history(
         end_date: str = Query(..., description="End date in YYYY-MM-DD format"),
         days: int = Query(90, ge=1, le=365, description="Number of business days to look back")
 ):
-    """
-    Fetch historical stock price data for a given symbol.
-    """
+    """Fetch historical stock price data for a given symbol."""
     try:
         if days > 365:
             raise HTTPException(400, "Max look-back is 365 business days.")
@@ -98,10 +255,7 @@ def fetch_price_history(
             raise HTTPException(404, "No price data returned. Check the symbol or date range.")
 
         df["date"] = df["date"].dt.strftime("%Y-%m-%d")
-        records = df.to_dict(orient="records")
-        logger.info(f"Head of dataframe:\n{df.head()}")
-        logger.debug(f"Sample record: {records[0]}")
-        return {"price": records}
+        return {"price": df.to_dict(orient="records")}
     except Exception:
         logger.exception("fetch_price_history failed")
         raise HTTPException(500, "Internal server error")
@@ -113,9 +267,7 @@ def fetch_news_history(
         end_date: str = Query(..., description="End date in YYYY-MM-DD format"),
         days: int = Query(7, ge=1, le=29, description="Number of calendar days to look back")
 ):
-    """
-    Fetch recent news headlines using the NewsAPI.
-    """
+    """Fetch recent news headlines using the NewsAPI."""
     try:
         if days > 29:
             raise HTTPException(400, "Max look-back is 29 days.")
@@ -142,196 +294,31 @@ def post_predict_from_raw(
         horizon: int = Query(30, ge=1, le=30, description="How many horizons to return"),
         return_path: bool = Query(True, description="Whether to return the full H-step path"),
         symbol: str = Query("^DJI", description="Ticker symbol for context (e.g., AAPL)")
-):
-    """
-    Predict next **price deltas** (delta price = AdjClose_{t+1} − AdjClose_t) using:
-    - Historical price data
-    - News headlines (optionally enriched with an LLM)
-    - FinBERT sentiment analysis
-    - A pre-trained regression model
-
-    Response:
-    - current_price
-    - delta_price (h=1)
-    - predicted_price (current_price + delta_price)
-    - Optional: delta_price_path, predicted_price_path, predicted_dates
-    """
-    horizon = min(horizon, 30)
-    logger.info("Received prediction request")
-
+) -> PredictionResponse:
+    """Predict next price deltas from prices + optional news."""
     if ignore_news and (enrich or pad_neutral):
-        raise HTTPException(400, "Invalid strategy: 'Do nothing' cannot be combined with 'enrich' or 'pad_neutral'.")
+        raise HTTPException(400, "Invalid strategy: 'ignore_news' cannot be combined with 'enrich' or 'pad_neutral'.")
     if enrich and pad_neutral:
-        raise HTTPException(400, "Choose exactly one strategy: 'enrich' OR 'pad_neutral' OR 'ignore_news'.")
+        raise HTTPException(400, "Choose exactly one strategy: enrich OR pad_neutral OR ignore_news.")
 
-    sentiment_model = request.app.state.sentiment_model
-    model = request.app.state.model
-    preprocessor = request.app.state.preprocessor
-
-    # --- PRICE ---
-    try:
-        if not getattr(request_body, "price", None):
-            raise HTTPException(422, "`price` is required and must be a non-empty list.")
-        price_rows = [to_dict(row) for row in request_body.price]
-    except HTTPException:
-        raise
-    except Exception:
-        logger.exception("Invalid `price` payload")
-        raise HTTPException(
-            422,
-            "`price` payload malformed. Expect a list of rows with "
-            "{date, open, high, low, close, adj_close, volume}."
-        )
-
-    price_df = pd.DataFrame(price_rows)
-    required_cols = {"date", "open", "high", "low", "close", "adj_close", "volume"}
-    missing = required_cols - set(price_df.columns)
-    if missing:
-        raise HTTPException(422, f"Missing required price columns: {sorted(missing)}")
-
-    price_df["date"] = pd.to_datetime(price_df["date"]).dt.normalize()
-    price_df = price_df.sort_values("date").drop_duplicates(subset=["date"], keep="last")
-
-    if price_df.empty:
-        raise HTTPException(422, "Price data is empty or invalid.")
-    if len(price_df) > 2000:
-        raise HTTPException(400, "Price data exceeds 2000-row limit.")
-    if (price_df["date"].max() - price_df["date"].min()).days > 365 * 5:
-        raise HTTPException(400, "Price data spans more than 5 years.")
-
+    price_df = _process_price_df(request_body)
     price_dates = price_df["date"].dt.strftime("%Y-%m-%d").tolist()
-    logger.info(f"Price DF:\n{price_df.tail()}")
 
-    # --- NEWS ---
-    news_payload = getattr(request_body, "news", None) or []
-    if len(news_payload) > 0:
-        try:
-            news_df = pd.DataFrame([to_dict(row) for row in request_body.news])
+    news_df = _process_news_df(
+        request_body, price_dates, enrich=enrich, pad_neutral=pad_neutral, ignore_news=ignore_news, symbol=symbol
+    )
 
-            if not news_df.empty and len(news_df) > 2000:
-                raise HTTPException(400, detail="News data exceeds 2000-row limit.")
+    feature_row = _generate_features(
+        price_df, news_df, request.app.state.sentiment_model, horizon, pad_neutral
+    )
 
-            news_df["date"] = pd.to_datetime(news_df["date"]).dt.normalize()
-            logger.info(f"News DF:\n{news_df.tail()}")
-        except Exception:
-            logger.exception("Invalid `news` payload")
-            raise HTTPException(422, "`news` payload malformed. Expect list of {date, headline}.")
-    else:
-        news_df = pd.DataFrame(columns=["date", "headline"])
-        logger.info("No initial news provided.")
-
-    if ignore_news:
-        logger.info("Strategy: Do nothing (ignore news) neutral every day.")
-        news_df = pd.DataFrame(columns=["date", "headline"])
-
-    # Trim for latency
-    if not news_df.empty:
-        number_of_row, amount_per_day = 1000, 20
-        news_df = (
-            news_df
-            .sort_values(["date"])
-            .groupby("date", as_index=False)
-            .head(amount_per_day)
-            .tail(number_of_row)
-        )
-
-    ollama_base = settings.ollama_base
-    ollama_ok = _ollama_alive(ollama_base)
-
-    # --- ENRICH NEWS (if requested) ---
-    if enrich and ollama_ok and not ignore_news:
-        if news_df.empty:
-            raise HTTPException(422, "Enrich requires ≥1 seed headline.")
-        logger.info("Strategy: Enrich with LLM generate missing dates based on seeds.")
-        try:
-            real_news = news_df.to_dict(orient="records")
-            enriched_news = enrich_news_with_generated(
-                price_dates=price_dates,
-                real_news=real_news,
-                symbol=symbol,
-                url_llm=f"{ollama_base.rstrip('/')}/api/generate",
-                model_llm=settings.ollama_model
-            )
-            news_df = pd.DataFrame(enriched_news)
-            news_df["date"] = pd.to_datetime(news_df["date"]).dt.normalize()
-        except Exception as e:
-            logger.exception("Enrichment failed")
-            raise HTTPException(500, f"Enrichment failed: {e}")
-
-    if pad_neutral and not ignore_news and not enrich:
-        if news_df.empty or len(news_df) < 2:
-            raise HTTPException(422, "Pad with neutral requires ≥2 headlines and does not generate news.")
-        logger.info("Strategy: Pad with neutral use provided news and neutral-fill gaps (no generation).")
-
-    # --- FEATURE GENERATION ---
-    try:
-        if news_df.empty:
-            logger.info("No news in use neutral sentiment for all days.")
-            feature_row = generate_full_feature_row(
-                price_df,
-                pd.DataFrame(),
-                None,
-                forecast_horizon=horizon
-            )
-        else:
-            feature_row = generate_full_feature_row(
-                price_df,
-                news_df,
-                sentiment_model,
-                forecast_horizon=horizon,
-                fill_missing_neutral=bool(pad_neutral),
-                max_embedding_dims=17
-            )
-    except Exception:
-        logger.exception("Feature generation failed")
-        raise HTTPException(500, "Failed to generate features from price/news data.")
-
-    logger.debug(f"Feature row:\n{feature_row}")
-
-    # --- PREDICTION ---
-    try:
-        X = preprocessor.transform(feature_row)
-        yhat = model.predict(X)  # shape (1, H) or (H,) or sometimes (N,H)
-        yhat = np.asarray(yhat, dtype=float)
-        if yhat.ndim == 1:
-            yhat = yhat.reshape(1, -1)
-    except Exception:
-        logger.exception("Model prediction failed")
-        raise HTTPException(500, "Prediction failed.")
-
-    yhat = np.asarray(yhat).reshape(1, -1)
-
-    # Inverse-transform if y was scaled during training
-    if getattr(request.app.state, "y_scale", False) and getattr(request.app.state, "y_scaler", None) is not None:
-        yhat = request.app.state.y_scaler.inverse_transform(yhat)
-
-    # Clamp horizon to available outputs
-    H = int(min(horizon, yhat.shape[1]))
-    current_price = float(price_df["adj_close"].iloc[-1])
-
-    # delta price for next day
-    delta_1 = float(yhat[0, 0])
-    predicted_price = current_price + delta_1
-
-    response_kwargs = {
-        "horizon": H,
-        "current_price": current_price,
-        "delta_price": delta_1,
-        "predicted_price": predicted_price,
-    }
-
-    if return_path:
-        delta_path = yhat[0, :H]
-        price_path = current_price + delta_path
-        future_dates = pd.bdate_range(price_df["date"].iloc[-1] + BDay(1), periods=H)
-
-        response_kwargs.update(
-            {
-                "delta_price_path": delta_path.tolist(),
-                "predicted_price_path": [float(x) for x in price_path],
-                "predicted_dates": future_dates.strftime("%Y-%m-%d").tolist(),
-                "last_date": pd.to_datetime(price_df["date"].iloc[-1]).date(),
-            }
-        )
-
-    return PredictionResponse(**response_kwargs)
+    return _make_prediction(
+        feature_row,
+        request.app.state.model,
+        request.app.state.preprocessor,
+        request.app.state.y_scaler,
+        request.app.state.y_scale,
+        price_df,
+        horizon,
+        return_path
+    )

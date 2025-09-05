@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, Iterable, List, Literal, Mapping, Optional, Tuple
+from typing import Mapping, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -12,12 +12,13 @@ from statsmodels.graphics.tsaplots import plot_acf
 
 
 _DPI_DEFAULT: int = 150
-_FIGSIZE_WIDE: Tuple[int, int] = (12, 5)
-_FIGSIZE_STD: Tuple[int, int] = (10, 4)
-_PHASE = Literal["val", "test"]
-_ADJ_CLOSE = "Adj Close"
+_FIGSIZE_WIDE: tuple[int, int] = (12, 5)
+_FIGSIZE_STD: tuple[int, int] = (10, 4)
+_PHASE = str  # "val" | "test"
+_ADJ_CLOSE: str = "Adj Close"
 
 def _ensure_parent(path: Path | str) -> Path:
+    """Ensure parent directory exists for a file path."""
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     return p
@@ -30,6 +31,7 @@ def _finalize_figure(
         tight: bool = True,
         show: bool = True,
 ) -> None:
+    """Save, optionally show, and close a matplotlib figure."""
     if tight:
         fig.tight_layout()
     outfile = _ensure_parent(path)
@@ -39,40 +41,36 @@ def _finalize_figure(
     plt.close(fig)
 
 def _dates_np(s: pd.Series) -> NDArray[np.datetime64]:
-    """Convert a date-like Series to a timezone-naive numpy datetime64 array."""
+    """Convert a Series to numpy datetime64, dropping timezone info."""
     dt = pd.to_datetime(s, utc=True, errors="coerce").dt.tz_convert(None)
     return dt.to_numpy(dtype="datetime64[ns]")
 
-def _extract_delta(y_pred: Iterable[float] | None) -> NDArray[np.float64]:
-    """Extract a 1D float array of log-returns."""
+def _extract_delta(y_pred: object) -> NDArray[np.float64]:
+    """Extract a clean 1D float array of deltas from predictions."""
     if y_pred is None:
         return np.array([], dtype=float)
-
-    arr = np.asarray(list(y_pred))
+    arr = np.asarray(y_pred)
     if arr.size == 0:
         return np.array([], dtype=float)
-
-    if arr.ndim == 2:
-        arr = arr[:, 0]
-    else:
-        arr = arr.ravel()
-
-    arr = pd.to_numeric(pd.Series(arr), errors="coerce").to_numpy(dtype=float)
+    arr = arr[:, 0] if arr.ndim == 2 else arr.ravel()
+    arr = pd.to_numeric(arr, errors="coerce").astype(float)
     return arr[np.isfinite(arr)]
 
-def _align_price_path(base_today: NDArray[np.float64], logret_t1: NDArray[np.float64]) -> NDArray[np.float64]:
-    """Given today's base prices and (t+1) **deltas**, align lengths and build price path."""
-    n = min(len(base_today), len(logret_t1))
-    if n <= 0:
-        return np.array([], dtype=float)
-    return base_today[:n] + logret_t1[:n]
+def _align_price_path(
+        base_today: NDArray[np.float64], deltas: NDArray[np.float64]
+) -> NDArray[np.float64]:
+    """Build price path given today's base prices and predicted deltas."""
+    n = min(len(base_today), len(deltas))
+    return np.array([], dtype=float) if n <= 0 else base_today[:n] + deltas[:n]
 
-def _next_step_arrays(df: pd.DataFrame) -> Tuple[NDArray[np.datetime64], NDArray[np.float64], NDArray[np.float64]]:
+def _next_step_arrays(
+        df: pd.DataFrame,
+) -> tuple[NDArray[np.datetime64], NDArray[np.float64], NDArray[np.float64]]:
     """
-    For a series of dates and adjusted close, return:
-      - dates[1:] (timestamps that correspond to t+1 actual)
-      - actual_next = adj_close[1:]
-      - base_today  = adj_close[:-1]
+    From a price series, return:
+    - dates[1:] (timestamps for t+1)
+    - actual_next (adj_close[1:])
+    - base_today  (adj_close[:-1])
     """
     dates = _dates_np(df["date"])
     adj = pd.to_numeric(df["adj_close"], errors="coerce").to_numpy(dtype=float)
@@ -81,13 +79,10 @@ def _next_step_arrays(df: pd.DataFrame) -> Tuple[NDArray[np.datetime64], NDArray
 def plot_val_test_overlay(
         df_val: pd.DataFrame,
         df_test: pd.DataFrame,
-        results: List[Mapping],
+        results: list[Mapping],
         path: Path | str,
 ) -> None:
-    """
-    Overlay actual (t+1) adjusted close vs. predicted paths (val+test concatenated).
-    Draws a split line at the end of validation segment.
-    """
+    """Overlay actual vs predicted adj_close for validation + test combined."""
     df_all = pd.concat([df_val, df_test], ignore_index=True)
     dates_all, actual_all, base_today = _next_step_arrays(df_all)
     split_date = _dates_np(df_val["date"])[-1]
@@ -104,26 +99,25 @@ def plot_val_test_overlay(
         yhat = _align_price_path(base_today, lr_all)
         n = min(len(dates_all), len(yhat))
         if n > 0:
-            ax.plot(dates_all[:n], yhat[:n], label=f"{res.get('kind', 'model')} (val+test)", linewidth=2)
+            ax.plot(dates_all[:n], yhat[:n], label=f"{res.get('kind', 'model')}", linewidth=2)
 
     ax.axvline(split_date, color="k", linestyle=":", alpha=0.7, label="Val/Test split")
-    ax.set_title("Actual vs Predicted Adj Close (Val + Test, H=1)")
+    ax.set_title("Actual vs Predicted Adj Close (Val+Test, H=1)")
     ax.set_xlabel("Date")
     ax.set_ylabel(_ADJ_CLOSE)
     ax.grid(True, alpha=0.25)
     ax.legend()
-
     _finalize_figure(fig, path)
 
 def plot_overlay(
         df: pd.DataFrame,
-        results: List[Mapping],
+        results: list[Mapping],
         path: Path | str,
         *,
         phase: _PHASE,
         title: Optional[str] = None,
 ) -> None:
-    """Overlay actual (t+1) adjusted close vs. predicted paths for a given phase."""
+    """Overlay actual vs predicted adj_close for a given phase ('val' or 'test')."""
     dates_next, actual_next, base_today = _next_step_arrays(df)
 
     fig, ax = plt.subplots(figsize=_FIGSIZE_WIDE)
@@ -135,58 +129,41 @@ def plot_overlay(
         yhat = _align_price_path(base_today, lr)
         n = min(len(dates_next), len(yhat))
         if n > 0:
-            ax.plot(
-                dates_next[:n],
-                yhat[:n],
-                label=f"{res.get('kind', 'model')} (t+1)",
-                linewidth=2,
-            )
+            ax.plot(dates_next[:n], yhat[:n], label=f"{res.get('kind', 'model')}", linewidth=2)
 
-    if title is None:
-        title = (
+    ax.set_title(
+        title
+        or (
             "Actual vs Predicted Adj Close (Validation, H=1)"
             if phase == "val"
-            else "Actual vs Predicted Adj Close (Test Set, H=1)"
+            else "Actual vs Predicted Adj Close (Test, H=1)"
         )
-
-    ax.set_title(title)
+    )
     ax.set_xlabel("Date")
     ax.set_ylabel(_ADJ_CLOSE)
     ax.grid(True, alpha=0.25)
     ax.legend()
-
     _finalize_figure(fig, path)
 
-def plot_val_overlay(
-        df_val: pd.DataFrame,
-        results: List[Mapping],
-        path: Path | str,
-) -> None:
+def plot_val_overlay(df_val: pd.DataFrame, results: list[Mapping], path: Path | str) -> None:
+    """Wrapper: validation overlay."""
     plot_overlay(df_val, results, path, phase="val")
 
-def plot_test_overlay(
-        df_test: pd.DataFrame,
-        results: List[Mapping],
-        path: Path | str,
-) -> None:
+def plot_test_overlay(df_test: pd.DataFrame, results: list[Mapping], path: Path | str) -> None:
+    """Wrapper: test overlay."""
     plot_overlay(df_test, results, path, phase="test")
 
 def plot_forecast_overlay(
         df_test: pd.DataFrame,
         df_forecast: pd.DataFrame,
-        results: List[Mapping],
+        results: list[Mapping],
         path: Path | str,
 ) -> None:
-    """
-    Plot forecast paths against actuals forward of the last test point,
-    including a naive (flat) baseline for the first H days.
-    """
+    """Forecast overlay: show model forecasts vs actual future prices + naive baseline."""
     H = int(results[0]["horizon"])
-
     hist_dates = _dates_np(df_test["date"])
     hist_prices = pd.to_numeric(df_test["adj_close"], errors="coerce").to_numpy(dtype=float)
-    anchor_date = hist_dates[-1]
-    p0 = float(hist_prices[-1])
+    anchor_date, p0 = hist_dates[-1], float(hist_prices[-1])
 
     fut_dates = _dates_np(df_forecast["date"])
     actual_path = pd.to_numeric(df_forecast["adj_close"], errors="coerce").to_numpy(dtype=float)
@@ -196,65 +173,42 @@ def plot_forecast_overlay(
     ax.axvline(anchor_date, linestyle=":", alpha=0.7)
 
     if len(fut_dates) and len(actual_path):
-        ax.plot(fut_dates, actual_path, label=f"Actual next {len(actual_path)}d", linewidth=2)
+        ax.plot(fut_dates, actual_path, label="Actual", linewidth=2)
 
     if len(fut_dates):
-        ax.plot(
-            fut_dates[:H],
-            [p0] * min(H, len(fut_dates)),
-            label="Naive baseline",
-            linestyle="--",
-            linewidth=2,
-            alpha=0.7,
-        )
+        ax.plot(fut_dates[:H], [p0] * min(H, len(fut_dates)), "--", label="Naive baseline", alpha=0.7)
 
     for res in results:
-        delta_path = _extract_delta(res.get("y_pred_last"))[:H]
-        if delta_path.size == 0:
+        deltas = _extract_delta(res.get("y_pred_last"))[:H]
+        if deltas.size == 0:
             continue
-        forecast_prices = p0 + delta_path
-        n = min(len(fut_dates), len(forecast_prices))
+        forecast = p0 + deltas
+        n = min(len(fut_dates), len(forecast))
         if n > 0:
-            ax.plot(
-                fut_dates[:n],
-                forecast_prices[:n],
-                "--",
-                linewidth=2,
-                label=f"{res.get('kind', 'model')} forecast",
-            )
+            ax.plot(fut_dates[:n], forecast[:n], "--", linewidth=2, label=f"{res.get('kind', 'model')}")
 
-    ad = pd.to_datetime(anchor_date).date()
-    ax.set_title(f"Forecast vs Actuals from {ad} (H={H}d)")
+    ax.set_title(f"Forecast vs Actuals from {pd.to_datetime(anchor_date).date()} (H={H})")
     ax.set_xlabel("Date")
     ax.set_ylabel(_ADJ_CLOSE)
     ax.grid(True, alpha=0.25)
     ax.legend()
-
     _finalize_figure(fig, path)
 
 def plot_forecast_diagnostics(
         df_forecast: pd.DataFrame,
         df_test: pd.DataFrame,
-        results: List[Mapping],
+        results: list[Mapping],
         path: Path | str,
 ) -> None:
-    """
-    Diagnostic:
-      1) Residuals (Actual − Forecast)
-      2) Cumulative log return (actual vs forecasts)
-      3) Price overlay (actual vs forecasts)
-    """
+    """Diagnostics: residuals, cumulative returns, price overlay for forecasts."""
     H = int(results[0]["horizon"])
-
     fut_dates = _dates_np(df_forecast["date"])
     actual_path = pd.to_numeric(df_forecast["adj_close"], errors="coerce").to_numpy(dtype=float)
     p0 = pd.to_numeric(df_test["adj_close"], errors="coerce").to_numpy(dtype=float)[-1]
 
-    preds: Dict[str, NDArray[np.float64]] = {
-        str(res.get("kind", "model")): p0 + np.asarray(res.get("y_pred_last")).ravel()[:H]
-        for res in results
+    preds: dict[str, NDArray[np.float64]] = {
+        str(res.get("kind", "model")): p0 + np.asarray(res.get("y_pred_last")).ravel()[:H] for res in results
     }
-
 
     fig, (ax_res, ax_clr, ax_pr) = plt.subplots(3, 1, figsize=(12, 10), sharex=True)
 
@@ -265,69 +219,57 @@ def plot_forecast_diagnostics(
             if n > 0:
                 ax_res.plot(fut_dates[:n], actual_path[:n] - yhat[:n], label=kind)
         ax_res.axhline(0, color="k", linewidth=0.8, alpha=0.5)
-        ax_res.set_title("Residuals over Horizon (Actual − Forecast)")
-        ax_res.set_ylabel("Residual (Price)")
-        ax_res.grid(True, alpha=0.25)
+        ax_res.set_title("Residuals (Actual − Forecast)")
         ax_res.legend()
     else:
-        ax_res.text(0.02, 0.5, "No actuals in forecast window", transform=ax_res.transAxes)
+        ax_res.text(0.5, 0.5, "No actuals", ha="center")
         ax_res.set_axis_off()
 
-    # Cumulative Log Return
+    # Cumulative log return
     if len(actual_path):
-        act_cum = np.cumsum(np.log(actual_path / actual_path[0]))
-        ax_clr.plot(fut_dates[: len(act_cum)], act_cum, label="Actual")
+        ax_clr.plot(fut_dates, np.cumsum(np.log(actual_path / actual_path[0])), label="Actual")
     for kind, yhat in preds.items():
-        pred_cum = np.cumsum(np.log(yhat / yhat[0]))
-        ax_clr.plot(fut_dates[: len(pred_cum)], pred_cum, "--", label=f"{kind}")
+        ax_clr.plot(fut_dates, np.cumsum(np.log(yhat / yhat[0])), "--", label=kind)
     ax_clr.axhline(0, color="k", linewidth=0.8, alpha=0.5)
-    ax_clr.set_title("Cumulative Log Return over Horizon")
-    ax_clr.set_ylabel("Cumulative Return")
-    ax_clr.grid(True, alpha=0.25)
+    ax_clr.set_title("Cumulative Log Return")
     ax_clr.legend()
 
-    # Price Overlay
+    # Price overlay
     if len(actual_path):
         ax_pr.plot(fut_dates, actual_path, label="Actual")
     for kind, yhat in preds.items():
-        n = min(len(fut_dates), len(yhat))
-        if n > 0:
-            ax_pr.plot(fut_dates[:n], yhat[:n], "--", label=f"{kind} forecast")
-    ax_pr.set_title("Price Overlay over Horizon")
-    ax_pr.set_xlabel("Date")
-    ax_pr.set_ylabel(_ADJ_CLOSE)
-    ax_pr.grid(True, alpha=0.25)
+        ax_pr.plot(fut_dates[: len(yhat)], yhat, "--", label=f"{kind}")
+    ax_pr.set_title("Forecast Price Overlay")
     ax_pr.legend()
 
     _finalize_figure(fig, path)
 
 def plot_price_series(df: pd.DataFrame, path: Path | str) -> None:
-    """Time series plot of adjusted close."""
+    """Time series of adjusted close."""
     fig, ax = plt.subplots(figsize=_FIGSIZE_STD)
     ax.plot(pd.to_datetime(df["date"]), df["adj_close"])
     ax.set_title("Closing Price Over Time")
-    ax.set_xlabel("Date")
     ax.set_ylabel(_ADJ_CLOSE)
     ax.grid(True)
     _finalize_figure(fig, path)
 
 def plot_correlation_heatmap(
         df: pd.DataFrame,
-        col: List[str],
+        cols: list[str],
         path: Path | str,
-        figsize: Tuple[int, int] = (8, 5),
+        figsize: tuple[int, int] = (8, 5),
 ) -> None:
-    """Correlation heatmap over numeric subset of provided columns."""
+    """Correlation heatmap of given numeric columns."""
     fig, ax = plt.subplots(figsize=figsize)
-    num = df[col].select_dtypes(include=[np.number])
+    num = df[cols].select_dtypes(include=[np.number])
     sns.heatmap(num.corr(), annot=True, cmap="coolwarm", ax=ax)
-    ax.set_title("OHLCV Correlation Heatmap")
+    ax.set_title("Correlation Heatmap")
     _finalize_figure(fig, path)
 
 def plot_moving_averages(df: pd.DataFrame, path: Path | str) -> None:
-    """Plot price with 10-day SMA and EMA."""
+    """Closing price with SMA/EMA overlays."""
     df_ = df.copy()
-    df_["sma_10"] = df_["adj_close"].rolling(window=10).mean()
+    df_["sma_10"] = df_["adj_close"].rolling(10).mean()
     df_["ema_10"] = df_["adj_close"].ewm(span=10).mean()
 
     fig, ax = plt.subplots(figsize=_FIGSIZE_STD)
@@ -335,63 +277,47 @@ def plot_moving_averages(df: pd.DataFrame, path: Path | str) -> None:
     ax.plot(t, df_["adj_close"], label=_ADJ_CLOSE)
     ax.plot(t, df_["sma_10"], label="SMA 10")
     ax.plot(t, df_["ema_10"], label="EMA 10")
-    ax.set_title("Moving Averages")
     ax.legend()
     _finalize_figure(fig, path)
 
-def plot_delta_distribution(
-        df: pd.DataFrame,
-        path: Path | str,
-        bins: int = 50
-) -> None:
-    """Histogram + KDE of daily delta-Price (1-day price change)."""
+def plot_delta_distribution(df: pd.DataFrame, path: Path | str, bins: int = 50) -> None:
+    """Histogram + KDE of daily delta-1 (price change)."""
     ser = pd.to_numeric(df["delta_1"], errors="coerce").dropna()
     fig, ax = plt.subplots(figsize=(6, 4))
     sns.histplot(ser, bins=bins, kde=True, ax=ax)
-    ax.set_title("delta-Price Distribution (1-Day Change)")
-    ax.set_xlabel("delta-Price")
-    ax.set_ylabel("Frequency")
+    ax.set_title("ΔPrice Distribution (1-Day)")
     _finalize_figure(fig, path)
 
 def plot_rolling_delta_volatility(
-        df: pd.DataFrame,
-        path: Path | str,
-        window: int = 20
+        df: pd.DataFrame, path: Path | str, window: int = 20
 ) -> None:
-    """Rolling volatility (std) of delta-Price."""
+    """Rolling std of delta-1."""
     df_ = df.copy()
-    df_["volatility_delta"] = pd.to_numeric(df_["delta_1"], errors="coerce").rolling(window=window).std()
+    df_["vol"] = pd.to_numeric(df_["delta_1"], errors="coerce").rolling(window).std()
 
     fig, ax = plt.subplots(figsize=_FIGSIZE_STD)
-    ax.plot(pd.to_datetime(df_["date"]), df_["volatility_delta"])
-    ax.set_title(f"Rolling Volatility (delta-Price, {window}-Day Window)")
-    ax.set_xlabel("Date")
-    ax.set_ylabel("Std of delta-Price")
-    ax.grid(True)
+    ax.plot(pd.to_datetime(df_["date"]), df_["vol"])
+    ax.set_title(f"Rolling Volatility ({window}-day)")
     _finalize_figure(fig, path)
 
 def plot_delta_autocorrelation(df: pd.DataFrame, path: Path | str, lags: int = 30) -> None:
-    """Autocorrelation of delta-Price (ACF)."""
+    """Autocorrelation of delta-1."""
     ser = pd.to_numeric(df["delta_1"], errors="coerce").dropna()
     fig, ax = plt.subplots(figsize=(8, 3))
     plot_acf(ser, lags=lags, zero=False, ax=ax)
-    ax.set_title(f"ACF: delta-Price (lags={lags})")
+    ax.set_title(f"ACF (lags={lags})")
     _finalize_figure(fig, path)
 
 def plot_ohlc_pairplot(df: pd.DataFrame, path: Path | str) -> None:
-    """Seaborn pairplot over OHLC (sample up to 1000 rows for speed)."""
-    g = sns.pairplot(
-        df[["open", "high", "low", "close"]].sample(n=min(len(df), 1000), random_state=42)
-    )
-    g.fig.suptitle("Pairplot: OHLC", y=1.02)
+    """Pairplot of OHLC sample (up to 1000 rows)."""
+    g = sns.pairplot(df[["open", "high", "low", "close"]].sample(n=min(len(df), 1000), random_state=42))
+    g.fig.suptitle("OHLC Pairplot", y=1.02)
     _ensure_parent(path)
-    g.fig.tight_layout()
     g.fig.savefig(path, dpi=_DPI_DEFAULT)
-    plt.show()
     plt.close(g.fig)
 
 def plot_seasonality_dow(df: pd.DataFrame, path: Path | str) -> None:
-    """Average delta-Price by day-of-week."""
+    """Mean delta-1 grouped by day-of-week."""
     df_ = df.copy()
     df_["dow"] = pd.to_datetime(df_["date"]).dt.dayofweek
     df_["delta_1"] = pd.to_numeric(df_["delta_1"], errors="coerce")
@@ -399,44 +325,33 @@ def plot_seasonality_dow(df: pd.DataFrame, path: Path | str) -> None:
 
     fig, ax = plt.subplots(figsize=(6, 4))
     ax.bar(["Mon", "Tue", "Wed", "Thu", "Fri"], avg)
-    ax.set_title("Average delta-Price by Day of Week")
-    ax.set_ylabel("Mean delta-Price")
+    ax.set_title("Avg ΔPrice by Day-of-Week")
     _finalize_figure(fig, path)
 
 def plot_feature_vs_delta(df: pd.DataFrame, feature: str, path: Path | str) -> None:
-    """Scatterplot of a feature vs. delta-Price."""
+    """Scatterplot of feature vs delta-1."""
     df_ = df.copy()
     df_["delta_1"] = pd.to_numeric(df_["delta_1"], errors="coerce")
     df_[feature] = pd.to_numeric(df_[feature], errors="coerce")
 
     fig, ax = plt.subplots(figsize=(6, 4))
     sns.scatterplot(x=df_[feature], y=df_["delta_1"], alpha=0.6, ax=ax)
-    ax.set_title(f"{feature} vs delta-Price (1-Day)")
-    ax.set_xlabel(feature)
-    ax.set_ylabel("delta-Price")
+    ax.set_title(f"{feature} vs ΔPrice")
     _finalize_figure(fig, path)
 
-def plot_sentiment_trend(
-        df: pd.DataFrame,
-        path: Path | str,
-        window: int = 7,
-) -> None:
-    """Plot daily sentiment (pos_minus_neg) with rolling mean and threshold lines."""
+def plot_sentiment_trend(df: pd.DataFrame, path: Path | str, window: int = 7) -> None:
+    """Plot pos_minus_neg sentiment with rolling mean & thresholds."""
     df_ = df.copy()
     df_["date"] = pd.to_datetime(df_["date"])
     df_ = df_.sort_values("date")
-    df_["smoothed"] = df_["pos_minus_neg"].rolling(window=window).mean()
+    df_["smoothed"] = df_["pos_minus_neg"].rolling(window).mean()
 
     fig, ax = plt.subplots(figsize=(14, 5))
-    ax.plot(df_["date"], df_["pos_minus_neg"], label="Daily pos_minus_neg", alpha=0.3, color="green")
-    ax.plot(df_["date"], df_["smoothed"], label=f"{window}-Day Rolling Avg", color="black", linewidth=2)
-    ax.axhline(0.0, linestyle="--", color="gray", linewidth=1)
-    ax.axhline(0.05, linestyle="--", color="blue", alpha=0.5, linewidth=1)
-    ax.axhline(-0.05, linestyle="--", color="red", alpha=0.5, linewidth=1)
-    ax.set_title("Sentiment Trend Over Time")
-    ax.set_xlabel("Date")
-    ax.set_ylabel("pos_minus_neg")
-    ax.grid(True, linestyle="--", alpha=0.3)
+    ax.plot(df_["date"], df_["pos_minus_neg"], alpha=0.3, label="Daily")
+    ax.plot(df_["date"], df_["smoothed"], color="black", linewidth=2, label=f"{window}-day Avg")
+    ax.axhline(0, linestyle="--", color="gray")
+    ax.axhline(0.05, linestyle="--", color="blue", alpha=0.5)
+    ax.axhline(-0.05, linestyle="--", color="red", alpha=0.5)
+    ax.set_title("Sentiment Trend")
     ax.legend()
-
     _finalize_figure(fig, path)
