@@ -51,7 +51,7 @@ class StackingEnsemble(Base):
     multioutput: bool = True
     cv_n_splits: int = 2
     ridge_alpha: float = 1.0
-    n_jobs: int = 1
+    n_jobs: int = -1
 
     # Random Forest
     rf_estimators: int = 50

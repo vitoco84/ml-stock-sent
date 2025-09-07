@@ -43,7 +43,7 @@ class LSTMModel(TorchBaseNN):
     epochs: int = 100
     batch_size: int = 64
     weight_decay: float = 1e-5
-    patience: int = 20
+    patience: int = 10
     min_delta: float = 0.0
     scheduler_patience: int = 5
     clip_grad_norm: float = 1.0

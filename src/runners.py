@@ -15,6 +15,7 @@ from src.metrics import metrics
 from src.models.factory import Experiment
 from src.preprocessing import get_preprocessor
 from src.train import ModelTrainer
+from src.utils import set_seed
 
 
 def run_experiments(
@@ -52,17 +53,20 @@ def _run(
         random_state: int = 42,
         n_trials: int = 30,
         n_splits: int = 2,
-        gap: int = 30
+        gap: int = 30,
+        subsample_train: int = 2000
 ) -> dict[str, Any]:
     """Single experiment: split → preprocess → tune → retrain → evaluate → save artifacts."""
     warnings.filterwarnings("ignore", category=ConvergenceWarning)
     warnings.filterwarnings("ignore", category=optuna.exceptions.ExperimentalWarning)
 
-    np.random.seed(random_state)
+    set_seed(random_state)
     gap = max(gap, forecast_horizon)
 
     # Data split and features
-    train, val, test, forecast = time_series_split(df_full, train_ratio=0.8, val_ratio=0.1, horizon=forecast_horizon)
+    train, val, test, forecast = time_series_split(
+        df_full, train_ratio=0.8, val_ratio=0.1, horizon=forecast_horizon
+    )
 
     drop_cols = ["open", "high", "low", "close", "volume", "adj_close"]
     target_cols = [c for c in df_full.columns if c == "target" or c.startswith("target_")]
@@ -76,13 +80,20 @@ def _run(
         sent |= {c for c in df_full.columns if c.startswith("emb_")}
         feature_cols = [c for c in feature_cols if c not in sent]
 
+    # Full data
     X_train, y_train = train[feature_cols], train[target_cols]
     X_val, y_val = val[feature_cols], val[target_cols]
     X_test, y_test = test[feature_cols], test[target_cols]
     X_forecast = forecast[feature_cols]
 
-    exp_name = exp.name
+    # Subsample
+    train_sub = (
+        train.sample(min(len(train), subsample_train), random_state=random_state)
+        if subsample_train else train
+    )
+    X_train_sub, y_train_sub = train_sub[feature_cols], train_sub[target_cols]
 
+    exp_name = exp.name
     out_path = Path(out_dir)
     out_path.mkdir(parents=True, exist_ok=True)
 
@@ -92,7 +103,7 @@ def _run(
     X_forecast.to_parquet(out_path / f"{exp_name}_X_forecast.parquet", index=False)
 
     # Preprocessor and Config
-    preprocessor, _ = get_preprocessor(X_train, exp_name)
+    preprocessor, _ = get_preprocessor(X_train_sub, exp_name)
     model_config = {"optimization_metric": "mae", "gap": gap, "seed": random_state}
     y_scale_flag = exp_name.lower() not in {"random_forest", "xgboost"}
 
@@ -110,22 +121,17 @@ def _run(
         y_scale=y_scale_flag
     )
 
-    # Optuna Hyperparameter tuning
+    # Optuna Hyperparameter tuning on a supsample
     # minimize for mae/rmse/mse/smape; maximize for r2/accuracy
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     study = optuna.create_study(
         direction="minimize",
-        sampler=optuna.samplers.TPESampler(
-            seed=random_state,
-            n_startup_trials=15,
-            multivariate=True,
-            group=True,
-            constant_liar=True
-        ),
+        sampler=optuna.samplers.TPESampler(seed=random_state),
         pruner=optuna.pruners.MedianPruner(n_startup_trials=5, n_warmup_steps=1)
     )
     study.optimize(
-        lambda tr: trainer.objective(tr, X_train, y_train, n_splits=n_splits), n_trials=n_trials
+        lambda tr: trainer.objective(tr, X_train_sub, y_train_sub, n_splits=n_splits),
+        n_trials=n_trials
     )
 
     best_params = study.best_trial.user_attrs.get("best_params", {}) or {}

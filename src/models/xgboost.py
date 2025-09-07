@@ -50,7 +50,7 @@ class XGBoost(Base):
     max_leaves: int = 0
 
     # Threading
-    n_jobs: int = 1  # threads per estimator
+    n_jobs: int = -1  # threads per estimator
     outer_n_jobs: int = 1  # horizons trained sequentially
 
     # Training
@@ -85,7 +85,7 @@ class XGBoost(Base):
             "reg_alpha": float(self.reg_alpha),
             "reg_lambda": float(self.reg_lambda),
             "gamma": float(self.gamma),
-            "n_jobs": 1,  # always single-thread per estimator
+            "n_jobs": self.n_jobs,
             "random_state": int(self.random_state + seed_offset),
             "objective": self.objective,
             "importance_type": self.importance_type,
@@ -100,6 +100,7 @@ class XGBoost(Base):
             params["max_depth"] = 0
             if params["max_leaves"] <= 0:
                 params["max_leaves"] = 128
+
         return XGBRegressor(**params)
 
     def _fit_with_val_single(self, model: XGBRegressor, X, y, Xv, yv):

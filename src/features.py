@@ -66,7 +66,7 @@ def create_features_and_target(
 
     #  Drop incomplete rows (training), keep last for Inference
     if training:
-        return df.iloc[back_horizon: len(df) - forecast_horizon].copy()
+        return df.iloc[max(back_horizon, 10): len(df) - forecast_horizon].copy()
     return df.iloc[back_horizon:].copy()
 
 def _neutral_sentiment(max_embedding_dims: int, price_dates_norm: pd.Series) -> pd.DataFrame:
@@ -124,6 +124,22 @@ def _drop_target_columns(features_df: pd.DataFrame, forecast_horizon: int) -> pd
         target_cols.append("target")
     return features_df.drop(columns=[c for c in target_cols if c in features_df.columns], errors="ignore")
 
+def _generate_feat_target(fill_missing_neutral, max_embedding_dims, news_df, price_df, sentiment_model):
+    price_dates_norm = pd.to_datetime(price_df["date"]).dt.normalize()
+    if sentiment_model is None or news_df is None or news_df.empty:
+        daily_sentiment = _neutral_sentiment(max_embedding_dims, price_dates_norm)
+    else:
+        enriched_news = sentiment_model.transform(news_df)
+        daily_sentiment = sentiment_model.aggregate_daily(enriched_news)
+        daily_sentiment.drop(columns=["headline_count"], inplace=True, errors="ignore")
+
+        daily_sentiment = _fill_missing_neutral(
+            daily_sentiment, fill_missing_neutral, max_embedding_dims, price_dates_norm
+        )
+        _ensure_embeddings(daily_sentiment, max_embedding_dims)
+    merged = merge_price_news(price_df, daily_sentiment)
+    return merged
+
 def generate_full_feature_row(
         price_df: pd.DataFrame,
         news_df: Optional[pd.DataFrame],
@@ -139,21 +155,7 @@ def generate_full_feature_row(
 
     Combines price history, engineered features, and optional FinBERT sentiment.
     """
-    price_dates_norm = pd.to_datetime(price_df["date"]).dt.normalize()
-
-    if sentiment_model is None or news_df is None or news_df.empty:
-        daily_sentiment = _neutral_sentiment(max_embedding_dims, price_dates_norm)
-    else:
-        enriched_news = sentiment_model.transform(news_df)
-        daily_sentiment = sentiment_model.aggregate_daily(enriched_news)
-        daily_sentiment.drop(columns=["headline_count"], inplace=True, errors="ignore")
-
-        daily_sentiment = _fill_missing_neutral(
-            daily_sentiment, fill_missing_neutral, max_embedding_dims, price_dates_norm
-        )
-        _ensure_embeddings(daily_sentiment, max_embedding_dims)
-
-    merged = merge_price_news(price_df, daily_sentiment)
+    merged = _generate_feat_target(fill_missing_neutral, max_embedding_dims, news_df, price_df, sentiment_model)
     features_df = create_features_and_target(merged, forecast_horizon, back_horizon)
 
     if features_df.empty:
@@ -161,3 +163,30 @@ def generate_full_feature_row(
 
     features_df = _drop_target_columns(features_df, forecast_horizon)
     return features_df.tail(1).copy()
+
+def generate_training_data(
+        price_df: pd.DataFrame,
+        news_df: Optional[pd.DataFrame],
+        sentiment_model: Optional[FinBERT],
+        *,
+        forecast_horizon: int = 30,
+        back_horizon: int = 7,
+        max_embedding_dims: int = 17,
+        fill_missing_neutral: bool = True
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Generate features + targets for model fine-tuning on a new stock.
+    """
+    merged = _generate_feat_target(fill_missing_neutral, max_embedding_dims, news_df, price_df, sentiment_model)
+    features_df = create_features_and_target(
+        merged, forecast_horizon=forecast_horizon, back_horizon=back_horizon, training=True
+    )
+
+    target_cols = [c for c in features_df.columns if c.startswith("target")]
+    if not target_cols:
+        raise ValueError("No target columns found for fine-tuning.")
+
+    X = features_df.drop(columns=target_cols + ["date"], errors="ignore")
+    y = features_df[target_cols]
+
+    return X, y

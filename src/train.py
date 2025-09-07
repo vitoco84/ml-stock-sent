@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import traceback
 from pathlib import Path
 from typing import Any, Optional, Tuple
 
@@ -161,10 +162,7 @@ class ModelTrainer:
     def _build_candidate(self, params: dict[str, Any], trial: optuna.Trial) -> Any:
         """Clone model with candidate parameters."""
         base_params = self.model.get_params()
-        cand_params = {**base_params, **params}
-        if "n_jobs" in cand_params:
-            cand_params["n_jobs"] = 1
-        cand = self.model.__class__(**cand_params)
+        cand = self.model.__class__(**{**base_params, **params})
         setattr(cand, "_trial", trial)
         return cand
 
@@ -198,43 +196,48 @@ class ModelTrainer:
             trial: optuna.Trial,
             X: pd.DataFrame,
             y: Any,
-            n_splits: int = 3
+            n_splits: int = 2
     ) -> float:
         """Optuna objective function using TimeSeries CV."""
-        params = self._get_search_params(trial)
+        try:
+            params = self._get_search_params(trial)
 
-        tscv = TimeSeriesSplit(n_splits=n_splits, gap=int(self.config.get("gap", 0)))
-        metric_name = self.config.get("optimization_metric", "mae")
+            tscv = TimeSeriesSplit(n_splits=n_splits, gap=int(self.config.get("gap", 0)))
+            metric_name = self.config.get("optimization_metric", "mae")
 
-        scores: list[float] = []
-        for fold, (tr_idx, va_idx) in enumerate(tscv.split(X), start=1):
-            # Split
-            X_tr, X_va = X.iloc[tr_idx], X.iloc[va_idx]
-            y_tr, y_va = y.iloc[tr_idx], y.iloc[va_idx]
+            scores: list[float] = []
+            for fold, (tr_idx, va_idx) in enumerate(tscv.split(X), start=1):
+                # Split
+                X_tr, X_va = X.iloc[tr_idx], X.iloc[va_idx]
+                y_tr, y_va = y.iloc[tr_idx], y.iloc[va_idx]
 
-            # Candidate Prep
-            candidate = self._build_candidate(params, trial)
-            _, X_tr_s, X_va_s = self._prep_X(self.preprocessor, X_tr, X_va)
-            y_s, y_tr_s, y_va_s = self._prep_y(y_tr, y_va)
+                # Candidate Prep
+                candidate = self._build_candidate(params, trial)
+                _, X_tr_s, X_va_s = self._prep_X(self.preprocessor, X_tr, X_va)
+                y_s, y_tr_s, y_va_s = self._prep_y(y_tr, y_va)
 
-            # Train
-            self._fit_or_train(X_tr_s, X_va_s, candidate, y_tr_s, y_va_s)
+                # Train
+                self._fit_or_train(X_tr_s, X_va_s, candidate, y_tr_s, y_va_s)
 
-            # Predict and inverse
-            pred = np.asarray(candidate.predict(X_va_s))
-            if pred.ndim == 1:
-                pred = pred.reshape(-1, 1)
-            pred = self._maybe_inverse(pred, y_s)
+                # Predict and inverse
+                pred = np.asarray(candidate.predict(X_va_s))
+                if pred.ndim == 1:
+                    pred = pred.reshape(-1, 1)
+                pred = self._maybe_inverse(pred, y_s)
 
-            # Score, Report, Prune
-            fold_score = self._score_metric(y_va, pred, metric_name)
-            scores.append(fold_score)
+                # Score, Report, Prune
+                fold_score = self._score_metric(y_va, pred, metric_name)
+                scores.append(fold_score)
 
-            trial.report(fold_score, step=fold)
-            if trial.should_prune():
-                raise optuna.TrialPruned()
+                trial.report(fold_score, step=fold)
+                if trial.should_prune():
+                    raise optuna.TrialPruned()
 
-        mean_score = float(np.mean(scores))
-        trial.set_user_attr("best_params", params)
-        trial.set_user_attr("cv_scores", scores)
-        return mean_score
+            mean_score = float(np.mean(scores))
+            trial.set_user_attr("best_params", params)
+            trial.set_user_attr("cv_scores", scores)
+            return mean_score
+        except ValueError as e:
+            self.logger.info(f"Trial failed {e}")
+            traceback.print_exc()
+            raise

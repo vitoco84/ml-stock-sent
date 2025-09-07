@@ -27,7 +27,7 @@ class RandomForest(Base):
     min_samples_leaf: int = 2
     max_features: str | float | int | None = "sqrt"
     bootstrap: bool = True
-    n_jobs: int = 1
+    n_jobs: int = -1
     max_samples: Optional[int | float] = None
     criterion: str = "squared_error"
 

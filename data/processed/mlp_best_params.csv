@@ -1,0 +1,9 @@
+,0
+hidden,"(256, 128, 64)"
+dropout,0.1099085529881075
+use_bn,False
+lr,0.0007150664592404099
+epochs,140
+batch_size,512
+weight_decay,2.8856223618597364e-06
+random_state,42

@@ -65,7 +65,7 @@ class MLP(TorchBaseNN):
     hidden: Tuple[int, ...] = (256, 128, 64)
     dropout: float = 0.1
     use_bn: bool = True
-    patience: int = 20
+    patience: int = 10
     min_delta: float = 0.0
     scheduler_patience: int = 5
     clip_grad_norm: float = 1.0

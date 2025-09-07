@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import Iterator, Optional, Self, Tuple
+from typing import Iterator, Optional, Self, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -46,7 +46,8 @@ class TorchBaseNN(Base):
     ) -> Self:
         hp = self._resolve_hparams(lr, epochs, batch_size, weight_decay, loss_fn)
         X_t, y_t = self._to_tensor(X), self._to_target(y)
-        self._init_net(output_dim=y_t.shape[1])
+        input_dim = X.shape[1] if self.input_mode == "tabular" else 1
+        self._init_net(output_dim=y_t.shape[1], input_dim=input_dim)
         self._train_loop(X_t, y_t, None, None, hp)
         return self
 
@@ -65,7 +66,8 @@ class TorchBaseNN(Base):
         hp = self._resolve_hparams(lr, epochs, batch_size, weight_decay, loss_fn)
         X_tr_t, y_tr_t = self._to_tensor(X_train), self._to_target(y_train)
         X_va_t, y_va_t = self._to_tensor(X_val), self._to_target(y_val)
-        self._init_net(output_dim=y_tr_t.shape[1])
+        input_dim = X_train.shape[1] if self.input_mode == "tabular" else 1
+        self._init_net(output_dim=y_tr_t.shape[1], input_dim=input_dim)
         self._train_loop(X_tr_t, y_tr_t, X_va_t, y_va_t, hp)
         return self
 
@@ -98,8 +100,8 @@ class TorchBaseNN(Base):
             "use_amp": bool(getattr(self, "use_amp", False))
         }
 
-    def _init_net(self, output_dim: int) -> None:
-        self._net = self._build_net(input_dim=1, output_dim=output_dim).to(self.device)
+    def _init_net(self, output_dim: int, input_dim: int) -> None:
+        self._net = self._build_net(input_dim=input_dim, output_dim=output_dim).to(self.device)
 
     def _train_loop(
             self,
@@ -202,13 +204,19 @@ class TorchBaseNN(Base):
         t = torch.as_tensor(y, dtype=torch.float32)
         return t.unsqueeze(1) if t.ndim == 1 else t
 
-    def _to_tensor(self, X: pd.DataFrame) -> Tensor:
+    def _to_tensor(self, X: Union[pd.DataFrame, np.ndarray]) -> Tensor:
         if self.input_mode == "sequence":
-            lag_cols = [c for c in X.columns if c.startswith("lag_")]
-            if not lag_cols:
-                raise ValueError("sequence mode requires lag_* columns in X.")
-            lag_cols = sorted(lag_cols, key=lambda s: int(s.split("_")[1]), reverse=True)
-            arr = X[lag_cols].to_numpy(dtype=np.float32)  # (N, T)
+            if isinstance(X, pd.DataFrame):
+                lag_cols = [c for c in X.columns if c.startswith("lag_")]
+                if not lag_cols:
+                    raise ValueError("sequence mode requires lag_* columns in X.")
+                lag_cols = sorted(lag_cols, key=lambda s: int(s.split("_")[1]), reverse=True)
+                arr = X[lag_cols].to_numpy(dtype=np.float32)
+            else:
+                arr = np.asarray(X, dtype=np.float32)
             return torch.from_numpy(arr[:, :, None])  # (N, T, 1)
-        arr = X.to_numpy(dtype=np.float32)
+
+        # tabular mode
+        arr = X.to_numpy(dtype=np.float32) if isinstance(X, pd.DataFrame) else np.asarray(X, dtype=np.float32)
         return torch.from_numpy(arr[:, :, None])
+
