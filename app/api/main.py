@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import pandas as pd
 import torch
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,6 +17,7 @@ from app.api.settings import get_settings
 from app.api.utils import LimitUploadSizeMiddleware
 from config.config import Config
 from src.data import get_news_history, get_price_history
+from src.features import generate_training_data
 from src.logger import get_logger
 from src.sentiment import FinBERT
 from src.train import ModelTrainer
@@ -121,11 +123,11 @@ def post_predict_from_raw(
         enrich: bool = Query(False, description="Generate missing headlines using local LLM"),
         pad_neutral: bool = Query(False, description="Use provided news and neutral-fill gaps (needs ≥2)"),
         ignore_news: bool = Query(False, description="Ignore all news (neutral every day)"),
-        horizon: int = Query(30, ge=1, le=30, description="How many horizons to return"),
+        horizon: int = Query(30, ge=1, le=30, description="Forecast horizon"),
         return_path: bool = Query(True, description="Whether to return the full H-step path"),
-        symbol: str = Query("^DJI", description="Ticker symbol for context (e.g., AAPL)")
+        symbol: str = Query("^DJI", description="Ticker symbol (e.g., AAPL)")
 ) -> PredictionResponse:
-    """Predict next price deltas from prices + optional news."""
+    """Predict next price deltas from prices and optional news."""
     if ignore_news and (enrich or pad_neutral):
         raise HTTPException(400, "Invalid strategy: 'ignore_news' cannot be combined with 'enrich' or 'pad_neutral'.")
     if enrich and pad_neutral:
@@ -145,6 +147,57 @@ def post_predict_from_raw(
     return _make_prediction(
         feature_row,
         request.app.state.model,
+        request.app.state.preprocessor,
+        request.app.state.y_scaler,
+        request.app.state.y_scale,
+        price_df,
+        horizon,
+        return_path
+    )
+
+@app.post("/fine-tune")
+def fine_tune_model(
+        request: Request,
+        symbol: str = Query(..., description="Ticker symbol (AAPL, TSLA, etc.)"),
+        end_date: str = Query(..., description="End date in YYYY-MM-DD format"),
+        days: int = Query(180, ge=30, le=365 * 2, description="How many business days of history to use"),
+        horizon: int = Query(30, ge=1, le=30, description="Forecast horizon"),
+        return_path: bool = Query(True, description="Return full forecast path")
+):
+    """Fine-tune the global model on a new stock."""
+
+    price_df = get_price_history(symbol, end_date, days)
+    if price_df.empty:
+        raise HTTPException(404, f"No price history found for {symbol}")
+
+    X, y = generate_training_data(
+        price_df,
+        None,
+        None,
+        forecast_horizon=horizon
+    )
+
+    model = request.app.state.model
+
+    if not hasattr(model, "fine_tune"):
+        raise HTTPException(
+            400,
+            f"Model '{type(model).__name__}' does not support fine-tuning!"
+        )
+
+    model.fine_tune(X, y)
+
+    feature_row = _generate_features(
+        price_df,
+        pd.DataFrame(),
+        None,
+        horizon,
+        pad_neutral=False
+    )
+
+    return _make_prediction(
+        feature_row,
+        model,
         request.app.state.preprocessor,
         request.app.state.y_scaler,
         request.app.state.y_scale,

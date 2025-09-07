@@ -83,7 +83,7 @@ def df_to_payload(df: pd.DataFrame) -> list[dict[str, str]]:
     return out.to_dict(orient="records")  # type: ignore[return-value]
 
 def init_finbert(config: Config) -> tuple[object, Pipeline, FinBERT]:
-    """Initialize FinBERT sentiment model and load baseline linear model + preprocessor."""
+    """Initialize FinBERT sentiment model and load baseline linear model and preprocessor."""
     sentiment_model = FinBERT(config, device="cpu", max_embedding_dims=MAX_EMB_DIMS)
     model_path = Path(config.data.models_dir) / "linreg.pkl"
     model, pre, _, _ = ModelTrainer.load(str(model_path))

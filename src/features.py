@@ -14,7 +14,7 @@ def create_features_and_target(
         training: bool = False
 ) -> pd.DataFrame:
     """
-    Create features and targets from price + sentiment data.
+    Create features and targets from price and sentiment data.
 
     Features:
       - Price deltas (1, 5, 10 days)
@@ -175,7 +175,7 @@ def generate_training_data(
         fill_missing_neutral: bool = True
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
-    Generate features + targets for model fine-tuning on a new stock.
+    Generate features and targets for model fine-tuning on a new stock.
     """
     merged = _generate_feat_target(fill_missing_neutral, max_embedding_dims, news_df, price_df, sentiment_model)
     features_df = create_features_and_target(

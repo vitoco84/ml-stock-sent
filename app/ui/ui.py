@@ -15,7 +15,7 @@ READ_TIMEOUT_FETCH: float = 15.0
 READ_TIMEOUT_PREDICT: float = 180.0
 
 st.set_page_config(page_title="Stock Prediction App", layout="centered")
-st.title("^DJI Stock Prediction App (FinBERT + LLM)")
+st.title("^DJI Stock Prediction App (FinBERT and LLM)")
 
 @st.cache_resource
 def get_http() -> requests.Session:
@@ -302,7 +302,7 @@ if "predict_btn" in locals() and predict_btn:
                 .mark_text(dx=8, dy=-8, color="red")
                 .encode(x="date:T", y="price:Q", text=alt.Text("price:Q", format="$.2f")),
             ).properties(width=700, height=380,
-                         title=f"Adj Close: Actual + Predicted Next {result.get('horizon', 0)} Days")
+                         title=f"Adj Close: Actual and Predicted Next {result.get('horizon', 0)} Days")
             st.subheader("Price Chart")
             st.altair_chart(chart, use_container_width=True)
         else:

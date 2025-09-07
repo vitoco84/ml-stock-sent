@@ -29,7 +29,7 @@ def get_preprocessor(X: pd.DataFrame, model_name: str) -> Tuple[Pipeline, list[s
 
     - CNN/LSTM: no-op (preserve DataFrame)
     - RandomForest/XGBoost: imputation only
-    - Others (linear/MLP): imputation + scaling
+    - Others (linear/MLP): imputation and scaling
     """
 
     # Torch sequence models expect raw lag_* features, no preprocessing

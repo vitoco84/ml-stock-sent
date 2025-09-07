@@ -96,7 +96,7 @@ def time_series_split(
 
 @memory.cache
 def get_price_history(symbol: str, end_date: str, days: int = 90) -> pd.DataFrame:
-    """Fetch OHLCV + Adj Close from Yahoo Finance."""
+    """Fetch OHLCV and Adj Close from Yahoo Finance."""
     end = pd.to_datetime(end_date).normalize()
     start = end - BDay(days - 1)
 

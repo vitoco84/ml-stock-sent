@@ -20,7 +20,7 @@ DEFAULT_FINBERT_MODEL = "yiyanghkust/finbert-tone"
 
 class FinBERT:
     """
-    Wrapper for FinBERT sentiment + embedding extraction.
+    Wrapper for FinBERT sentiment and embedding extraction.
 
     Features:
     - Sentiment scores (pos, neg, neu, pos_minus_neg)
@@ -119,7 +119,7 @@ class FinBERT:
         return {k: v.to(self.device) for k, v in inputs.items()}
 
     def _process_batch(self, texts: list[str]) -> dict[str, Any]:
-        """Run FinBERT forward pass to get scores + embeddings."""
+        """Run FinBERT forward pass to get scores and embeddings."""
         inputs = self._prepare_inputs(texts)
         with torch.no_grad():
             logits = self.classifier(**inputs).logits
@@ -165,7 +165,7 @@ class FinBERT:
             batch_size: Batch size for transformer
 
         Returns:
-            DataFrame with sentiment + embedding columns
+            DataFrame with sentiment and embedding columns
         """
         set_seed(self.config.runtime.seed)
         df = df.copy()
@@ -203,7 +203,7 @@ class FinBERT:
     @staticmethod
     def aggregate_daily(df: pd.DataFrame, text_column: str = "headline") -> pd.DataFrame:
         """
-        Aggregate sentiment + embeddings to daily level.
+        Aggregate sentiment and embeddings to daily level.
         - Mean across embeddings & sentiment
         - Count of headlines
         """

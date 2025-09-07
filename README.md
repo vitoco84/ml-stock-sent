@@ -6,7 +6,7 @@ Forecast stock prices by combining:
 - 📊 Historical market data (Yahoo Finance)
 - 📰 News sentiment via [FinBERT](https://huggingface.co/yiyanghkust/finbert-tone)
 - 🤖 Optional headline generation with local LLMs (Ollama)
-- ⚡ A production-ready FastAPI backend + Streamlit dashboard
+- ⚡ A production-ready FastAPI backend and Streamlit dashboard
 
 ---
 
@@ -358,7 +358,7 @@ This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for d
 - [ ] Transfer Learning and Fine-Tuning
 - [ ] Write **academic-style report** (thesis-like)
 - [ ] Prepare **PowerPoint** presentation
-- [ ] Optional: Deploy demo API + Streamlit to cloud (Render / Fly.io / AWS)
+- [ ] Optional: Deploy demo API and Streamlit to cloud (Render / Fly.io / AWS)
 - [ ] If deployed:
     - [ ] Add authentication
     - [ ] Add rate-limiting

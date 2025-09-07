@@ -159,7 +159,7 @@ def plot_forecast_overlay(
         results: list[Mapping],
         path: Path | str,
 ) -> None:
-    """Forecast overlay: show model forecasts vs actual future prices + naive baseline."""
+    """Forecast overlay: show model forecasts vs actual future prices and naive baseline."""
     H = int(results[0]["horizon"])
     hist_dates = _dates_np(df_test["date"])
     hist_prices = pd.to_numeric(df_test["adj_close"], errors="coerce").to_numpy(dtype=float)
@@ -281,7 +281,7 @@ def plot_moving_averages(df: pd.DataFrame, path: Path | str) -> None:
     _finalize_figure(fig, path)
 
 def plot_delta_distribution(df: pd.DataFrame, path: Path | str, bins: int = 50) -> None:
-    """Histogram + KDE of daily delta-1 (price change)."""
+    """Histogram and KDE of daily delta-1 (price change)."""
     ser = pd.to_numeric(df["delta_1"], errors="coerce").dropna()
     fig, ax = plt.subplots(figsize=(6, 4))
     sns.histplot(ser, bins=bins, kde=True, ax=ax)
