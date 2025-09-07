@@ -158,9 +158,9 @@ def post_predict_from_raw(
 @app.post("/fine-tune")
 def fine_tune_model(
         request: Request,
-        symbol: str = Query(..., description="Ticker symbol (AAPL, TSLA, etc.)"),
+        symbol: str = Query(..., description="Ticker symbol, e.g., AAPL, ^DJI"),
         end_date: str = Query(..., description="End date in YYYY-MM-DD format"),
-        days: int = Query(180, ge=30, le=365 * 2, description="How many business days of history to use"),
+        days: int = Query(90, ge=1, le=365, description="Number of business days to look back"),
         horizon: int = Query(30, ge=1, le=30, description="Forecast horizon"),
         return_path: bool = Query(True, description="Return full forecast path")
 ):
