@@ -56,7 +56,10 @@ def _run(
         gap: int = 30,
         subsample_train: int = 2000
 ) -> dict[str, Any]:
-    """Single experiment: split → preprocess → tune → retrain → evaluate → save artifacts."""
+    """
+    Single experiment: split → preprocess → tune → retrain → evaluate → save artifacts.
+    Targets are log returns. Evaluation includes MAE, MSE, RMSE, R^2, and directional accuracy.
+    """
     warnings.filterwarnings("ignore", category=ConvergenceWarning)
     warnings.filterwarnings("ignore", category=optuna.exceptions.ExperimentalWarning)
 
@@ -169,10 +172,11 @@ def _run(
         [{"name": exp_name, **{k: float(v) for k, v in metrics_test.items()}}]
     ).to_csv(metrics_path, index=False)
 
-    # Baseline
-    y_pred_naive = np.zeros_like(np.asarray(y_test))
+    # Baseline: mean return predictor
+    mean_return = np.mean(np.asarray(y_train))
+    y_pred_naive = np.full_like(np.asarray(y_test), fill_value=mean_return)
     baseline_metrics = metrics(np.asarray(y_test), y_pred_naive, y_insample=np.asarray(y_train))
-    pd.DataFrame([{"name": "naive", **baseline_metrics}]).to_csv(
+    pd.DataFrame([{"name": "mean_return_baseline", **baseline_metrics}]).to_csv(
         out_path / f"{exp_name}_metrics_test_naive.csv", index=False
     )
 
@@ -187,7 +191,7 @@ def _run(
         "horizon": forecast_horizon,
         "include_sentiment": exp.include_sentiment,
         "best_params": best_params,
-        "metrics": {"test": metrics_test, "naive": baseline_metrics},
+        "metrics": {"test": metrics_test, "mean": baseline_metrics},
         "trainer": trainer,
         "paths": {"model": str(model_path), "params_csv": str(params_path), "metrics_csv": str(metrics_path)},
         "test_index": X_test.index.to_numpy(),

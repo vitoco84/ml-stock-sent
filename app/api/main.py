@@ -53,7 +53,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     root_path=settings.api_root_path,
     title="Stock Prediction API",
-    description="Predict stock price deltas (AdjClose_{t+1} − AdjClose_t) using prices, news, and FinBERT sentiment.",
+    description="Predict stock price log-returns (log(AdjClose_{t+1}/AdjClose_t)) using prices, news, and FinBERT sentiment.",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -127,7 +127,7 @@ def post_predict_from_raw(
         return_path: bool = Query(True, description="Whether to return the full H-step path"),
         symbol: str = Query("^DJI", description="Ticker symbol (e.g., AAPL)")
 ) -> PredictionResponse:
-    """Predict next price deltas from prices and optional news."""
+    """Predict next price log-returns from prices and optional news."""
     if ignore_news and (enrich or pad_neutral):
         raise HTTPException(400, "Invalid strategy: 'ignore_news' cannot be combined with 'enrich' or 'pad_neutral'.")
     if enrich and pad_neutral:
@@ -164,8 +164,7 @@ def fine_tune_model(
         horizon: int = Query(30, ge=1, le=30, description="Forecast horizon"),
         return_path: bool = Query(True, description="Return full forecast path")
 ):
-    """Fine-tune the global model on a new stock."""
-
+    """Fine-tune the global model on a new stock (log-return forecasting)."""
     price_df = get_price_history(symbol, end_date, days)
     if price_df.empty:
         raise HTTPException(404, f"No price history found for {symbol}")

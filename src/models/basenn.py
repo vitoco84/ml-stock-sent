@@ -219,4 +219,3 @@ class TorchBaseNN(Base):
         # tabular mode
         arr = X.to_numpy(dtype=np.float32) if isinstance(X, pd.DataFrame) else np.asarray(X, dtype=np.float32)
         return torch.from_numpy(arr[:, :, None])
-

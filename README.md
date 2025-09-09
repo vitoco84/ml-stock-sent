@@ -150,7 +150,7 @@ Fetch recent news headlines via NewsAPI.
 ---
 
 ### `POST /predict-raw`
-Predict stock price deltas (delta price = AdjClose_{t+1} − AdjClose_t) using historical prices, news sentiment, and FinBERT.
+Predict next price log-returns using historical prices, news sentiment, and FinBERT.
 
 **Query params**
 - `symbol` *(str, required)* - Ticker symbol for context (e.g., `AAPL`)
@@ -180,10 +180,10 @@ Predict stock price deltas (delta price = AdjClose_{t+1} − AdjClose_t) using h
 ```json
 {
   "horizon": 5,
-  "delta_price": 0.37,
+  "log_return": 0.0035,
   "current_price": 105.0,
   "predicted_price": 105.37,
-  "delta_price_path": [0.37, 0.13, 0.07, -0.03, 0.21],
+  "log_return_path": [0.0035, 0.0012, 0.0007, -0.0003, 0.0021],
   "predicted_price_path": [105.37, 105.50, 105.57, 105.54, 105.77],
   "predicted_dates": ["2025-01-10", "2025-01-13", "2025-01-14", "2025-01-15", "2025-01-16"],
   "last_date": "2025-01-09"
@@ -193,7 +193,7 @@ Predict stock price deltas (delta price = AdjClose_{t+1} − AdjClose_t) using h
 ```json
 {
   "horizon": 5,
-  "delta_price": 0.37,
+  "log_return": 0.0035,
   "current_price": 105.0,
   "predicted_price": 105.37
 }

@@ -17,7 +17,6 @@ def create_features_and_target(
     Create features and targets from price and sentiment data.
 
     Features:
-      - Price deltas (1, 5, 10 days)
       - OHLC shifted features
       - Calendar (day of week)
       - Lagged log returns
@@ -26,7 +25,7 @@ def create_features_and_target(
     Targets:
       - If horizon=1: 'target'
       - If horizon>1: 'target_1' ... 'target_H'
-        defined as ΔAdjClose(t+h) = AdjClose_{t+h} − AdjClose_t
+        defined as log-return: log(AdjClose_{t+h} / AdjClose_t)
     """
     df = df.copy()
     df["date"] = pd.to_datetime(df["date"])
@@ -35,22 +34,19 @@ def create_features_and_target(
     if "adj_close" not in df.columns:
         raise ValueError("Expected 'adj_close' column in df.")
 
+    price = df["adj_close"].astype(float)
+    df["log_return"] = np.log(price / price.shift(1))
+
     # Targets
     if forecast_horizon > 1:
         for h in range(1, forecast_horizon + 1):
-            df[f"target_{h}"] = df["adj_close"].shift(-h) - df["adj_close"]
+            df[f"target_{h}"] = df["log_return"].shift(-h)
     else:
-        df["target"] = df["adj_close"].shift(-1) - df["adj_close"]
+        df["target"] = df["log_return"].shift(-1)
 
     # Lags of log-returns
-    df["log_return"] = np.log(df["adj_close"] / df["adj_close"].shift(1))
     for k in range(1, back_horizon + 1):
         df[f"lag_{k}"] = df["log_return"].shift(k)
-
-    # Delta Price features
-    df["delta_1"] = df["adj_close"].diff(1)
-    df["delta_5"] = df["adj_close"].diff(5)
-    df["delta_10"] = df["adj_close"].diff(10)
 
     # Rolling and Momentum
     df["mom_10"] = np.log(df["adj_close"] / df["adj_close"].shift(10))

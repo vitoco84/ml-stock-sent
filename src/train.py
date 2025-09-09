@@ -198,7 +198,13 @@ class ModelTrainer:
             y: Any,
             n_splits: int = 2
     ) -> float:
-        """Optuna objective function using TimeSeries CV."""
+        """
+        Optuna objective function using TimeSeries CV.
+
+        Notes:
+            - Optimization metric are on error metric (MAE, MSE, RMSE).
+            - R^2 and directional accuracy are for reporting, not optimization.
+        """
         try:
             params = self._get_search_params(trial)
 

@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any, Optional
 
 import altair as alt
+import numpy as np
 import pandas as pd
 import requests
 import streamlit as st
@@ -276,21 +277,26 @@ if "predict_btn" in locals() and predict_btn:
     # Display results
     st.success("Prediction Complete")
     current_price = float(result.get("current_price", float("nan")))
-    predicted_price = float(result.get("predicted_price", float("nan")))
-    delta_price = float(result.get("delta_price", float("nan")))
+    log_return = float(result.get("log_return", float("nan")))
 
     st.write(f"**Current Price:** ${current_price:.2f}")
-    st.write(f"**Next-day Predicted Price (h=1):** ${predicted_price:.2f}")
-    st.write(f"**Next-day delta Price:** {delta_price:.4f}")
+    st.write(f"**Next-day Predicted Log Return (h=1):** {log_return:.4f}")
+    st.write(f"**Implied Next-day Price:** ${current_price * np.exp(log_return):.2f}")
 
-    # Plot
+    # Plot forecast path
     df_prices = price_df.copy()
     if {"adj_close", "date"} <= set(df_prices.columns):
         df_prices["date"] = pd.to_datetime(df_prices["date"])
         actual_df = df_prices.rename(columns={"adj_close": "price"})[["date", "price"]].copy()
 
         pred_dates = [pd.to_datetime(d) for d in result.get("predicted_dates", [])]
-        pred_prices = [float(x) for x in result.get("predicted_price_path", [])]
+        logret_path = [float(x) for x in result.get("log_return_path", [])]
+
+        # Build forecast path only if horizon > 1
+        if logret_path:
+            pred_prices = (current_price * np.exp(np.cumsum(logret_path))).tolist()
+        else:
+            pred_prices = []
 
         if pred_dates and pred_prices and len(pred_dates) == len(pred_prices):
             path_df = pd.DataFrame({"date": pred_dates, "price": pred_prices})
@@ -301,8 +307,11 @@ if "predict_btn" in locals() and predict_btn:
                 alt.Chart(path_df.tail(1))
                 .mark_text(dx=8, dy=-8, color="red")
                 .encode(x="date:T", y="price:Q", text=alt.Text("price:Q", format="$.2f")),
-            ).properties(width=700, height=380,
-                         title=f"Adj Close: Actual and Predicted Next {result.get('horizon', 0)} Days")
+            ).properties(
+                width=700,
+                height=380,
+                title=f"Adj Close: Actual and Forecasted (via log-returns) Next {result.get('horizon', 0)} Days"
+            )
             st.subheader("Price Chart")
             st.altair_chart(chart, use_container_width=True)
         else:

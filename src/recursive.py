@@ -17,7 +17,7 @@ def recursive_forecast(
         past_prices: Optional[np.ndarray] = None,
 ) -> np.ndarray:
     """
-    Recursive H-step forecast in ΔPrice units.
+    Recursive H-step forecast in log-return units.
 
     Args:
         trainer: Trained ModelTrainer with a predict() method.
@@ -27,7 +27,7 @@ def recursive_forecast(
         past_prices: Optional array of historical prices for initializing momentum.
 
     Returns:
-        np.ndarray of shape (H,) with forecasted deltas.
+        np.ndarray of shape (H,).
     """
     if len(X_last) != 1:
         raise ValueError("X_last must be a single row.")
@@ -48,12 +48,12 @@ def recursive_forecast(
     preds: list[float] = []
 
     for _ in range(forecast_horizon):
-        delta = float(np.asarray(trainer.predict(X)).ravel()[0])
-        preds.append(delta)
-        next_price = price + delta
+        log_r = float(np.asarray(trainer.predict(X)).ravel()[0])
+        preds.append(log_r)
+        next_price = price * np.exp(log_r)
 
         # Update features
-        _update_delta_features(X, idx, price, next_price, price_buf)
+        _update_log_return_features(X, idx, log_r)
         _update_prices(X, idx, next_price)
         _update_momentum(X, idx, price_buf, next_price)
         _update_day_of_week(X, idx)
@@ -62,15 +62,16 @@ def recursive_forecast(
 
     return np.asarray(preds, dtype=float)
 
-def _update_delta_features(
-        X: pd.DataFrame, idx, prev_price: float, new_price: float, price_buf: deque
-) -> None:
-    """Update delta features based on new price."""
-    X.at[idx, "delta_1"] = new_price - prev_price
-    if "delta_5" in X.columns and len(price_buf) >= 6:
-        X.at[idx, "delta_5"] = new_price - price_buf[-5]
-    if "delta_10" in X.columns and len(price_buf) >= 11:
-        X.at[idx, "delta_10"] = new_price - price_buf[-10]
+def _update_log_return_features(X: pd.DataFrame, idx, log_r: float) -> None:
+    """Shift lagged log return features and insert the new prediction."""
+    lag_cols = [c for c in X.columns if c.startswith("lag_")]
+    if not lag_cols:
+        return
+    for k in range(len(lag_cols), 1, -1):
+        prev_col = f"lag_{k - 1}"
+        if prev_col in X.columns:
+            X.at[idx, f"lag_{k}"] = X.at[idx, prev_col]
+    X.at[idx, "lag_1"] = log_r
 
 def _update_prices(X: pd.DataFrame, idx, price: float) -> None:
     """Update shifted OHLC features with new price."""

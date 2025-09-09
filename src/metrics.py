@@ -4,15 +4,13 @@ import numpy as np
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 
-def _smape(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+def _directional_accuracy(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     """
-    Symmetric mean absolute percentage error (SMAPE).
-    Formula: 2 * |y_pred - y_true| / (|y_true| + |y_pred|)
+    Directional accuracy: fraction of times predicted and actual returns have the same sign.
     """
     y_true = np.asarray(y_true)
     y_pred = np.asarray(y_pred)
-    denom = (np.abs(y_true) + np.abs(y_pred)) + 1e-12
-    return float(np.mean(2.0 * np.abs(y_pred - y_true) / denom))
+    return float(np.mean(np.sign(y_true) == np.sign(y_pred)))
 
 def _mase(y_true: np.ndarray, y_pred: np.ndarray, y_insample: np.ndarray) -> float:
     """
@@ -47,8 +45,8 @@ def metrics(y_true: np.ndarray, y_pred: np.ndarray, y_insample: np.ndarray = Non
         "mae": float(mean_absolute_error(yt, yp)),
         "mse": float(mse),
         "rmse": float(np.sqrt(mse)),
-        "smape": _smape(yt, yp),
         "r2": float(r2_score(yt, yp)),
+        "directional_accuracy": _directional_accuracy(yt, yp)
     }
     if y_insample is not None:
         out["mase"] = _mase(yt, yp, y_insample)

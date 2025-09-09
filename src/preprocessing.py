@@ -27,7 +27,7 @@ def get_preprocessor(X: pd.DataFrame, model_name: str) -> Tuple[Pipeline, list[s
     """
     Build preprocessing pipeline for a given model type.
 
-    - CNN/LSTM: no-op (preserve DataFrame)
+    - CNN/LSTM: no-op (preserve raw lagged features like log returns)
     - RandomForest/XGBoost: imputation only
     - Others (linear/MLP): imputation and scaling
     """

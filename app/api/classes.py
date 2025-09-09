@@ -37,9 +37,9 @@ class PredictionResponse(BaseModel):
     """Schema for prediction response."""
     horizon: int
     current_price: float
-    delta_price: float
+    log_return: float
     predicted_price: float
-    delta_price_path: Optional[list[float]] = None
+    log_return_path: Optional[list[float]] = None
     predicted_price_path: Optional[list[float]] = None
     predicted_dates: Optional[list[date]] = None
     last_date: Optional[date] = None

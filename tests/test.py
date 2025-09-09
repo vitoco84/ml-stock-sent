@@ -406,7 +406,7 @@ def test_predict_raw_from_file():
         r = c.post("/predict-raw?enrich=false&symbol=DJIA", json=payload)
         assert r.status_code == 200, r.text
         data = r.json()
-        assert {"delta_price", "current_price", "predicted_price"} <= data.keys()
+        assert {"log_return", "current_price", "predicted_price"} <= data.keys()
 
 @pytest.mark.integration
 def test_predict_raw_enrich_requires_seed(client: TestClient):

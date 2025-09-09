@@ -146,12 +146,15 @@ def _make_prediction(
         horizon: int,
         return_path: bool
 ) -> PredictionResponse:
-    """Run model prediction and build response (aligned with direct-delta training)."""
+    """Run model prediction and build response (direct log-returns)."""
     try:
         X = preprocessor.transform(feature_row)
         yhat = np.asarray(model.predict(X), dtype=float)
         if yhat.ndim == 1:
             yhat = yhat.reshape(1, -1)
+        # Inverse-transform if y was scaled during training
+        if y_scale and y_scaler is not None:
+            yhat = y_scaler.inverse_transform(yhat)
     except Exception:
         logger.exception("Model prediction failed")
         raise HTTPException(500, "Prediction failed.")
@@ -159,25 +162,24 @@ def _make_prediction(
     H = min(horizon, yhat.shape[1])
     current_price = float(price_df["adj_close"].iloc[-1])
 
-    # Horizon=1 is just the first direct delta
-    delta_1 = float(yhat[0, 0])
-    predicted_price = current_price + delta_1
+    # Horizon=1: first-step log return
+    log_return = float(yhat[0, 0])
+    predicted_price = current_price * float(np.exp(log_return))
 
     response_kwargs: dict[str, Any] = {
         "horizon": H,
         "current_price": current_price,
-        "delta_price": delta_1,
+        "log_return": log_return,
         "predicted_price": predicted_price,
     }
 
     if return_path:
-        delta_path = yhat[0, :H]
-        price_path = current_price + delta_path
+        logret_path = yhat[0, :H]
+        predicted_price_path = [current_price * np.exp(r) for r in logret_path]
         future_dates = pd.bdate_range(price_df["date"].iloc[-1] + BDay(1), periods=H)
-
         response_kwargs.update(
-            delta_price_path=delta_path.tolist(),
-            predicted_price_path=price_path.tolist(),
+            log_return_path=logret_path.tolist(),
+            predicted_price_path=predicted_price_path,
             predicted_dates=future_dates.strftime("%Y-%m-%d").tolist(),
             last_date=pd.to_datetime(price_df["date"].iloc[-1]).date(),
         )
