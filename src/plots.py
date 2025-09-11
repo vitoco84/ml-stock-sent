@@ -290,7 +290,7 @@ def plot_rolling_volatility(df: pd.DataFrame, path: Path | str, window: int = 20
     ax.set_title(f"Rolling Volatility ({window}-day)")
     _finalize_figure(fig, path)
 
-def plot_return_autocorrelation(df: pd.DataFrame, path: Path | str, lags: int = 30) -> None:
+def plot_return_autocorrelation(df: pd.DataFrame, path: Path | str, lags: int = 20) -> None:
     ser = pd.to_numeric(df["log_return"], errors="coerce").dropna()
     fig, ax = plt.subplots(figsize=(8, 3))
     plot_acf(ser, lags=lags, zero=False, ax=ax)

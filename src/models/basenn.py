@@ -15,7 +15,7 @@ from src.models.base import Base
 
 class TorchBaseNN(Base):
     """
-    Base class for PyTorch models (CNN, MLP, LSTM).
+    Base class for PyTorch models (CNN, GRU).
 
     Features:
     - input_mode: "tabular" => (N, F, 1), "sequence" => (N, T, 1) from lag_* columns
@@ -24,7 +24,7 @@ class TorchBaseNN(Base):
 
     input_mode: str = "tabular"  # "tabular" or "sequence" (lags-only)
 
-    def __init__(self, horizon: int = 30, random_state: int = 42, device: Optional[str] = None) -> None:
+    def __init__(self, horizon: int = 20, random_state: int = 42, device: Optional[str] = None) -> None:
         super().__init__(horizon=horizon, random_state=random_state)
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self._net: nn.Module | None = None

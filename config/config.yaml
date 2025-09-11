@@ -14,6 +14,6 @@ data:
 
 runtime:
   seed: 42
-  horizon: 30
+  horizon: 20
   trials: 10
   splits: 2

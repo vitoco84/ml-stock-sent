@@ -113,7 +113,7 @@ if mode == "Upload CSVs":
     pad_neutral_csv = fill_strategy_csv == "Pad with neutral (needs ≥2)"
     ignore_news_csv = fill_strategy_csv == "Do nothing (ignore news)"
 
-    h_sel_csv = st.number_input("Forecast horizon (business days)", min_value=1, max_value=30, value=30, step=1)
+    h_sel_csv = st.number_input("Forecast horizon (business days)", min_value=1, max_value=20, value=20, step=1)
 
     can_predict_csv = isinstance(st.session_state.get("price_csv_df"), pd.DataFrame) and not st.session_state[
         "price_csv_df"
@@ -135,10 +135,10 @@ else:
         end_date = st.date_input("End Date", value=st.session_state.get("end_date", datetime.today()))
         c1, c2 = st.columns([1, 1])
         with c1:
-            days = st.slider("Lookback Days", min_value=30, max_value=365, value=int(st.session_state.get("days", 90)))
+            days = st.slider("Lookback Days", min_value=20, max_value=365, value=int(st.session_state.get("days", 90)))
         with c2:
             h_sel_fetch = st.number_input(
-                "Forecast horizon (business days)", min_value=1, max_value=30, value=30, step=1
+                "Forecast horizon (business days)", min_value=1, max_value=20, value=20, step=1
             )
 
         fill_strategy = st.radio(

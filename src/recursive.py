@@ -12,7 +12,7 @@ from src.train import ModelTrainer
 def recursive_forecast(
         trainer: ModelTrainer,
         X_last: pd.DataFrame,
-        forecast_horizon: int = 30,
+        forecast_horizon: int = 20,
         p0: Optional[float] = None,
         past_prices: Optional[np.ndarray] = None,
 ) -> np.ndarray:

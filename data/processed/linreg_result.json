@@ -1,0 +1,41 @@
+{
+  "kind": "linreg",
+  "study": "<optuna.study.study.Study object at 0x000001EB6A764E30>",
+  "horizon": 20,
+  "include_sentiment": true,
+  "best_params": {
+    "alpha": 0.003967605077052989,
+    "l1_ratio": 0.6011150117432088,
+    "max_iter": 3000,
+    "eta0": 0.00011527987128232407,
+    "learning_rate": "invscaling",
+    "random_state": 42
+  },
+  "metrics": {
+    "test": {
+      "mae": 0.00815945876736425,
+      "mse": 0.00011732384996844106,
+      "rmse": 0.010831613451764288,
+      "r2": 0.00011037050850914998,
+      "directional_accuracy": 0.527319587628866
+    },
+    "mean": {
+      "mae": 0.00816217615920198,
+      "mse": 0.00011735094452265058,
+      "rmse": 0.010832864096011294,
+      "r2": -0.000120542164208981,
+      "directional_accuracy": 0.5262886597938145,
+      "mase": 0.6449922809933067
+    }
+  },
+  "trainer": "<src.train.ModelTrainer object at 0x000001EB6A75BDD0>",
+  "paths": {
+    "model": "..\\data\\models\\linreg.pkl",
+    "params_csv": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\linreg_best_params.csv",
+    "metrics_csv": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\linreg_metrics_test.csv",
+    "preds_npz": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\linreg_preds.npz",
+    "test_index_npy": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\linreg_test_index.npy",
+    "features_csv": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\linreg_features.csv",
+    "X_forecast_parquet": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\linreg_X_forecast.parquet"
+  }
+}

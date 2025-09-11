@@ -141,7 +141,7 @@ def generate_full_feature_row(
         news_df: Optional[pd.DataFrame],
         sentiment_model: Optional[FinBERT],
         *,
-        forecast_horizon: int = 30,
+        forecast_horizon: int = 20,
         back_horizon: int = 7,
         max_embedding_dims: int = 17,
         fill_missing_neutral: bool = True,
@@ -165,7 +165,7 @@ def generate_training_data(
         news_df: Optional[pd.DataFrame],
         sentiment_model: Optional[FinBERT],
         *,
-        forecast_horizon: int = 30,
+        forecast_horizon: int = 20,
         back_horizon: int = 7,
         max_embedding_dims: int = 17,
         fill_missing_neutral: bool = True

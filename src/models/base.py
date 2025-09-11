@@ -15,7 +15,7 @@ class Base(ABC, BaseEstimator):
 
     name = "base"
 
-    def __init__(self, horizon: int = 30, random_state: int = 42):
+    def __init__(self, horizon: int = 20, random_state: int = 42):
         self.horizon = horizon
         self.random_state = random_state
 

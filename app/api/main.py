@@ -123,7 +123,7 @@ def post_predict_from_raw(
         enrich: bool = Query(False, description="Generate missing headlines using local LLM"),
         pad_neutral: bool = Query(False, description="Use provided news and neutral-fill gaps (needs ≥2)"),
         ignore_news: bool = Query(False, description="Ignore all news (neutral every day)"),
-        horizon: int = Query(30, ge=1, le=30, description="Forecast horizon"),
+        horizon: int = Query(20, ge=1, le=20, description="Forecast horizon"),
         return_path: bool = Query(True, description="Whether to return the full H-step path"),
         symbol: str = Query("^DJI", description="Ticker symbol (e.g., AAPL)")
 ) -> PredictionResponse:
@@ -161,7 +161,7 @@ def fine_tune_model(
         symbol: str = Query(..., description="Ticker symbol, e.g., AAPL, ^DJI"),
         end_date: str = Query(..., description="End date in YYYY-MM-DD format"),
         days: int = Query(90, ge=1, le=365, description="Number of business days to look back"),
-        horizon: int = Query(30, ge=1, le=30, description="Forecast horizon"),
+        horizon: int = Query(20, ge=1, le=20, description="Forecast horizon"),
         return_path: bool = Query(True, description="Return full forecast path")
 ):
     """Fine-tune the global model on a new stock (log-return forecasting)."""

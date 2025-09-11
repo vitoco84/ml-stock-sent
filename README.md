@@ -229,15 +229,13 @@ curl -X POST "http://localhost:8000/predict-raw?symbol=AAPL&horizon=5&return_pat
 3. **03_feature.ipynb** - Feature engineering
 4. **04_adfulller_test.ipynb** - Stationarity test (Augmented Dickey–Fuller)
 5. **05_linreg.ipynb** - Linear Regression Model
-6. **06_linreg_wo_sent.ipynb** - Linear Regression without Sentiment
-7. **07_xgboost.ipynb** - XGBoost Model (RT: ~30min)
-8. **08_random_forest.ipynb** - Random Forest Model
-9. **09_mlp.ipynb** - Feed Forward Multi Layer Perceptron
-10. **10_cnn.ipynb** - Convolutional Neural Network
-11. **11_lstm.ipynb** - Long Short-term Memory
-12. **12_stacking.ipynb** - Stacking Model
-13. **13_results_plots.ipynb** - Combined Plots
-14. **14_shap.ipynb** - Model evaluation and interpretability (SHAP)
+6. **06_xgboost.ipynb** - XGBoost Model
+7. **7_cnn.ipynb** - Convolutional Neural Network
+8. **8_gru.ipynb** - Gated Recurrent Unit
+9. **9_results_plots.ipynb** - Combined Plots and Results
+10. **10_shap.ipynb** - Model evaluation and interpretability (SHAP)
+
+> Note: The Notebooks should be run in order.
 
 ---
 

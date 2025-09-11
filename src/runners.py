@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import warnings
 from pathlib import Path
 from typing import Any
@@ -22,11 +23,11 @@ def run_experiments(
         df: pd.DataFrame,
         out_dir: Path,
         experiments: list[Experiment],
-        forecast_horizon: int = 30,
+        forecast_horizon: int = 20,
         random_state: int = 42,
         n_trials: int = 30,
         n_splits: int = 2,
-        gap: int = 30
+        gap: int = 20
 ) -> list[dict[str, Any]]:
     """Run multiple experiments sequentially."""
     results: list[dict[str, Any]] = []
@@ -49,11 +50,11 @@ def _run(
         df_full: pd.DataFrame,
         exp: Experiment,
         out_dir: str,
-        forecast_horizon: int = 30,
+        forecast_horizon: int = 20,
         random_state: int = 42,
         n_trials: int = 30,
         n_splits: int = 2,
-        gap: int = 30,
+        gap: int = 20,
         subsample_train: int = 2000
 ) -> dict[str, Any]:
     """
@@ -75,7 +76,7 @@ def _run(
     target_cols = [c for c in df_full.columns if c == "target" or c.startswith("target_")]
     feature_cols = [c for c in df_full.columns if c not in target_cols + ["date"] + drop_cols]
 
-    if "cnn" not in exp.name.lower() and "lstm" not in exp.name.lower():
+    if "cnn" not in exp.name.lower() and "gru" not in exp.name.lower():
         feature_cols = [c for c in feature_cols if not c.startswith("lag_") and c != "log_return"]
 
     if not exp.include_sentiment:
@@ -114,7 +115,7 @@ def _run(
     base_model = exp.build(forecast_horizon, random_state)
 
     if getattr(base_model, "input_mode", "tabular") == "sequence":
-        assert any(c.startswith("lag_") for c in feature_cols), "CNN and LSTM require lag_* features."
+        assert any(c.startswith("lag_") for c in feature_cols), "CNN and GRU require lag_* features."
 
     trainer = ModelTrainer(
         model=base_model,
@@ -185,7 +186,7 @@ def _run(
     pd.Series(best_params).to_csv(params_path)
     model_path = trainer.save()
 
-    return {
+    result = {
         "kind": exp_name,
         "study": study,
         "horizon": forecast_horizon,
@@ -193,9 +194,27 @@ def _run(
         "best_params": best_params,
         "metrics": {"test": metrics_test, "mean": baseline_metrics},
         "trainer": trainer,
-        "paths": {"model": str(model_path), "params_csv": str(params_path), "metrics_csv": str(metrics_path)},
+        "paths": {
+            "model": str(model_path),
+            "params_csv": str(params_path),
+            "metrics_csv": str(metrics_path),
+            "preds_npz": str(out_path / f"{exp_name}_preds.npz"),
+            "test_index_npy": str(out_path / f"{exp_name}_test_index.npy"),
+            "features_csv": str(out_path / f"{exp_name}_features.csv"),
+            "X_forecast_parquet": str(out_path / f"{exp_name}_X_forecast.parquet")
+        },
         "test_index": X_test.index.to_numpy(),
         "y_pred_val": y_pred_val,
         "y_pred_test": y_pred_test,
         "y_pred_last": y_pred_last
     }
+
+    result_light = {
+        k: (str(v) if k in {"study", "trainer"} else v)
+        for k, v in result.items()
+        if k not in {"y_pred_val", "y_pred_test", "y_pred_last", "test_index"}
+    }
+    with open(out_path / f"{exp_name}_result.json", "w") as f:
+        json.dump(result_light, f, indent=2)
+
+    return result

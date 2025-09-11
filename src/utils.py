@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import json
 import os
 import random
-from typing import Final
+from pathlib import Path
+from typing import Final, Union
 
 import numpy as np
+import pandas as pd
 
 from src.logger import get_logger
 
@@ -65,3 +68,48 @@ def set_seed(seed: int = 42) -> np.random.Generator:
 
     logger.info(f"Global random seed set to {seed}")
     return np.random.default_rng(seed)
+
+def results_to_df(results, key: Union[str, list[str]]) -> pd.DataFrame:
+    if isinstance(key, str):
+        key = [key]
+
+    dfs = []
+    for res in results:
+        data = res
+        for k in key:
+            data = data[k]
+
+        df = pd.DataFrame(data, index=[0])
+        df.insert(0, "model", res["kind"])
+        dfs.append(df)
+
+    return pd.concat(dfs, ignore_index=True)
+
+def _to_1d_float(arr) -> np.ndarray:
+    if arr is None:
+        return np.array([], dtype=float)
+    a = np.asarray(arr).ravel()
+    a = pd.to_numeric(pd.Series(a), errors="coerce").to_numpy(dtype=float)
+    return a[np.isfinite(a)]
+
+def load_results_from_dir(out_dir: Path, load_arrays: bool = True) -> list[dict]:
+    results = []
+    for json_path in sorted(out_dir.glob("*_result.json")):
+        with open(json_path) as f:
+            res = json.load(f)
+
+        if load_arrays:
+            npz_path = Path(res["paths"]["preds_npz"])
+            if npz_path.exists():
+                with np.load(npz_path, allow_pickle=True) as data:
+                    res["y_pred_val"] = _to_1d_float(data.get("y_pred_val"))
+                    res["y_pred_test"] = _to_1d_float(data.get("y_pred_test"))
+                    res["y_pred_last"] = _to_1d_float(data.get("y_pred_last"))
+
+            test_idx_path = Path(res["paths"]["test_index_npy"])
+            if test_idx_path.exists():
+                res["test_index"] = np.load(test_idx_path, allow_pickle=True)
+
+        results.append(res)
+
+    return results

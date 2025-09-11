@@ -63,7 +63,7 @@ def time_series_split(
         df: pd.DataFrame,
         train_ratio: float = 0.8,
         val_ratio: float = 0.1,
-        horizon: int = 30
+        horizon: int = 20
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Chronologically split into train/val/test sets with forecast holdout."""
     if train_ratio + val_ratio >= 1.0:

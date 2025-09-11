@@ -302,8 +302,8 @@ def test_linear_elasticnet_predictions_shape(rng: np.random.Generator, h: int, m
     assert preds.shape == (10, h) if multi else preds.shape == (10,)
 
 def test_model_trainer_fit_and_evaluate(rng: np.random.Generator):
-    X = pd.DataFrame(rng.random((30, 5)), columns=[f"x{i}" for i in range(5)])
-    y = pd.DataFrame(rng.random((30, 3)), columns=["target_0", "target_1", "target_2"])
+    X = pd.DataFrame(rng.random((20, 5)), columns=[f"x{i}" for i in range(5)])
+    y = pd.DataFrame(rng.random((20, 3)), columns=["target_0", "target_1", "target_2"])
 
     linreg_exp = Experiment(
         name="linreg",
@@ -334,10 +334,10 @@ def test_prediction_changes_with_different_prices(config: Config):
     model, pre, sentiment_model = init_finbert(config)
 
     X1 = pre.transform(generate_full_feature_row(
-        price_df1, pd.DataFrame(), sentiment_model, forecast_horizon=30, max_embedding_dims=MAX_EMB_DIMS)
+        price_df1, pd.DataFrame(), sentiment_model, forecast_horizon=20, max_embedding_dims=MAX_EMB_DIMS)
     )
     X2 = pre.transform(generate_full_feature_row(
-        price_df2, pd.DataFrame(), sentiment_model, forecast_horizon=30, max_embedding_dims=MAX_EMB_DIMS)
+        price_df2, pd.DataFrame(), sentiment_model, forecast_horizon=20, max_embedding_dims=MAX_EMB_DIMS)
     )
 
     preds1 = model.predict(X1)
@@ -350,7 +350,7 @@ def test_deterministic_prediction_with_seed(config: Config):
     model, pre, sentiment_model = init_finbert(config)
 
     X = pre.transform(generate_full_feature_row(
-        price_df, pd.DataFrame(), sentiment_model, forecast_horizon=30, max_embedding_dims=MAX_EMB_DIMS)
+        price_df, pd.DataFrame(), sentiment_model, forecast_horizon=20, max_embedding_dims=MAX_EMB_DIMS)
     )
 
     preds1 = model.predict(X)
