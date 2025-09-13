@@ -9,8 +9,8 @@ from src.sentiment import FinBERT
 
 def create_features_and_target(
         df: pd.DataFrame,
-        forecast_horizon: int = 1,
-        back_horizon: int = 7,
+        forecast_horizon: int,
+        back_horizon: int,
         training: bool = False
 ) -> pd.DataFrame:
     """
@@ -141,9 +141,9 @@ def generate_full_feature_row(
         news_df: Optional[pd.DataFrame],
         sentiment_model: Optional[FinBERT],
         *,
-        forecast_horizon: int = 20,
-        back_horizon: int = 7,
-        max_embedding_dims: int = 17,
+        forecast_horizon: int,
+        back_horizon: int,
+        max_embedding_dims: int,
         fill_missing_neutral: bool = True,
 ) -> pd.DataFrame:
     """
@@ -165,9 +165,9 @@ def generate_training_data(
         news_df: Optional[pd.DataFrame],
         sentiment_model: Optional[FinBERT],
         *,
-        forecast_horizon: int = 20,
-        back_horizon: int = 7,
-        max_embedding_dims: int = 17,
+        forecast_horizon: int,
+        back_horizon: int,
+        max_embedding_dims: int,
         fill_missing_neutral: bool = True
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """

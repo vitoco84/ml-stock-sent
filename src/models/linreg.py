@@ -10,7 +10,6 @@ from sklearn.multioutput import MultiOutputRegressor
 
 from src.models.base import Base
 
-
 @dataclass
 class LinearElasticNet(Base):
     """
@@ -22,11 +21,12 @@ class LinearElasticNet(Base):
     - Incremental updates via warm_start or partial_fit
     """
 
-    name = "linreg"
+    name: str = field(default="linreg", init=False)
 
-    n_jobs: int = -1
-    horizon: int = 20
-    random_state: int = 42
+    n_jobs: int
+    horizon: int
+    random_state: int
+
     alpha: float = 1e-3
     l1_ratio: float = 0.2
     max_iter: int = 2000
@@ -39,7 +39,7 @@ class LinearElasticNet(Base):
     model: SGDRegressor | MultiOutputRegressor = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
-        super().__init__(horizon=self.horizon, random_state=self.random_state)
+        super().__init__(horizon=self.horizon, random_state=self.random_state, n_jobs=self.n_jobs)
         self._build()
 
     def _build(self) -> None:

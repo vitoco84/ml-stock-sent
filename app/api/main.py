@@ -24,7 +24,7 @@ from src.train import ModelTrainer
 
 
 logger = get_logger(__name__)
-config = Config(Path("config/config.yaml"))
+cfg = Config.load()
 settings = get_settings()
 
 @asynccontextmanager
@@ -33,9 +33,9 @@ async def lifespan(app: FastAPI):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     logger.info(f"Initializing FinBERT on {device}")
 
-    sentiment_model = FinBERT(config, device=device, max_embedding_dims=17)
+    sentiment_model = FinBERT(device=device, max_embedding_dims=cfg.runtime.max_sentiment_embeddings)
 
-    model_path = Path(config.data.models_dir) / "linreg.pkl"
+    model_path = Path(cfg.data.models_dir) / "linreg.pkl"
     if not model_path.exists():
         raise RuntimeError(f"Model file not found at {model_path}")
 
@@ -173,7 +173,9 @@ def fine_tune_model(
         price_df,
         None,
         None,
-        forecast_horizon=horizon
+        forecast_horizon=horizon,
+        back_horizon=cfg.runtime.lag_horizon,
+        max_embedding_dims=cfg.runtime.max_sentiment_embeddings
     )
 
     model = request.app.state.model

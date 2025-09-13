@@ -23,11 +23,15 @@ def run_experiments(
         df: pd.DataFrame,
         out_dir: Path,
         experiments: list[Experiment],
-        forecast_horizon: int = 20,
-        random_state: int = 42,
-        n_trials: int = 30,
-        n_splits: int = 2,
-        gap: int = 20
+        forecast_horizon: int,
+        random_state: int,
+        n_trials: int,
+        n_splits: int,
+        gap: int,
+        subsample_train: int,
+        train_ratio: int,
+        val_ratio: int,
+        n_jobs: int
 ) -> list[dict[str, Any]]:
     """Run multiple experiments sequentially."""
     results: list[dict[str, Any]] = []
@@ -42,6 +46,10 @@ def run_experiments(
                 n_trials=n_trials,
                 n_splits=n_splits,
                 gap=gap,
+                subsample_train=subsample_train,
+                train_ratio=train_ratio,
+                val_ratio=val_ratio,
+                n_jobs=n_jobs
             )
         )
     return results
@@ -50,12 +58,15 @@ def _run(
         df_full: pd.DataFrame,
         exp: Experiment,
         out_dir: str,
-        forecast_horizon: int = 20,
-        random_state: int = 42,
-        n_trials: int = 30,
-        n_splits: int = 2,
-        gap: int = 20,
-        subsample_train: int = 2000
+        forecast_horizon: int,
+        random_state: int,
+        n_trials: int,
+        n_splits: int,
+        gap: int,
+        subsample_train: int,
+        train_ratio: int,
+        val_ratio: int,
+        n_jobs: int
 ) -> dict[str, Any]:
     """
     Single experiment: split → preprocess → tune → retrain → evaluate → save artifacts.
@@ -69,14 +80,14 @@ def _run(
 
     # Data split and features
     train, val, test, forecast = time_series_split(
-        df_full, train_ratio=0.8, val_ratio=0.1, horizon=forecast_horizon
+        df_full, train_ratio=train_ratio, val_ratio=val_ratio, horizon=forecast_horizon
     )
 
     drop_cols = ["open", "high", "low", "close", "volume", "adj_close"]
     target_cols = [c for c in df_full.columns if c == "target" or c.startswith("target_")]
     feature_cols = [c for c in df_full.columns if c not in target_cols + ["date"] + drop_cols]
 
-    if "cnn" not in exp.name.lower() and "gru" not in exp.name.lower():
+    if "cnn" not in exp.name.lower() and "lstm" not in exp.name.lower():
         feature_cols = [c for c in feature_cols if not c.startswith("lag_") and c != "log_return"]
 
     if not exp.include_sentiment:
@@ -109,13 +120,13 @@ def _run(
     # Preprocessor and Config
     preprocessor, _ = get_preprocessor(X_train_sub, exp_name)
     model_config = {"optimization_metric": "mae", "gap": gap, "seed": random_state}
-    y_scale_flag = exp_name.lower() not in {"random_forest", "xgboost"}
+    y_scale_flag = exp_name.lower() not in {"xgboost"}
 
     # Base Model and Trainer
-    base_model = exp.build(forecast_horizon, random_state)
+    base_model = exp.build(forecast_horizon, random_state, n_jobs)
 
     if getattr(base_model, "input_mode", "tabular") == "sequence":
-        assert any(c.startswith("lag_") for c in feature_cols), "CNN and GRU require lag_* features."
+        assert any(c.startswith("lag_") for c in feature_cols), "CNN and LSTM require lag_* features."
 
     trainer = ModelTrainer(
         model=base_model,
@@ -126,7 +137,6 @@ def _run(
     )
 
     # Optuna Hyperparameter tuning on a supsample
-    # minimize for mae/rmse/mse/smape; maximize for r2/accuracy
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     study = optuna.create_study(
         direction="minimize",
@@ -168,22 +178,22 @@ def _run(
 
     # Metrics
     metrics_test = trainer.evaluate(X_test, y_test)
-    metrics_path = out_path / f"{exp_name}_metrics_test.csv"
-    pd.DataFrame(
-        [{"name": exp_name, **{k: float(v) for k, v in metrics_test.items()}}]
-    ).to_csv(metrics_path, index=False)
+    metrics_path = out_path / f"{exp_name}_metrics_test.json"
+    with open(metrics_path, "w") as f:
+        json.dump(metrics_test, f, indent=2)
 
-    # Baseline: mean return predictor
-    mean_return = np.mean(np.asarray(y_train))
-    y_pred_naive = np.full_like(np.asarray(y_test), fill_value=mean_return)
+    # Naive baseline: predict last observed return at each horizon
+    last_return = np.asarray(y_train.iloc[-1])
+    y_pred_naive = np.tile(last_return, (len(y_test), 1))
     baseline_metrics = metrics(np.asarray(y_test), y_pred_naive, y_insample=np.asarray(y_train))
-    pd.DataFrame([{"name": "mean_return_baseline", **baseline_metrics}]).to_csv(
-        out_path / f"{exp_name}_metrics_test_naive.csv", index=False
-    )
+    baseline_path = out_path / f"{exp_name}_metrics_test_naive.json"
+    with open(baseline_path, "w") as f:
+        json.dump(baseline_metrics, f, indent=2)
 
     # Save artifacts
     params_path = out_path / f"{exp_name}_best_params.csv"
     pd.Series(best_params).to_csv(params_path)
+
     model_path = trainer.save()
 
     result = {
@@ -192,12 +202,13 @@ def _run(
         "horizon": forecast_horizon,
         "include_sentiment": exp.include_sentiment,
         "best_params": best_params,
-        "metrics": {"test": metrics_test, "mean": baseline_metrics},
+        "metrics": {"test": metrics_test, "naive": baseline_metrics},
         "trainer": trainer,
         "paths": {
             "model": str(model_path),
             "params_csv": str(params_path),
-            "metrics_csv": str(metrics_path),
+            "metrics_json": str(metrics_path),
+            "baseline_metrics_json": str(baseline_path),
             "preds_npz": str(out_path / f"{exp_name}_preds.npz"),
             "test_index_npy": str(out_path / f"{exp_name}_test_index.npy"),
             "features_csv": str(out_path / f"{exp_name}_features.csv"),

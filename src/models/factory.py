@@ -9,7 +9,7 @@ from src.models.base import Base
 class ModelBuilder(Protocol):
     """Protocol for experiment model builders."""
 
-    def __call__(self, horizon: int, seed: int) -> Base: ...
+    def __call__(self, horizon: int, seed: int, n_jobs: int | None) -> Base: ...
 
 @dataclass(frozen=True, slots=True)
 class Experiment:

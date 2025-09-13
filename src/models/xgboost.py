@@ -5,6 +5,7 @@ from typing import List, Optional, Self
 
 import numpy as np
 import pandas as pd
+import torch
 from optuna.integration import XGBoostPruningCallback
 from xgboost import XGBRegressor
 from xgboost.callback import EarlyStopping
@@ -24,10 +25,13 @@ class XGBoost(Base):
     - Currently CPU-only, sequential training across horizons.
     """
 
-    name: str = "xgboost"
+    name: str = field(default="xgboost", init=False)
+
+    n_jobs: int
+    random_state: int
+    horizon: int = 1
 
     # Core params
-    random_state: int = 42
     n_estimators: int = 800
     learning_rate: float = 0.05
     max_depth: int = 5
@@ -38,6 +42,7 @@ class XGBoost(Base):
     importance_type: str = "gain"
     eval_metric: str = "rmse"
     objective: str = "reg:squarederror"
+    device: str = "cpu"
 
     # Sampling
     subsample: float = 1.0
@@ -50,12 +55,10 @@ class XGBoost(Base):
     max_leaves: int = 0
 
     # Threading
-    n_jobs: int = -1  # threads per estimator
-    outer_n_jobs: int = 1  # horizons trained sequentially
+    outer_n_jobs: int = 1
 
     # Training
     early_stopping_rounds: int = 200
-    horizon: int = 1
     multioutput: bool = False
 
     # Runtime state
@@ -63,7 +66,7 @@ class XGBoost(Base):
     _multi: Optional[List[XGBRegressor]] = field(default=None, init=False, repr=False)
 
     def __post_init__(self) -> None:
-        super().__init__(horizon=self.horizon, random_state=self.random_state)
+        super().__init__(horizon=self.horizon, random_state=self.random_state, n_jobs=self.n_jobs)
 
     @staticmethod
     def _as_2d(y) -> np.ndarray:
@@ -94,7 +97,7 @@ class XGBoost(Base):
             "grow_policy": self.grow_policy,
             "max_leaves": int(self.max_leaves),
             "tree_method": self.tree_method,
-            "device": "cpu",
+            "device": self.device or ("cuda" if torch.cuda.is_available() else "cpu")
         }
         if self.grow_policy == "lossguide":
             params["max_depth"] = 0

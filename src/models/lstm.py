@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import torch.nn as nn
 from torch import Tensor
@@ -8,13 +8,19 @@ from torch import Tensor
 from src.models.basenn import TorchBaseNN
 
 
-class _GRUNet(nn.Module):
-    """GRU forecaster head."""
+class _LSTMNet(nn.Module):
+    """LSTM forecaster head."""
 
-    def __init__(self, output_dim: int, units: int, dense_units: int, dropout: float,
-                 bidirectional: bool = False) -> None:
+    def __init__(
+            self,
+            output_dim: int,
+            units: int,
+            dense_units: int,
+            dropout: float,
+            bidirectional: bool = False,
+    ) -> None:
         super().__init__()
-        self.gru = nn.GRU(input_size=1, hidden_size=units, batch_first=True, bidirectional=bidirectional)
+        self.lstm = nn.LSTM(input_size=1, hidden_size=units, batch_first=True, bidirectional=bidirectional)
         self.dropout = nn.Dropout(dropout)
         self.fc1 = nn.Linear(units * (2 if bidirectional else 1), dense_units)
         self.relu = nn.ReLU()
@@ -22,21 +28,23 @@ class _GRUNet(nn.Module):
 
     def forward(self, x: Tensor) -> Tensor:
         # input (N, T, 1)
-        out, _ = self.gru(x)
+        out, _ = self.lstm(x)
         out = out[:, -1, :]  # last hidden state
         out = self.dropout(out)
         out = self.relu(self.fc1(out))
         return self.fc2(out)
 
 @dataclass
-class GRUModel(TorchBaseNN):
-    """Gated Recurrent Unit (GRU) forecaster."""
+class LSTMModel(TorchBaseNN):
+    """Long Short-Term Memory (LSTM) forecaster."""
 
-    name: str = "gru"
-    input_mode: str = "sequence"
+    name: str = field(default="lstm", init=False)
+    input_mode: str = field(default="sequence", init=False)
 
-    horizon: int = 20
-    random_state: int = 42
+    n_jobs: int
+    horizon: int
+    random_state: int
+
     bidirectional: bool = False
 
     units: int = 64
@@ -53,15 +61,15 @@ class GRUModel(TorchBaseNN):
     use_amp: bool = True
 
     def __post_init__(self) -> None:
-        super().__init__(horizon=self.horizon, random_state=self.random_state)
+        super().__init__(horizon=self.horizon, random_state=self.random_state, n_jobs=self.n_jobs)
 
     def _build_net(self, input_dim: int, output_dim: int) -> nn.Module:
-        return _GRUNet(
+        return _LSTMNet(
             output_dim=output_dim,
             units=self.units,
             dense_units=self.dense_units,
             dropout=self.dropout,
-            bidirectional=self.bidirectional
+            bidirectional=self.bidirectional,
         )
 
     @staticmethod
@@ -74,5 +82,5 @@ class GRUModel(TorchBaseNN):
             "epochs": trial.suggest_int("epochs", 30, 100, step=10),
             "batch_size": trial.suggest_categorical("batch_size", [32, 64, 128]),
             "bidirectional": trial.suggest_categorical("bidirectional", [False, True]),
-            "weight_decay": trial.suggest_float("weight_decay", 1e-6, 1e-2, log=True)
+            "weight_decay": trial.suggest_float("weight_decay", 1e-6, 1e-2, log=True),
         }

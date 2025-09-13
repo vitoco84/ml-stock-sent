@@ -9,11 +9,13 @@ from joblib import Memory
 from pandas.tseries.offsets import BDay
 from requests import RequestException
 
+from config.config import Config
 from src.logger import get_logger
 
 
 logger = get_logger(__name__)
 memory = Memory(location=Path(".cache"), verbose=0)
+
 
 def _rename_columns(df: pd.DataFrame) -> pd.DataFrame:
     """Return a DataFrame with normalized (lowercase, snake_case) column names."""
@@ -61,9 +63,9 @@ def merge_price_news(price: pd.DataFrame, news: pd.DataFrame) -> pd.DataFrame:
 
 def time_series_split(
         df: pd.DataFrame,
-        train_ratio: float = 0.8,
-        val_ratio: float = 0.1,
-        horizon: int = 20
+        train_ratio: float,
+        val_ratio: float,
+        horizon: int
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Chronologically split into train/val/test sets with forecast holdout."""
     if train_ratio + val_ratio >= 1.0:
@@ -95,7 +97,7 @@ def time_series_split(
     return train, val, test, forecast
 
 @memory.cache
-def get_price_history(symbol: str, end_date: str, days: int = 90) -> pd.DataFrame:
+def get_price_history(symbol: str, end_date: str, days: int) -> pd.DataFrame:
     """Fetch OHLCV and Adj Close from Yahoo Finance."""
     end = pd.to_datetime(end_date).normalize()
     start = end - BDay(days - 1)

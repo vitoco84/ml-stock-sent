@@ -120,7 +120,7 @@ class ModelTrainer:
             pred = self.y_scaler.inverse_transform(pred)
         return pred
 
-    def evaluate(self, X: pd.DataFrame, y: Any) -> dict[str, float]:
+    def evaluate(self, X: pd.DataFrame, y: Any) -> dict[str, Any]:
         """Evaluate model using standard metrics."""
         self.logger.info("Evaluating model...")
         preds = self.predict(X)
@@ -189,14 +189,17 @@ class ModelTrainer:
     @staticmethod
     def _score_metric(y_true: np.ndarray, y_pred: np.ndarray, metric_name: str) -> float:
         """Compute a single metric."""
-        return metrics(np.asarray(y_true), np.asarray(y_pred))[metric_name]
+        all_metrics = metrics(np.asarray(y_true), np.asarray(y_pred))
+        if "aggregate" in all_metrics:
+            return all_metrics["aggregate"][metric_name]
+        return all_metrics[metric_name]
 
     def objective(
             self,
             trial: optuna.Trial,
             X: pd.DataFrame,
             y: Any,
-            n_splits: int = 2
+            n_splits: int
     ) -> float:
         """
         Optuna objective function using TimeSeries CV.

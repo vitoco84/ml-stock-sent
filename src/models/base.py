@@ -15,9 +15,10 @@ class Base(ABC, BaseEstimator):
 
     name = "base"
 
-    def __init__(self, horizon: int = 20, random_state: int = 42):
+    def __init__(self, horizon: int, random_state: int, n_jobs: Optional[int]):
         self.horizon = horizon
         self.random_state = random_state
+        self.n_jobs = n_jobs
 
     @abstractmethod
     def fit(self, X_train: pd.DataFrame, y_train: np.ndarray) -> Self:

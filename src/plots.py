@@ -113,42 +113,6 @@ def plot_val_overlay(df_val: pd.DataFrame, results: list[Mapping], path: Path | 
 def plot_test_overlay(df_test: pd.DataFrame, results: list[Mapping], path: Path | str) -> None:
     plot_overlay(df_test, results, path, phase="test")
 
-def plot_val_test_overlay(
-        df_val: pd.DataFrame,
-        df_test: pd.DataFrame,
-        results: list[Mapping],
-        path: Path | str,
-) -> None:
-    dates_val, actual_val, base_val = _next_step_arrays(df_val)
-    dates_test, actual_test, base_test = _next_step_arrays(df_test)
-    split_date = dates_val[-1]
-
-    fig, ax = plt.subplots(figsize=_FIGSIZE_WIDE)
-
-    ax.plot(dates_val, actual_val, "--", label="Actual (Val)", linewidth=2, color="C0")
-    ax.plot(dates_test, actual_test, "--", label="Actual (Test)", linewidth=2, color="C1")
-
-    for res in results:
-        lr_val = _extract_lr(res.get("y_pred_val"))
-        if lr_val.size:
-            yhat_val = _predicted_prices(base_val, lr_val)
-            ax.plot(dates_val[:len(yhat_val)], yhat_val, label=f"{res.get('kind', 'model')} (Val)", linewidth=2,
-                    color="C3")
-
-        lr_test = _extract_lr(res.get("y_pred_test"))
-        if lr_test.size:
-            yhat_test = _predicted_prices(base_test, lr_test)
-            ax.plot(dates_test[:len(yhat_test)], yhat_test, label=f"{res.get('kind', 'model')} (Test)", linewidth=2,
-                    color="C4")
-
-    ax.axvline(split_date, color="k", linestyle=":", alpha=0.7, label="Val/Test split")
-    ax.set_title("Actual vs Predicted Adj Close (Val+Test, H=1)")
-    ax.set_xlabel("Date")
-    ax.set_ylabel(_ADJ_CLOSE)
-    ax.grid(True, alpha=0.25)
-    ax.legend()
-    _finalize_figure(fig, path)
-
 def plot_forecast_overlay(
         df_test: pd.DataFrame,
         df_forecast: pd.DataFrame,
@@ -238,6 +202,33 @@ def plot_forecast_diagnostics(
         ax_pr.plot(fut_dates[: len(yhat)], yhat, "--", label=f"{kind}")
     ax_pr.set_title("Forecast Price Overlay")
     ax_pr.legend()
+
+    _finalize_figure(fig, path)
+
+def plot_return_overlay(
+        df: pd.DataFrame,
+        results: list[dict],
+        path: Path | str,
+        phase: str = "test"
+) -> None:
+    fig, ax = plt.subplots(figsize=(12, 5))
+
+    y_true = df["log_return"].to_numpy(dtype=float)
+    dates = pd.to_datetime(df["date"]).to_numpy()
+    ax.plot(dates, y_true, "--", label=f"Actual ({phase})", linewidth=2)
+
+    pred_key = f"y_pred_{phase}"
+    for res in results:
+        y_pred = np.asarray(res.get(pred_key)).ravel()
+        n = min(len(y_true), len(y_pred))
+        if n > 0:
+            ax.plot(dates[:n], y_pred[:n], label=f"{res.get('kind','model')} ({phase})", linewidth=2)
+
+    ax.set_title(f"Actual vs Predicted Log Returns ({phase.capitalize()})")
+    ax.set_xlabel("Date")
+    ax.set_ylabel("Log Return")
+    ax.grid(True, alpha=0.25)
+    ax.legend()
 
     _finalize_figure(fig, path)
 

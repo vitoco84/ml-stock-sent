@@ -15,8 +15,8 @@ class SHAPExplainer:
             model: Any,
             preprocessor: TransformerMixin | None,
             background_data: pd.DataFrame,
+            seed: int,
             mode: str = "tree",
-            seed: int = 42,
             background_sample_size: int = 50
     ):
         self.model = model

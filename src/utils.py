@@ -18,11 +18,11 @@ _THREAD_ENV_VARS: Final[dict[str, str]] = {
     "PYTHONHASHSEED": None,
     "TF_DETERMINISTIC_OPS": "1",
     "CUBLAS_WORKSPACE_CONFIG": ":4096:8",
-    "OMP_NUM_THREADS": "1",
-    "OPENBLAS_NUM_THREADS": "1",
-    "MKL_NUM_THREADS": "1",
-    "VECLIB_MAXIMUM_THREADS": "1",
-    "NUMEXPR_NUM_THREADS": "1"
+    "OMP_NUM_THREADS": "8",
+    "OPENBLAS_NUM_THREADS": "8",
+    "MKL_NUM_THREADS": "8",
+    "VECLIB_MAXIMUM_THREADS": "8",
+    "NUMEXPR_NUM_THREADS": "8"
 }
 
 def set_seed(seed: int = 42) -> np.random.Generator:
@@ -79,8 +79,15 @@ def results_to_df(results, key: Union[str, list[str]]) -> pd.DataFrame:
         for k in key:
             data = data[k]
 
-        df = pd.DataFrame(data, index=[0])
-        df.insert(0, "model", res["kind"])
+        if isinstance(data, dict) and all(isinstance(v, dict) for v in data.values()):
+            df = pd.DataFrame.from_dict(data, orient="index").reset_index().rename(
+                columns={"index": key[-1]}
+            )
+            df.insert(0, "model", res["kind"])
+        else:
+            df = pd.DataFrame([data])
+            df.insert(0, "model", res["kind"])
+
         dfs.append(df)
 
     return pd.concat(dfs, ignore_index=True)

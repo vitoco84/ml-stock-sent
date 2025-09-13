@@ -12,7 +12,7 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 
 class IdentityTransformer(BaseEstimator, TransformerMixin):
-    """No-op transformer for models expecting raw DataFrames (e.g. CNN/GRU)."""
+    """No-op transformer for models expecting raw DataFrames (e.g. CNN/LSTM)."""
 
     def __init__(self, copy: bool = False) -> None:
         self.copy = copy
@@ -27,13 +27,13 @@ def get_preprocessor(X: pd.DataFrame, model_name: str) -> Tuple[Pipeline, list[s
     """
     Build preprocessing pipeline for a given model type.
 
-    - CNN/GRU: no-op (preserve raw lagged features like log returns)
+    - CNN/LSTM: no-op (preserve raw lagged features like log returns)
     - RandomForest/XGBoost: imputation only
     - Others (linear/MLP): imputation and scaling
     """
 
     # Torch sequence models expect raw lag_* features, no preprocessing
-    if model_name.lower() in {"cnn", "gru"}:
+    if model_name.lower() in {"cnn", "lstm"}:
         return Pipeline([("identity", IdentityTransformer())], memory=None), list(X.columns)
 
     # Separate numeric vs categorical
@@ -44,7 +44,7 @@ def get_preprocessor(X: pd.DataFrame, model_name: str) -> Tuple[Pipeline, list[s
         raise ValueError("No feature columns found after filtering (only targets/date present).")
 
     # Preprocessors
-    if model_name.lower() in {"random_forest", "xgboost"}:
+    if model_name.lower() in {"xgboost"}:
         num_tf = SimpleImputer(strategy="median")
     else:
         num_tf = Pipeline(steps=[

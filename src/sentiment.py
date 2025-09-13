@@ -11,9 +11,7 @@ import torch
 from tqdm import tqdm
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
-from config.config import Config
 from src.logger import get_logger
-from src.utils import set_seed
 
 
 DEFAULT_FINBERT_MODEL = "yiyanghkust/finbert-tone"
@@ -31,20 +29,14 @@ class FinBERT:
 
     def __init__(
             self,
-            config: Config,
             device: str = "cuda",
             max_embedding_dims: int | None = None,
-            cache_dir: str | Path = ".cache/finbert"
+            cache_dir: str | Path = ".cache/finbert",
     ) -> None:
-        self.config = config
         self.device = "cuda" if torch.cuda.is_available() and device == "cuda" else "cpu"
         self.max_embedding_dims = max_embedding_dims
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-
-        self.logger = get_logger(self.__class__.__name__)
-
-        self._set_deterministic(int(config.runtime.seed))
 
         self.tokenizer = AutoTokenizer.from_pretrained(DEFAULT_FINBERT_MODEL)
         self.classifier = AutoModelForSequenceClassification.from_pretrained(
@@ -56,25 +48,11 @@ class FinBERT:
         self.classifier.eval()
         self.embedder.eval()
 
+        self.logger = get_logger(self.__class__.__name__)
         self.logger.info(f"Loaded FinBERT model: {DEFAULT_FINBERT_MODEL} on {self.device}")
 
         # Cache label mapping dynamically
         self.idx_map = self._resolve_label_indices()
-
-    def _set_deterministic(self, seed: int) -> None:
-        """Set torch seeds and deterministic algorithms where available."""
-        try:
-            torch.set_num_threads(1)
-            torch.manual_seed(seed)
-            if hasattr(torch, "use_deterministic_algorithms"):
-                torch.use_deterministic_algorithms(True)
-            if torch.cuda.is_available() and self.device == "cuda":
-                torch.cuda.manual_seed_all(seed)
-                if hasattr(torch.backends, "cudnn"):
-                    torch.backends.cudnn.deterministic = True
-                    torch.backends.cudnn.benchmark = False
-        except Exception as e:
-            self.logger.warning(f"Deterministic torch setup failed: {e}")
 
     def _resolve_label_indices(self) -> dict[str, int]:
         """Resolve FinBERT label indices dynamically (avoid hardcoding)."""
@@ -97,7 +75,7 @@ class FinBERT:
         try:
             with open(cache_file, "rb") as f:
                 return pickle.load(f)
-        except Exception as e:
+        except Exception:
             cache_file.unlink(missing_ok=True)
             return None
 
@@ -159,15 +137,9 @@ class FinBERT:
         """
         Run FinBERT on a DataFrame of texts.
 
-        Args:
-            df: Input DataFrame
-            text_column: Column name with text
-            batch_size: Batch size for transformer
-
         Returns:
             DataFrame with sentiment and embedding columns
         """
-        set_seed(self.config.runtime.seed)
         df = df.copy()
         texts = df[text_column].fillna("").astype(str).tolist()
 

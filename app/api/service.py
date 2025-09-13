@@ -11,6 +11,7 @@ from app.api.classes import (
 )
 from app.api.settings import get_settings
 from app.api.utils import _ollama_alive, to_dict
+from config.config import Config
 from src.features import generate_full_feature_row
 from src.llm import enrich_news_with_generated
 from src.logger import get_logger
@@ -18,6 +19,8 @@ from src.logger import get_logger
 
 logger = get_logger(__name__)
 settings = get_settings()
+
+cfg = Config.load()
 
 def _process_price_df(request_body: PredictionRequest) -> pd.DataFrame:
     """Validate and normalize price data from request."""
@@ -122,15 +125,23 @@ def _generate_features(
     """Generate model-ready feature row."""
     try:
         if news_df.empty:
-            return generate_full_feature_row(price_df, pd.DataFrame(), None, forecast_horizon=horizon)
+            return generate_full_feature_row(
+                price_df,
+                pd.DataFrame(),
+                None,
+                forecast_horizon=horizon,
+                back_horizon=cfg.runtime.lag_horizon,
+                max_embedding_dims=cfg.runtime.max_sentiment_embeddings
+            )
 
         return generate_full_feature_row(
             price_df,
             news_df,
             sentiment_model,
             forecast_horizon=horizon,
+            back_horizon=cfg.runtime.lag_horizon,
             fill_missing_neutral=pad_neutral,
-            max_embedding_dims=17
+            max_embedding_dims=cfg.runtime.max_sentiment_embeddings
         )
     except Exception:
         logger.exception("Feature generation failed")

@@ -15,5 +15,15 @@ data:
 runtime:
   seed: 42
   horizon: 20
-  trials: 10
-  splits: 2
+  lag_horizon: 7
+  n_trials: 100
+  n_splits: 3
+  n_jobs: 8
+  gap: 20
+  device: "cuda"
+  subsample_train: 2000
+  train_ratio: 0.8
+  val_ratio: 0.1
+  test_ratio: 0.1
+  days_history: 90
+  max_sentiment_embeddings: 17

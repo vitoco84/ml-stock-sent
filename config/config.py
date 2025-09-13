@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -55,3 +56,14 @@ class Config:
     def __repr__(self) -> str:
         env = getattr(self._config, "env", None)
         return f"Config(file={self._config_file}, env={env!r})"
+
+    @classmethod
+    def load(cls, path: Path | str | None = None) -> Config:
+        """Load a config file."""
+        if path is None:
+            env_path = os.getenv("CONFIG_PATH")
+            if env_path:
+                path = Path(env_path)
+            else:
+                path = Path(__file__).resolve().parents[2] / "ml-stock-sent" / "config" / "config.yaml"
+        return cls(path)

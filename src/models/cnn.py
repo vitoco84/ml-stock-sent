@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import torch.nn as nn
 from torch import Tensor
@@ -36,27 +36,29 @@ class _CNNNet(nn.Module):
 class CNNModel(TorchBaseNN):
     """2-layer Convolutional Neural Network (CNN) forecaster."""
 
-    name: str = "cnn"
-    input_mode: str = "sequence"
+    name: str = field(default="cnn", init=False)
+    input_mode: str = field(default="sequence", init=False)
 
-    horizon: int = 20
-    random_state: int = 42
-    filters: int = 64
+    n_jobs: int
+    horizon: int
+    random_state: int
+
+    filters: int = 128
     kernel_size: int = 3
-    dense_units: int = 64
-    dropout: float = 0.2
-    lr: float = 1e-3
-    epochs: int = 100
+    dense_units: int = 128
+    dropout: float = 0.3
+    lr: float = 3e-4
+    epochs: int = 200
     batch_size: int = 64
-    weight_decay: float = 1e-5
-    patience: int = 10
+    weight_decay: float = 1e-4
+    patience: int = 15
     min_delta: float = 0.0
     scheduler_patience: int = 5
     clip_grad_norm: float = 1.0
     use_amp: bool = True
 
     def __post_init__(self) -> None:
-        super().__init__(horizon=self.horizon, random_state=self.random_state)
+        super().__init__(horizon=self.horizon, random_state=self.random_state, n_jobs=self.n_jobs)
 
     def _build_net(self, input_dim: int, output_dim: int) -> nn.Module:
         return _CNNNet(
@@ -70,12 +72,12 @@ class CNNModel(TorchBaseNN):
     @staticmethod
     def search_space(trial) -> dict:
         return {
-            "filters": trial.suggest_int("filters", 32, 256, step=32),
+            "filters": trial.suggest_int("filters", 64, 256, step=64),
             "kernel_size": trial.suggest_int("kernel_size", 2, 5),
-            "dense_units": trial.suggest_int("dense_units", 32, 256, step=32),
-            "dropout": trial.suggest_float("dropout", 0.1, 0.5),
-            "lr": trial.suggest_float("lr", 1e-4, 5e-3, log=True),
-            "epochs": trial.suggest_int("epochs", 30, 100, step=10),
-            "batch_size": trial.suggest_categorical("batch_size", [32, 64, 128]),
-            "weight_decay": trial.suggest_float("weight_decay", 1e-6, 1e-2, log=True)
+            "dense_units": trial.suggest_int("dense_units", 64, 256, step=64),
+            "dropout": trial.suggest_float("dropout", 0.2, 0.5),
+            "lr": trial.suggest_float("lr", 1e-4, 1e-3, log=True),
+            "epochs": trial.suggest_int("epochs", 100, 300, step=50),
+            "batch_size": trial.suggest_categorical("batch_size", [32, 64]),
+            "weight_decay": trial.suggest_float("weight_decay", 1e-5, 1e-3, log=True)
         }
