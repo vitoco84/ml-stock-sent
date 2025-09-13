@@ -32,9 +32,9 @@ class XGBoost(Base):
     horizon: int = 1
 
     # Core params
-    n_estimators: int = 800
-    learning_rate: float = 0.05
-    max_depth: int = 5
+    n_estimators: int = 300
+    learning_rate: float = 0.1
+    max_depth: int = 4
     min_child_weight: float = 1.0
     reg_alpha: float = 0.0
     reg_lambda: float = 1.0
@@ -45,8 +45,8 @@ class XGBoost(Base):
     device: str = "cpu"
 
     # Sampling
-    subsample: float = 1.0
-    colsample_bytree: float = 1.0
+    subsample: float = 0.8
+    colsample_bytree: float = 0.8
 
     # Tree/backend
     tree_method: str = "hist"
@@ -58,7 +58,7 @@ class XGBoost(Base):
     outer_n_jobs: int = 1
 
     # Training
-    early_stopping_rounds: int = 200
+    early_stopping_rounds: int = 50
     multioutput: bool = False
 
     # Runtime state
@@ -193,19 +193,19 @@ class XGBoost(Base):
     @staticmethod
     def search_space(trial) -> dict:
         space = {
-            "n_estimators": trial.suggest_int("n_estimators", 600, 2000, step=200),
-            "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.1, log=True),
-            "max_depth": trial.suggest_int("max_depth", 3, 10),
-            "min_child_weight": trial.suggest_float("min_child_weight", 0.5, 20.0, log=True),
-            "reg_alpha": trial.suggest_float("reg_alpha", 0.0, 5.0),
-            "reg_lambda": trial.suggest_float("reg_lambda", 0.1, 10.0),
-            "gamma": trial.suggest_float("gamma", 0.0, 5.0),
-            "max_bin": trial.suggest_int("max_bin", 128, 512, step=64),
-            "grow_policy": trial.suggest_categorical("grow_policy", ["depthwise", "lossguide"]),
+            "n_estimators": trial.suggest_int("n_estimators", 100, 600, step=100),
+            "learning_rate": trial.suggest_float("learning_rate", 0.05, 0.2, log=True),
+            "max_depth": trial.suggest_int("max_depth", 2, 6),
+            "min_child_weight": trial.suggest_float("min_child_weight", 0.5, 5.0, log=True),
+            "reg_alpha": trial.suggest_float("reg_alpha", 0.0, 1.0),
+            "reg_lambda": trial.suggest_float("reg_lambda", 0.1, 5.0),
+            "gamma": trial.suggest_float("gamma", 0.0, 2.0),
+            "max_bin": trial.suggest_int("max_bin", 128, 256, step=64),
+            "grow_policy": trial.suggest_categorical("grow_policy", ["depthwise"]),
             "objective": trial.suggest_categorical("objective", ["reg:squarederror", "reg:absoluteerror"]),
             "eval_metric": trial.suggest_categorical("eval_metric", ["rmse", "mae"]),
-            "subsample": trial.suggest_float("subsample", 0.5, 1.0),
-            "colsample_bytree": trial.suggest_float("colsample_bytree", 0.5, 1.0),
+            "subsample": trial.suggest_float("subsample", 0.7, 1.0),
+            "colsample_bytree": trial.suggest_float("colsample_bytree", 0.7, 1.0),
             "tree_method": "hist"
         }
         if space["grow_policy"] == "lossguide":

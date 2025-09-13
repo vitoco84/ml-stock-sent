@@ -87,7 +87,9 @@ def _run(
     target_cols = [c for c in df_full.columns if c == "target" or c.startswith("target_")]
     feature_cols = [c for c in df_full.columns if c not in target_cols + ["date"] + drop_cols]
 
-    if "cnn" not in exp.name.lower() and "lstm" not in exp.name.lower():
+    if exp.name.lower() in {"cnn", "lstm"}:
+        feature_cols = [c for c in feature_cols if c.startswith("lag_")]
+    else:
         feature_cols = [c for c in feature_cols if not c.startswith("lag_") and c != "log_return"]
 
     if not exp.include_sentiment:
@@ -108,19 +110,18 @@ def _run(
     )
     X_train_sub, y_train_sub = train_sub[feature_cols], train_sub[target_cols]
 
-    exp_name = exp.name
     out_path = Path(out_dir)
     out_path.mkdir(parents=True, exist_ok=True)
 
-    pd.DataFrame({"feature": feature_cols}).to_csv(out_path / f"{exp_name}_features.csv", index=False)
-    X_test.to_parquet(out_path / f"{exp_name}_X_test.parquet", index=False)
-    X_train.to_parquet(out_path / f"{exp_name}_X_train.parquet", index=False)
-    X_forecast.to_parquet(out_path / f"{exp_name}_X_forecast.parquet", index=False)
+    pd.DataFrame({"feature": feature_cols}).to_csv(out_path / f"{exp.name}_features.csv", index=False)
+    X_test.to_parquet(out_path / f"{exp.name}_X_test.parquet", index=False)
+    X_train.to_parquet(out_path / f"{exp.name}_X_train.parquet", index=False)
+    X_forecast.to_parquet(out_path / f"{exp.name}_X_forecast.parquet", index=False)
 
     # Preprocessor and Config
-    preprocessor, _ = get_preprocessor(X_train_sub, exp_name)
+    preprocessor, _ = get_preprocessor(X_train_sub, exp.name)
     model_config = {"optimization_metric": "mae", "gap": gap, "seed": random_state}
-    y_scale_flag = exp_name.lower() not in {"xgboost"}
+    y_scale_flag = exp.name.lower() not in {"xgboost"}
 
     # Base Model and Trainer
     base_model = exp.build(forecast_horizon, random_state, n_jobs)
@@ -130,7 +131,7 @@ def _run(
 
     trainer = ModelTrainer(
         model=base_model,
-        name=f"{exp_name}",
+        name=f"{exp.name}",
         config=model_config,
         preprocessor=preprocessor,
         y_scale=y_scale_flag
@@ -143,8 +144,9 @@ def _run(
         sampler=optuna.samplers.TPESampler(seed=random_state),
         pruner=optuna.pruners.MedianPruner(n_startup_trials=5, n_warmup_steps=1)
     )
+    walk_forward = True if exp.name in ["lstm", "cnn"] else False
     study.optimize(
-        lambda tr: trainer.objective(tr, X_train_sub, y_train_sub, n_splits=n_splits),
+        lambda tr: trainer.objective(tr, X_train_sub, y_train_sub, n_splits=n_splits, walk_forward=walk_forward),
         n_trials=n_trials
     )
 
@@ -155,13 +157,13 @@ def _run(
     best_model = base_model.__class__(**{**base_model.get_params(), **best_params})
     trainer = ModelTrainer(
         best_model,
-        name=f"{exp_name}",
+        name=f"{exp.name}",
         config=model_config,
         preprocessor=preprocessor,
         y_scale=y_scale_flag
     )
     trainer.fit(X_train, y_train, X_val, y_val)
-    joblib.dump(trainer.preprocessor, out_path / f"{exp_name}_preprocessor.joblib")
+    joblib.dump(trainer.preprocessor, out_path / f"{exp.name}_preprocessor.joblib")
 
     # Predictions
     y_pred_val = np.asarray(trainer.predict(X_val))
@@ -169,16 +171,16 @@ def _run(
     y_pred_last = np.asarray(trainer.predict(X_forecast.iloc[[0]])).ravel()
 
     np.savez_compressed(
-        out_path / f"{exp_name}_preds.npz",
+        out_path / f"{exp.name}_preds.npz",
         y_pred_val=y_pred_val,
         y_pred_test=y_pred_test,
         y_pred_last=y_pred_last
     )
-    np.save(out_path / f"{exp_name}_test_index.npy", X_test.index.to_numpy())
+    np.save(out_path / f"{exp.name}_test_index.npy", X_test.index.to_numpy())
 
     # Metrics
     metrics_test = trainer.evaluate(X_test, y_test)
-    metrics_path = out_path / f"{exp_name}_metrics_test.json"
+    metrics_path = out_path / f"{exp.name}_metrics_test.json"
     with open(metrics_path, "w") as f:
         json.dump(metrics_test, f, indent=2)
 
@@ -186,18 +188,18 @@ def _run(
     last_return = np.asarray(y_train.iloc[-1])
     y_pred_naive = np.tile(last_return, (len(y_test), 1))
     baseline_metrics = metrics(np.asarray(y_test), y_pred_naive, y_insample=np.asarray(y_train))
-    baseline_path = out_path / f"{exp_name}_metrics_test_naive.json"
+    baseline_path = out_path / f"{exp.name}_metrics_test_naive.json"
     with open(baseline_path, "w") as f:
         json.dump(baseline_metrics, f, indent=2)
 
     # Save artifacts
-    params_path = out_path / f"{exp_name}_best_params.csv"
+    params_path = out_path / f"{exp.name}_best_params.csv"
     pd.Series(best_params).to_csv(params_path)
 
     model_path = trainer.save()
 
     result = {
-        "kind": exp_name,
+        "kind": exp.name,
         "study": study,
         "horizon": forecast_horizon,
         "include_sentiment": exp.include_sentiment,
@@ -209,10 +211,10 @@ def _run(
             "params_csv": str(params_path),
             "metrics_json": str(metrics_path),
             "baseline_metrics_json": str(baseline_path),
-            "preds_npz": str(out_path / f"{exp_name}_preds.npz"),
-            "test_index_npy": str(out_path / f"{exp_name}_test_index.npy"),
-            "features_csv": str(out_path / f"{exp_name}_features.csv"),
-            "X_forecast_parquet": str(out_path / f"{exp_name}_X_forecast.parquet")
+            "preds_npz": str(out_path / f"{exp.name}_preds.npz"),
+            "test_index_npy": str(out_path / f"{exp.name}_test_index.npy"),
+            "features_csv": str(out_path / f"{exp.name}_features.csv"),
+            "X_forecast_parquet": str(out_path / f"{exp.name}_X_forecast.parquet")
         },
         "test_index": X_test.index.to_numpy(),
         "y_pred_val": y_pred_val,
@@ -225,7 +227,7 @@ def _run(
         for k, v in result.items()
         if k not in {"y_pred_val", "y_pred_test", "y_pred_last", "test_index"}
     }
-    with open(out_path / f"{exp_name}_result.json", "w") as f:
+    with open(out_path / f"{exp.name}_result.json", "w") as f:
         json.dump(result_light, f, indent=2)
 
     return result

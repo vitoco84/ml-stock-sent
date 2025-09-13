@@ -43,19 +43,19 @@ class CNNModel(TorchBaseNN):
     horizon: int
     random_state: int
 
-    filters: int = 128
+    filters: int = 16
     kernel_size: int = 3
-    dense_units: int = 128
-    dropout: float = 0.3
-    lr: float = 3e-4
+    dense_units: int = 32
+    dropout: float = 0.1
+    lr: float = 1e-3
     epochs: int = 200
-    batch_size: int = 64
-    weight_decay: float = 1e-4
-    patience: int = 15
-    min_delta: float = 0.0
+    batch_size: int = 32
+    weight_decay: float = 1e-5
+    patience: int = 10
+    min_delta: float = 1e-4
     scheduler_patience: int = 5
     clip_grad_norm: float = 1.0
-    use_amp: bool = True
+    use_amp: bool = False
 
     def __post_init__(self) -> None:
         super().__init__(horizon=self.horizon, random_state=self.random_state, n_jobs=self.n_jobs)
@@ -72,12 +72,12 @@ class CNNModel(TorchBaseNN):
     @staticmethod
     def search_space(trial) -> dict:
         return {
-            "filters": trial.suggest_int("filters", 64, 256, step=64),
+            "filters": trial.suggest_int("filters", 8, 64, step=8),
             "kernel_size": trial.suggest_int("kernel_size", 2, 5),
-            "dense_units": trial.suggest_int("dense_units", 64, 256, step=64),
-            "dropout": trial.suggest_float("dropout", 0.2, 0.5),
-            "lr": trial.suggest_float("lr", 1e-4, 1e-3, log=True),
-            "epochs": trial.suggest_int("epochs", 100, 300, step=50),
-            "batch_size": trial.suggest_categorical("batch_size", [32, 64]),
-            "weight_decay": trial.suggest_float("weight_decay", 1e-5, 1e-3, log=True)
+            "dense_units": trial.suggest_int("dense_units", 16, 64, step=16),
+            "dropout": trial.suggest_float("dropout", 0.0, 0.3),
+            "lr": trial.suggest_float("lr", 5e-4, 3e-3, log=True),
+            "epochs": trial.suggest_int("epochs", 20, 100, step=20),
+            "batch_size": trial.suggest_categorical("batch_size", [16, 32]),
+            "weight_decay": trial.suggest_float("weight_decay", 1e-6, 1e-4, log=True)
         }

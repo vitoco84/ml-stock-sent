@@ -17,6 +17,7 @@ runtime:
   horizon: 20
   lag_horizon: 7
   n_trials: 100
+  n_trials_nn: 30
   n_splits: 3
   n_jobs: 8
   gap: 20

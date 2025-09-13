@@ -28,10 +28,10 @@ class LinearElasticNet(Base):
     random_state: int
 
     alpha: float = 1e-3
-    l1_ratio: float = 0.2
-    max_iter: int = 2000
+    l1_ratio: float = 0.5
+    max_iter: int = 1500
     tol: float = 1e-3
-    learning_rate: str = "invscaling"
+    learning_rate: str = "constant"
     eta0: float = 0.01
     penalty: str = "elasticnet"
     multioutput: bool = True
@@ -84,9 +84,9 @@ class LinearElasticNet(Base):
         return {
             "alpha": trial.suggest_float("alpha", 1e-5, 1e-2, log=True),
             "l1_ratio": trial.suggest_float("l1_ratio", 0.0, 1.0),
-            "max_iter": trial.suggest_int("max_iter", 1000, 4000, step=500),
-            "eta0": trial.suggest_float("eta0", 1e-4, 1e-1, log=True),
+            "max_iter": trial.suggest_int("max_iter", 1000, 3000, step=500),
+            "eta0": trial.suggest_float("eta0", 1e-3, 1e-1, log=True),
             "learning_rate": trial.suggest_categorical(
-                "learning_rate", ["invscaling", "constant", "optimal"]
+                "learning_rate", ["constant", "optimal"]
             )
         }

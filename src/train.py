@@ -38,7 +38,7 @@ class ModelTrainer:
             config: dict[str, Any],
             output_path: str | Path = "../data/models",
             preprocessor: Any = None,
-            y_scale: bool = True,
+            y_scale: bool = True
     ) -> None:
         self.model = model
         self.name = name
@@ -194,12 +194,23 @@ class ModelTrainer:
             return all_metrics["aggregate"][metric_name]
         return all_metrics[metric_name]
 
+    @staticmethod
+    def _walk_forward_splits(n_samples: int, train_size: int, test_size: int, step_size: int):
+        """Generator for walk-forward (rolling origin) splits."""
+        start = 0
+        while start + train_size + test_size <= n_samples:
+            train_idx = np.arange(0, start + train_size)
+            val_idx = np.arange(start + train_size, start + train_size + test_size)
+            yield train_idx, val_idx
+            start += step_size
+
     def objective(
             self,
             trial: optuna.Trial,
             X: pd.DataFrame,
             y: Any,
-            n_splits: int
+            n_splits: int,
+            walk_forward: bool
     ) -> float:
         """
         Optuna objective function using TimeSeries CV.
@@ -210,12 +221,20 @@ class ModelTrainer:
         """
         try:
             params = self._get_search_params(trial)
-
-            tscv = TimeSeriesSplit(n_splits=n_splits, gap=int(self.config.get("gap", 0)))
             metric_name = self.config.get("optimization_metric", "mae")
 
+            if walk_forward:
+                n_samples = len(X)
+                train_size = int(n_samples * 0.7)
+                val_size = int(n_samples * 0.1)
+                step_size = val_size
+                splits = self._walk_forward_splits(n_samples, train_size, val_size, step_size)
+            else:
+                tscv = TimeSeriesSplit(n_splits=n_splits, gap=int(self.config.get("gap", 0)))
+                splits = tscv.split(X)
+
             scores: list[float] = []
-            for fold, (tr_idx, va_idx) in enumerate(tscv.split(X), start=1):
+            for fold, (tr_idx, va_idx) in enumerate(splits, start=1):
                 # Split
                 X_tr, X_va = X.iloc[tr_idx], X.iloc[va_idx]
                 y_tr, y_va = y.iloc[tr_idx], y.iloc[va_idx]

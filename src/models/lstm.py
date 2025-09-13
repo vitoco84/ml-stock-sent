@@ -47,18 +47,18 @@ class LSTMModel(TorchBaseNN):
 
     bidirectional: bool = False
 
-    units: int = 64
-    dense_units: int = 64
-    dropout: float = 0.2
+    units: int = 32
+    dense_units: int = 32
+    dropout: float = 0.1
     lr: float = 1e-3
-    epochs: int = 100
-    batch_size: int = 64
+    epochs: int = 200
+    batch_size: int = 32
     weight_decay: float = 1e-5
     patience: int = 10
-    min_delta: float = 0.0
+    min_delta: float = 1e-4
     scheduler_patience: int = 5
     clip_grad_norm: float = 1.0
-    use_amp: bool = True
+    use_amp: bool = False
 
     def __post_init__(self) -> None:
         super().__init__(horizon=self.horizon, random_state=self.random_state, n_jobs=self.n_jobs)
@@ -75,12 +75,12 @@ class LSTMModel(TorchBaseNN):
     @staticmethod
     def search_space(trial) -> dict:
         return {
-            "units": trial.suggest_int("units", 32, 128, step=32),
-            "dense_units": trial.suggest_int("dense_units", 32, 128, step=32),
-            "dropout": trial.suggest_float("dropout", 0.1, 0.5),
-            "lr": trial.suggest_float("lr", 1e-4, 5e-3, log=True),
-            "epochs": trial.suggest_int("epochs", 30, 100, step=10),
-            "batch_size": trial.suggest_categorical("batch_size", [32, 64, 128]),
-            "bidirectional": trial.suggest_categorical("bidirectional", [False, True]),
-            "weight_decay": trial.suggest_float("weight_decay", 1e-6, 1e-2, log=True),
+            "units": trial.suggest_int("units", 16, 64, step=16),
+            "dense_units": trial.suggest_int("dense_units", 16, 64, step=16),
+            "dropout": trial.suggest_float("dropout", 0.0, 0.3),
+            "lr": trial.suggest_float("lr", 5e-4, 3e-3, log=True),
+            "epochs": trial.suggest_int("epochs", 20, 100, step=20),
+            "batch_size": trial.suggest_categorical("batch_size", [16, 32]),
+            "bidirectional": trial.suggest_categorical("bidirectional", [False]),
+            "weight_decay": trial.suggest_float("weight_decay", 1e-6, 1e-4, log=True)
         }
