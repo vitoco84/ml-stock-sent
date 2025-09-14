@@ -275,11 +275,15 @@ if "predict_btn" in locals() and predict_btn:
 
     rows = []
 
-    # Rolling mode: detect keys like log_return_5, log_return_20...
-    rolling_keys = [k for k in result.keys() if k.startswith("log_return_")]
+    # Rolling mode: detect keys like log_return_1, log_return_5, log_return_20...
+    rolling_keys = [
+        k for k in result.keys()
+        if k.startswith("log_return_") and k.split("_")[-1].isdigit()
+    ]
+
     if rolling_keys:
-        for k in sorted(rolling_keys, key=lambda x: int(x.split("_")[2])):
-            h = int(k.split("_")[2])
+        for k in sorted(rolling_keys, key=lambda x: int(x.split("_")[-1])):
+            h = int(k.split("_")[-1])
             log_ret = float(result[k])
             implied_price = current_price * np.exp(log_ret)
             rows.append({
@@ -291,7 +295,7 @@ if "predict_btn" in locals() and predict_btn:
     # Step mode: cumulative from log_return_path
     elif "log_return_path" in result:
         logret_path = [float(x) for x in result.get("log_return_path", [])]
-        for h in [1, len(logret_path)]:  # you could also show multiple points
+        for h in [1, len(logret_path)]:
             if len(logret_path) >= h:
                 cum_ret = np.sum(logret_path[:h])
                 implied_price = current_price * np.exp(cum_ret)

@@ -44,7 +44,7 @@ def get_preprocessor(X: pd.DataFrame, model_name: str) -> Tuple[Pipeline, list[s
         raise ValueError("No feature columns found after filtering (only targets/date present).")
 
     # Preprocessors
-    if model_name.lower() in {"xgboost"}:
+    if model_name.lower() in {"xgboost", "random_forest"}:
         num_tf = SimpleImputer(strategy="median")
     else:
         num_tf = Pipeline(steps=[

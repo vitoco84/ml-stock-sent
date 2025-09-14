@@ -131,7 +131,7 @@ df_full, train_ratio=train_ratio, val_ratio=val_ratio, horizon=forecast_horizon
     # Preprocessor and Config
     preprocessor, _ = get_preprocessor(X_train_sub, exp.name)
     model_config = {"optimization_metric": "r2", "gap": gap, "seed": random_state}
-    y_scale_flag = exp.name.lower() not in {"xgboost"}
+    y_scale_flag = exp.name.lower() not in {"xgboost", "random_forest"}
 
     # Base Model and Trainer
     base_model = exp.build(forecast_horizon, random_state, n_jobs)
