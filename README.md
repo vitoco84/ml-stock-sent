@@ -227,13 +227,9 @@ curl -X POST "http://localhost:8000/predict-raw?symbol=AAPL&horizon=5&return_pat
 1. **01_eda.ipynb** - Exploratory Data Analysis
 2. **02_sentiment.ipynb** - Sentiment analysis with FinBERT
 3. **03_feature.ipynb** - Feature engineering
-4. **04_adfulller_test.ipynb** - Stationarity test (Augmented Dickey–Fuller)
-5. **05_linreg.ipynb** - Linear Regression Model
-6. **06_xgboost.ipynb** - XGBoost Model
-7. **07_cnn.ipynb** - Convolutional Neural Network
-8. **08_gru.ipynb** - Gated Recurrent Unit
-9. **09_results_plots.ipynb** - Combined Plots and Results
-10. **10_shap.ipynb** - Model evaluation and interpretability (SHAP)
+4. **04_pipeline.ipynb** - Train and Tune Models (linreg, xgboost, cnn and lstm)
+5. **05_eval.ipynb** - Stationarity test (Augmented Dickey–Fuller) and interpretability (SHAP)
+6. **06_results_plots.ipynb** - Combined Plots and Results
 
 > Note: The Notebooks should be run in order.
 

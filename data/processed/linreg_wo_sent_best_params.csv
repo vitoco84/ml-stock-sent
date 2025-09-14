@@ -1,7 +1,0 @@
-,0
-alpha,0.009516325191099559
-l1_ratio,0.9300523911630579
-max_iter,2000
-eta0,0.0011598530965484348
-learning_rate,constant
-random_state,42

@@ -7,11 +7,46 @@ from src.data import merge_price_news
 from src.sentiment import FinBERT
 
 
+def _make_targets(
+        df: pd.DataFrame,
+        forecast_horizon: int,
+        target_mode: str,
+        custom_horizons: Optional[list[int]]
+) -> pd.DataFrame:
+    if target_mode == "step":
+        if forecast_horizon > 1:
+            for h in range(1, forecast_horizon + 1):
+                df[f"target_{h}"] = df["log_return"].shift(-h)
+        else:
+            df["target"] = df["log_return"].shift(-1)
+    elif target_mode == "rolling":
+        horizons = custom_horizons or [5, 20]
+        for h in horizons:
+            df[f"target_{h}"] = df["log_return"].rolling(h).sum().shift(-h)
+    else:
+        raise ValueError(f"Unknown target_mode={target_mode}")
+    return df
+
+def _make_lags(df: pd.DataFrame, back_horizon: int) -> pd.DataFrame:
+    for k in range(1, back_horizon + 1):
+        df[f"lag_{k}"] = df["log_return"].shift(k)
+    return df
+
+def _make_ohlc_features(df: pd.DataFrame) -> pd.DataFrame:
+    for c in ["open", "high", "low", "close", "adj_close", "volume"]:
+        if c in df.columns:
+            val = np.log1p(df[c]) if c == "volume" else df[c]
+            df[f"{c}_l"] = val.shift(1)
+    return df
+
 def create_features_and_target(
         df: pd.DataFrame,
         forecast_horizon: int,
         back_horizon: int,
-        training: bool = False
+        training: bool = False,
+        *,
+        target_mode: str,
+        custom_horizons: Optional[list[int]] = None
 ) -> pd.DataFrame:
     """
     Create features and targets from price and sentiment data.
@@ -22,10 +57,9 @@ def create_features_and_target(
       - Lagged log returns
       - Rolling momentum
 
-    Targets:
-      - If horizon=1: 'target'
-      - If horizon>1: 'target_1' ... 'target_H'
-        defined as log-return: log(AdjClose_{t+h} / AdjClose_t)
+    Target mode:
+      - "step": standard t+1, t+2, …, t+H log returns
+      - "rolling": cumulative log return over given horizons (e.g. 5, 20 days)
     """
     df = df.copy()
     df["date"] = pd.to_datetime(df["date"])
@@ -38,29 +72,21 @@ def create_features_and_target(
     df["log_return"] = np.log(price / price.shift(1))
 
     # Targets
-    if forecast_horizon > 1:
-        for h in range(1, forecast_horizon + 1):
-            df[f"target_{h}"] = df["log_return"].shift(-h)
-    else:
-        df["target"] = df["log_return"].shift(-1)
+    df = _make_targets(df, forecast_horizon, target_mode, custom_horizons)
 
-    # Lags of log-returns
-    for k in range(1, back_horizon + 1):
-        df[f"lag_{k}"] = df["log_return"].shift(k)
+    # Lag features
+    df = _make_lags(df, back_horizon)
 
-    # Rolling and Momentum
+    # Rolling momentum
     df["mom_10"] = np.log(df["adj_close"] / df["adj_close"].shift(10))
 
-    # OHLC Shifted
-    for c in ["open", "high", "low", "close", "adj_close", "volume"]:
-        if c in df.columns:
-            val = np.log1p(df[c]) if c == "volume" else df[c]
-            df[f"{c}_l"] = val.shift(1)
+    # OHLC features
+    df = _make_ohlc_features(df)
 
-    # Calendar
+    # Calendar features
     df["dow"] = df["date"].dt.dayofweek.astype(int)
 
-    #  Drop incomplete rows (training), keep last for Inference
+    # Drop incomplete rows
     if training:
         return df.iloc[max(back_horizon, 10): len(df) - forecast_horizon].copy()
     return df.iloc[back_horizon:].copy()
@@ -145,6 +171,8 @@ def generate_full_feature_row(
         back_horizon: int,
         max_embedding_dims: int,
         fill_missing_neutral: bool = True,
+        target_mode: str,
+        custom_horizons: Optional[list[int]] = None
 ) -> pd.DataFrame:
     """
     Generate the latest full feature row for inference.
@@ -152,7 +180,14 @@ def generate_full_feature_row(
     Combines price history, engineered features, and optional FinBERT sentiment.
     """
     merged = _generate_feat_target(fill_missing_neutral, max_embedding_dims, news_df, price_df, sentiment_model)
-    features_df = create_features_and_target(merged, forecast_horizon, back_horizon)
+    features_df = create_features_and_target(
+        merged,
+        forecast_horizon=forecast_horizon,
+        back_horizon=back_horizon,
+        training=False,
+        target_mode=target_mode,
+        custom_horizons=custom_horizons
+    )
 
     if features_df.empty:
         raise ValueError("Feature DataFrame is empty. Likely due to insufficient price history.")
@@ -168,14 +203,21 @@ def generate_training_data(
         forecast_horizon: int,
         back_horizon: int,
         max_embedding_dims: int,
-        fill_missing_neutral: bool = True
+        fill_missing_neutral: bool = True,
+        target_mode: str,
+        custom_horizons: Optional[list[int]] = None
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     Generate features and targets for model fine-tuning on a new stock.
     """
     merged = _generate_feat_target(fill_missing_neutral, max_embedding_dims, news_df, price_df, sentiment_model)
     features_df = create_features_and_target(
-        merged, forecast_horizon=forecast_horizon, back_horizon=back_horizon, training=True
+        merged,
+        forecast_horizon=forecast_horizon,
+        back_horizon=back_horizon,
+        training=True,
+        target_mode=target_mode,
+        custom_horizons=custom_horizons
     )
 
     target_cols = [c for c in features_df.columns if c.startswith("target")]

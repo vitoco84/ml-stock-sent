@@ -148,7 +148,7 @@ def test_time_series_split_with_horizon_tail():
         "adj_close": range(n),
         "open": 0.0, "high": 0.0, "low": 0.0, "close": 0.0, "volume": 0.0
     })
-    df = create_features_and_target(df, forecast_horizon=H, back_horizon=l)
+    df = create_features_and_target(df, forecast_horizon=H, back_horizon=l, target_mode="step")
     train, val, test, future = time_series_split(df, train_ratio=0.7, val_ratio=0.2, horizon=H)
 
     n_feat = len(df)
@@ -175,7 +175,7 @@ def test_time_series_split_no_overlap():
         "adj_close": np.arange(n, dtype=float),
         "open": 0.0, "high": 0.0, "low": 0.0, "close": 0.0, "volume": 0.0,
     })
-    df = create_features_and_target(df, forecast_horizon=H, back_horizon=l)
+    df = create_features_and_target(df, forecast_horizon=H, back_horizon=l, target_mode="step")
     _, _, test, future = time_series_split(df, train_ratio=0.6, val_ratio=0.2, horizon=H)
 
     assert test.index.max() < future.index.min()
@@ -189,7 +189,7 @@ def test_create_features_and_target_minimal():
         "adj_close": np.linspace(100, 150, 60),
         "open": 0.0, "high": 0.0, "low": 0.0, "close": 0.0, "volume": 0.0
     })
-    features = create_features_and_target(df, forecast_horizon=H, back_horizon=l)
+    features = create_features_and_target(df, forecast_horizon=H, back_horizon=l, target_mode="step")
     assert {"target_1", "log_return"} <= set(features.columns)
 
 def test_get_preprocessor_returns_pipeline_and_features():
@@ -207,7 +207,7 @@ def test_generate_full_feature_row_no_sentiment():
     df = mk_price_df(BUSINESS_DATES_40)
     row = generate_full_feature_row(
         df, None, None,
-        forecast_horizon=5, back_horizon=7, max_embedding_dims=MAX_EMB_DIMS
+        forecast_horizon=5, back_horizon=7, max_embedding_dims=MAX_EMB_DIMS, target_mode="step"
     )
     assert isinstance(row, pd.DataFrame) and row.shape[0] == 1
 
@@ -219,7 +219,7 @@ def test_generate_full_feature_row_pad_neutral_last_day_zero(config: Config):
     _, _, sentiment_model = init_finbert(config)
     row = generate_full_feature_row(
         price_df, news_df, sentiment_model,
-        forecast_horizon=1, back_horizon=7, max_embedding_dims=MAX_EMB_DIMS,
+        forecast_horizon=1, back_horizon=7, max_embedding_dims=MAX_EMB_DIMS, target_mode="step"
     )
     assert is_close(row["pos_minus_neg"].values[0], 0.0)
     assert "emb_0" in row.columns and is_close(row["emb_0"].values[0], 0.0)
@@ -240,7 +240,8 @@ def test_sentiment_affects_feature_row():
         model,
         forecast_horizon=1,
         back_horizon=7,
-        max_embedding_dims=MAX_EMB_DIMS
+        max_embedding_dims=MAX_EMB_DIMS,
+        target_mode="step"
     )
     row_neg = generate_full_feature_row(
         df_price,
@@ -248,7 +249,8 @@ def test_sentiment_affects_feature_row():
         model,
         forecast_horizon=1,
         back_horizon=7,
-        max_embedding_dims=MAX_EMB_DIMS
+        max_embedding_dims=MAX_EMB_DIMS,
+        target_mode="step"
     )
 
     # Expect different sentiment on the last day
@@ -359,11 +361,11 @@ def test_prediction_changes_with_different_prices(config: Config):
 
     X1 = pre.transform(generate_full_feature_row(
         price_df1, pd.DataFrame(), sentiment_model, forecast_horizon=20, back_horizon=7,
-        max_embedding_dims=MAX_EMB_DIMS)
+        max_embedding_dims=MAX_EMB_DIMS, target_mode="step")
     )
     X2 = pre.transform(generate_full_feature_row(
         price_df2, pd.DataFrame(), sentiment_model, forecast_horizon=20, back_horizon=7,
-        max_embedding_dims=MAX_EMB_DIMS)
+        max_embedding_dims=MAX_EMB_DIMS, target_mode="step")
     )
 
     preds1 = model.predict(X1)
@@ -376,7 +378,8 @@ def test_deterministic_prediction_with_seed(config: Config):
     model, pre, sentiment_model = init_finbert(config)
 
     X = pre.transform(generate_full_feature_row(
-        price_df, pd.DataFrame(), sentiment_model, forecast_horizon=20, back_horizon=7, max_embedding_dims=MAX_EMB_DIMS)
+        price_df, pd.DataFrame(), sentiment_model, forecast_horizon=20, back_horizon=7,
+        max_embedding_dims=MAX_EMB_DIMS, target_mode="step")
     )
 
     preds1 = model.predict(X)

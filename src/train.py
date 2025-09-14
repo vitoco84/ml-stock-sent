@@ -212,16 +212,10 @@ class ModelTrainer:
             n_splits: int,
             walk_forward: bool
     ) -> float:
-        """
-        Optuna objective function using TimeSeries CV.
-
-        Notes:
-            - Optimization metric are on error metric (MAE, MSE, RMSE).
-            - R^2 and directional accuracy are for reporting, not optimization.
-        """
+        """Optuna objective function using TimeSeries CV."""
         try:
             params = self._get_search_params(trial)
-            metric_name = self.config.get("optimization_metric", "mae")
+            metric_name = self.config.get("optimization_metric", "r2")
 
             if walk_forward:
                 n_samples = len(X)

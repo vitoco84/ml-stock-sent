@@ -15,9 +15,9 @@ data:
 runtime:
   seed: 42
   horizon: 20
+  horizon_list: [1,5,20]
   lag_horizon: 7
-  n_trials: 100
-  n_trials_nn: 30
+  n_trials: [30,100]
   n_splits: 3
   n_jobs: 8
   gap: 20
@@ -28,3 +28,4 @@ runtime:
   test_ratio: 0.1
   days_history: 90
   max_sentiment_embeddings: 17
+  target_mode: "rolling" # step or rolling

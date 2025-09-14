@@ -131,7 +131,8 @@ def _generate_features(
                 None,
                 forecast_horizon=horizon,
                 back_horizon=cfg.runtime.lag_horizon,
-                max_embedding_dims=cfg.runtime.max_sentiment_embeddings
+                max_embedding_dims=cfg.runtime.max_sentiment_embeddings,
+                target_mode=cfg.runtime.target_mode
             )
 
         return generate_full_feature_row(
@@ -141,7 +142,8 @@ def _generate_features(
             forecast_horizon=horizon,
             back_horizon=cfg.runtime.lag_horizon,
             fill_missing_neutral=pad_neutral,
-            max_embedding_dims=cfg.runtime.max_sentiment_embeddings
+            max_embedding_dims=cfg.runtime.max_sentiment_embeddings,
+            target_mode=cfg.runtime.target_mode
         )
     except Exception:
         logger.exception("Feature generation failed")

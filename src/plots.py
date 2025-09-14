@@ -29,11 +29,13 @@ def _finalize_figure(
         dpi: int = _DPI_DEFAULT,
         tight: bool = True,
         show: bool = True,
+        save: bool = True
 ) -> None:
     if tight:
         fig.tight_layout()
     outfile = _ensure_parent(path)
-    fig.savefig(outfile, dpi=dpi)
+    if save:
+        fig.savefig(outfile, dpi=dpi)
     if show:
         plt.show()
     plt.close(fig)
@@ -79,6 +81,7 @@ def plot_overlay(
         *,
         phase: _PHASE,
         title: Optional[str] = None,
+        save: bool = True
 ) -> None:
     dates_next, actual_next, base_today = _next_step_arrays(df)
 
@@ -105,19 +108,20 @@ def plot_overlay(
     ax.set_ylabel(_ADJ_CLOSE)
     ax.grid(True, alpha=0.25)
     ax.legend()
-    _finalize_figure(fig, path)
+    _finalize_figure(fig, path, save=save)
 
-def plot_val_overlay(df_val: pd.DataFrame, results: list[Mapping], path: Path | str) -> None:
-    plot_overlay(df_val, results, path, phase="val")
+def plot_val_overlay(df_val: pd.DataFrame, results: list[Mapping], path: Path | str, save: bool = True) -> None:
+    plot_overlay(df_val, results, path, phase="val", save=save)
 
-def plot_test_overlay(df_test: pd.DataFrame, results: list[Mapping], path: Path | str) -> None:
-    plot_overlay(df_test, results, path, phase="test")
+def plot_test_overlay(df_test: pd.DataFrame, results: list[Mapping], path: Path | str, save: bool = True) -> None:
+    plot_overlay(df_test, results, path, phase="test", save=save)
 
 def plot_forecast_overlay(
         df_test: pd.DataFrame,
         df_forecast: pd.DataFrame,
         results: list[Mapping],
         path: Path | str,
+        save: bool = True
 ) -> None:
     H = int(results[0]["horizon"])
     hist_dates = _dates_np(df_test["date"])
@@ -153,13 +157,14 @@ def plot_forecast_overlay(
     ax.set_ylabel(_ADJ_CLOSE)
     ax.grid(True, alpha=0.25)
     ax.legend()
-    _finalize_figure(fig, path)
+    _finalize_figure(fig, path, save=save)
 
 def plot_forecast_diagnostics(
         df_forecast: pd.DataFrame,
         df_test: pd.DataFrame,
         results: list[Mapping],
         path: Path | str,
+        save: bool = True
 ) -> None:
     H = int(results[0]["horizon"])
     fut_dates = _dates_np(df_forecast["date"])
@@ -203,34 +208,73 @@ def plot_forecast_diagnostics(
     ax_pr.set_title("Forecast Price Overlay")
     ax_pr.legend()
 
-    _finalize_figure(fig, path)
+    _finalize_figure(fig, path, save=save)
+
+def _resolve_targets(df: pd.DataFrame, target_mode: str) -> list[str]:
+    if target_mode == "step":
+        cols = [c for c in df.columns if c.startswith("target")]
+        return cols if cols else ["log_return"]
+    elif target_mode == "rolling":
+        return [c for c in df.columns if c.startswith("target_")]
+    else:
+        raise ValueError(f"Unknown target_mode={target_mode}")
 
 def plot_return_overlay(
         df: pd.DataFrame,
         results: list[dict],
         path: Path | str,
-        phase: str = "test"
+        phase: str = "test",
+        target_mode: str = "step",
+        save: bool = True
 ) -> None:
-    fig, ax = plt.subplots(figsize=(12, 5))
-
-    y_true = df["log_return"].to_numpy(dtype=float)
     dates = pd.to_datetime(df["date"]).to_numpy()
-    ax.plot(dates, y_true, "--", label=f"Actual ({phase})", linewidth=2)
-
     pred_key = f"y_pred_{phase}"
-    for res in results:
-        y_pred = np.asarray(res.get(pred_key)).ravel()
-        n = min(len(y_true), len(y_pred))
-        if n > 0:
-            ax.plot(dates[:n], y_pred[:n], label=f"{res.get('kind','model')} ({phase})", linewidth=2)
 
-    ax.set_title(f"Actual vs Predicted Log Returns ({phase.capitalize()})")
-    ax.set_xlabel("Date")
-    ax.set_ylabel("Log Return")
-    ax.grid(True, alpha=0.25)
-    ax.legend()
+    if target_mode == "step":
+        if "log_return" in df.columns:
+            y_true = df["log_return"].to_numpy(dtype=float)
+        else:
+            y_true = df["target_1"].to_numpy(dtype=float)
 
-    _finalize_figure(fig, path)
+        fig, ax = plt.subplots(figsize=(12, 5))
+        ax.plot(dates, y_true, "--", label=f"Actual ({phase})", linewidth=2)
+
+        for res in results:
+            y_pred = np.asarray(res.get(pred_key)).ravel()
+            n = min(len(y_true), len(y_pred))
+            if n > 0:
+                ax.plot(dates[:n], y_pred[:n], label=f"{res.get('kind', 'model')} ({phase})", linewidth=2)
+
+        ax.set_title(f"Actual vs Predicted Log Returns ({phase.capitalize()})")
+        ax.set_xlabel("Date")
+        ax.set_ylabel("Log Return")
+        ax.grid(True, alpha=0.25)
+        ax.legend()
+
+    elif target_mode == "rolling":
+        cols = _resolve_targets(df, "rolling")
+        fig, axes = plt.subplots(len(cols), 1, figsize=(12, 4 * len(cols)), sharex=True)
+        if len(cols) == 1:
+            axes = [axes]
+
+        for ax, col in zip(axes, cols):
+            y_true = df[col].to_numpy(dtype=float)
+            ax.plot(dates, y_true, "--", label=f"Actual {col} ({phase})", linewidth=2)
+
+            for res in results:
+                y_pred = np.asarray(res.get(pred_key)).ravel()
+                n = min(len(y_true), len(y_pred))
+                if n > 0:
+                    ax.plot(dates[:n], y_pred[:n], label=f"{res.get('kind', 'model')} {col} ({phase})", linewidth=2)
+
+            ax.set_title(f"Actual vs Predicted {col} (Rolling mode)")
+            ax.grid(True, alpha=0.25)
+            ax.legend()
+
+        axes[-1].set_xlabel("Date")
+        axes[0].set_ylabel("Return")
+
+    _finalize_figure(fig, path, save=save)
 
 def plot_price_series(df: pd.DataFrame, path: Path | str) -> None:
     fig, ax = plt.subplots(figsize=_FIGSIZE_STD)
