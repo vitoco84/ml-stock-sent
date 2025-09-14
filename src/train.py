@@ -193,7 +193,7 @@ class ModelTrainer:
         """Generator for walk-forward (rolling origin) splits."""
         start = 0
         while start + train_size + test_size <= n_samples:
-            train_idx = np.arange(0, start + train_size)
+            train_idx = np.arange(start, start + train_size)
             val_idx = np.arange(start + train_size, start + train_size + test_size)
             yield train_idx, val_idx
             start += step_size
@@ -209,7 +209,7 @@ class ModelTrainer:
         """Optuna objective function using TimeSeries CV."""
         try:
             params = self._get_search_params(trial)
-            metric_name = self.config.get("optimization_metric", "r2")
+            metric_name = self.config.get("optimization_metric", "mae")
 
             if walk_forward:
                 n_samples = len(X)
