@@ -8,6 +8,7 @@ from src.models.base import Base
 from src.models.cnn import CNNModel
 from src.models.linreg import LinearElasticNet
 from src.models.lstm import LSTMModel
+from src.models.random_forest import RandomForest
 from src.models.xgboost import XGBoost
 
 
@@ -52,6 +53,15 @@ experiments = [
     Experiment(
         name="xgboost",
         build=lambda horizon, seed, n_jobs: XGBoost(
+            horizon=HORIZON,
+            random_state=SEED,
+            n_jobs=N_JOBS
+        ),
+        include_sentiment=True,
+    ),
+    Experiment(
+        name="random_forest",
+        build=lambda horizon, seed, n_jobs: RandomForest(
             horizon=HORIZON,
             random_state=SEED,
             n_jobs=N_JOBS

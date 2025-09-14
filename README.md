@@ -154,7 +154,6 @@ Predict next price log-returns using historical prices, news sentiment, and FinB
 
 **Query params**
 - `symbol` *(str, required)* - Ticker symbol for context (e.g., `AAPL`)
-- `horizon` *(int, default `30`, min `1`, max `30`)* - number of steps to return
 - `return_path` *(bool, default `true`)* - whether to return full H‑step paths
 - `enrich` *(bool, default `false`)* - generate missing headlines locally (requires reachable `OLLAMA_URL`)
 - `pad_neutral` *(bool, default `false`)* - Use provided headlines and fill missing days with neutral sentiment (requires ≥2 headlines, no generation)
@@ -176,16 +175,35 @@ Predict next price log-returns using historical prices, news sentiment, and FinB
 }
 ```
 
-**Response - `PredictionResponse` (when `return_path=true`)**
+**Response - `PredictionResponse` (Step Target Mode, when `return_path=true`)**
 ```json
 {
-  "horizon": 5,
-  "log_return": 0.0035,
+  "horizon": 20,
   "current_price": 105.0,
+  "log_return": 0.0035,
   "predicted_price": 105.37,
   "log_return_path": [0.0035, 0.0012, 0.0007, -0.0003, 0.0021],
   "predicted_price_path": [105.37, 105.50, 105.57, 105.54, 105.77],
   "predicted_dates": ["2025-01-10", "2025-01-13", "2025-01-14", "2025-01-15", "2025-01-16"],
+  "last_date": "2025-01-09"
+}
+```
+**Response - `PredictionResponse` (Rolling Target Mode, when `return_path=true`)**
+```json
+{
+  "horizon": [1, 5, 20],
+  "current_price": 105.0,
+  "log_return_1": -0.0021,
+  "predicted_price_1": 104.78,
+  "log_return_5": 0.0065,
+  "predicted_price_5": 105.69,
+  "log_return_20": 0.0123,
+  "predicted_price_20": 106.29,
+  "log_return": -0.0021,
+  "predicted_price": 106.29,
+  "log_return_path": [-0.0001, -0.0001, ...], 
+  "predicted_price_path": [105.8, 105.9, ...],
+  "predicted_dates": ["2025-01-10", "2025-01-13", "..."],
   "last_date": "2025-01-09"
 }
 ```
@@ -206,7 +224,7 @@ Predict next price log-returns using historical prices, news sentiment, and FinB
 
 **cURL example**
 ```bash
-curl -X POST "http://localhost:8000/predict-raw?symbol=AAPL&horizon=5&return_path=true&ignore_news=false&enrich=false&pad_neutral=true" \
+curl -X POST "http://localhost:8000/predict-raw?symbol=AAPL&return_path=true&ignore_news=false&enrich=false&pad_neutral=true" \
   -H "Content-Type: application/json" \
   -d '{
         "price":[
@@ -227,7 +245,7 @@ curl -X POST "http://localhost:8000/predict-raw?symbol=AAPL&horizon=5&return_pat
 1. **01_eda.ipynb** - Exploratory Data Analysis
 2. **02_sentiment.ipynb** - Sentiment analysis with FinBERT
 3. **03_feature.ipynb** - Feature engineering
-4. **04_pipeline.ipynb** - Train and Tune Models (linreg, xgboost, cnn and lstm)
+4. **04_pipeline.ipynb** - Train and Tune Models (linreg, xgboost, random_forest, cnn and lstm)
 5. **05_eval.ipynb** - Stationarity test (Augmented Dickey–Fuller) and interpretability (SHAP)
 6. **06_results_plots.ipynb** - Combined Plots and Results
 
