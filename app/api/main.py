@@ -123,7 +123,6 @@ def post_predict_from_raw(
         enrich: bool = Query(False, description="Generate missing headlines using local LLM"),
         pad_neutral: bool = Query(False, description="Use provided news and neutral-fill gaps (needs ≥2)"),
         ignore_news: bool = Query(False, description="Ignore all news (neutral every day)"),
-        horizon: int = Query(20, ge=1, le=20, description="Forecast horizon"),
         return_path: bool = Query(True, description="Whether to return the full H-step path"),
         symbol: str = Query("^DJI", description="Ticker symbol (e.g., AAPL)")
 ) -> PredictionResponse:
@@ -141,9 +140,9 @@ def post_predict_from_raw(
     )
 
     feature_row = _generate_features(
-        price_df, news_df, request.app.state.sentiment_model, horizon, pad_neutral
+        price_df, news_df, request.app.state.sentiment_model, cfg.runtime.horizon, pad_neutral
     )
-
+    horizon = cfg.runtime.horizon if cfg.runtime.target_mode == "step"  else cfg.runtime.horizon_list
     return _make_prediction(
         feature_row,
         request.app.state.model,
@@ -152,7 +151,8 @@ def post_predict_from_raw(
         request.app.state.y_scale,
         price_df,
         horizon,
-        return_path
+        return_path,
+        cfg.runtime.target_mode
     )
 
 @app.post("/fine-tune")
@@ -161,7 +161,6 @@ def fine_tune_model(
         symbol: str = Query(..., description="Ticker symbol, e.g., AAPL, ^DJI"),
         end_date: str = Query(..., description="End date in YYYY-MM-DD format"),
         days: int = Query(90, ge=1, le=365, description="Number of business days to look back"),
-        horizon: int = Query(20, ge=1, le=20, description="Forecast horizon"),
         return_path: bool = Query(True, description="Return full forecast path")
 ):
     """Fine-tune the global model on a new stock (log-return forecasting)."""
@@ -173,9 +172,11 @@ def fine_tune_model(
         price_df,
         None,
         None,
-        forecast_horizon=horizon,
+        forecast_horizon=cfg.runtime.horizon,
         back_horizon=cfg.runtime.lag_horizon,
-        max_embedding_dims=cfg.runtime.max_sentiment_embeddings
+        max_embedding_dims=cfg.runtime.max_sentiment_embeddings,
+        target_mode=cfg.runtime.target_mode,
+        custom_horizons=cfg.runtime.horizon_list
     )
 
     model = request.app.state.model
@@ -192,10 +193,11 @@ def fine_tune_model(
         price_df,
         pd.DataFrame(),
         None,
-        horizon,
+        cfg.runtime.horizon,
         pad_neutral=False
     )
 
+    horizon = cfg.runtime.horizon if cfg.runtime.target_mode == "step"  else cfg.runtime.horizon_list
     return _make_prediction(
         feature_row,
         model,
@@ -204,5 +206,6 @@ def fine_tune_model(
         request.app.state.y_scale,
         price_df,
         horizon,
-        return_path
+        return_path,
+        cfg.runtime.target_mode
     )

@@ -157,9 +157,10 @@ def _make_prediction(
         y_scale: bool,
         price_df: pd.DataFrame,
         horizon: int,
-        return_path: bool
+        return_path: bool,
+        target_mode: str
 ) -> PredictionResponse:
-    """Run model prediction and build response (direct log-returns)."""
+    """Run model prediction and build response (direct or rolling log-returns)."""
     try:
         X = preprocessor.transform(feature_row)
         yhat = np.asarray(model.predict(X), dtype=float)
@@ -172,29 +173,67 @@ def _make_prediction(
         logger.exception("Model prediction failed")
         raise HTTPException(500, "Prediction failed.")
 
-    H = min(horizon, yhat.shape[1])
     current_price = float(price_df["adj_close"].iloc[-1])
+    last_date = pd.to_datetime(price_df["date"]).iloc[-1]
 
-    # Horizon=1: first-step log return
-    log_return = float(yhat[0, 0])
-    predicted_price = current_price * float(np.exp(log_return))
+    if target_mode == "step":
+        H = min(horizon, yhat.shape[1])
+        # Horizon=1: first-step log return
+        log_return = float(yhat[0, 0])
+        predicted_price = current_price * float(np.exp(log_return))
 
-    response_kwargs: dict[str, Any] = {
-        "horizon": H,
-        "current_price": current_price,
-        "log_return": log_return,
-        "predicted_price": predicted_price,
-    }
+        response_kwargs: dict[str, Any] = {
+            "horizon": H,
+            "current_price": current_price,
+            "log_return": log_return,
+            "predicted_price": predicted_price,
+        }
 
-    if return_path:
-        logret_path = yhat[0, :H]
-        predicted_price_path = [current_price * np.exp(r) for r in logret_path]
-        future_dates = pd.bdate_range(price_df["date"].iloc[-1] + BDay(1), periods=H)
-        response_kwargs.update(
-            log_return_path=logret_path.tolist(),
-            predicted_price_path=predicted_price_path,
-            predicted_dates=future_dates.strftime("%Y-%m-%d").tolist(),
-            last_date=pd.to_datetime(price_df["date"].iloc[-1]).date(),
-        )
+        if return_path:
+            logret_path = yhat[0, :H]
+            predicted_price_path = current_price * np.exp(np.cumsum(logret_path))
+            future_dates = pd.bdate_range(last_date + BDay(1), periods=H)
+            response_kwargs.update(
+                log_return_path=logret_path.tolist(),
+                predicted_price_path=predicted_price_path.tolist(),
+                predicted_dates=future_dates.strftime("%Y-%m-%d").tolist(),
+                last_date=last_date.date(),
+            )
 
-    return PredictionResponse(**response_kwargs)
+        return PredictionResponse(**response_kwargs)
+
+    elif target_mode == "rolling":
+        # yhat shape (1,X)
+        horizons = cfg.runtime.horizon_list
+        horizon_preds = {h: float(yhat[0, i]) for i, h in enumerate(horizons) if i < yhat.shape[1]}
+
+        # Default to horizon=20 for path
+        H = 20
+        total_return = horizon_preds.get(20, 0.0)
+        # Approximate daily path as equal-split of 20-day return
+        logret_path = np.full(H, total_return / H)
+        predicted_price_path = current_price * np.exp(np.cumsum(logret_path))
+
+        response_kwargs: dict[str, Any] = {
+            "horizon": H,
+            "current_price": current_price,
+            "log_return": horizon_preds.get(1, float("nan")),
+            "predicted_price": float(predicted_price_path[-1]),
+            "log_return_1": horizon_preds.get(1),
+            "log_return_5": horizon_preds.get(5),
+            "log_return_20": horizon_preds.get(20)
+        }
+
+        if return_path:
+            future_dates = pd.bdate_range(last_date + BDay(1), periods=H)
+            response_kwargs.update(
+                log_return_path=logret_path.tolist(),
+                predicted_price_path=predicted_price_path.tolist(),
+                predicted_dates=future_dates.strftime("%Y-%m-%d").tolist(),
+                last_date=last_date.date(),
+            )
+
+        return PredictionResponse(**response_kwargs)
+
+    else:
+        raise HTTPException(400, f"Unknown target_mode={target_mode}")

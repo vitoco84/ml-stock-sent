@@ -49,24 +49,29 @@ def validate_symbol(symbol: str) -> None:
         st.error("Invalid symbol format.")
         st.stop()
 
+# ---------------------------------------------------------
+# UI: Mode Selection
+# ---------------------------------------------------------
 mode = st.radio("Data source", ["Fetch from API", "Upload CSVs"], horizontal=True)
 st.caption(
     "Model is currently trained for **^DJI (Dow Jones)**. "
     "You can change the ticker, but predictions may be less accurate."
 )
 
-#  Mode: Upload CSVs
+# ---------------------------------------------------------
+# Mode: Upload CSVs
+# ---------------------------------------------------------
 if mode == "Upload CSVs":
     clear_fetch_state()
     st.subheader("Upload CSVs")
 
     # Price uploader
-    st.markdown("<span style='color:#16a34a; font-weight:700'>Prices CSV</span>", unsafe_allow_html=True)
+    st.markdown("**📈 Prices CSV**")
     price_file = st.file_uploader(
         "Prices CSV (date, open, high, low, close, adj_close, volume)",
         type=["csv"],
         key="price_upl",
-        label_visibility="collapsed"
+        label_visibility="collapsed",
     )
 
     if price_file:
@@ -76,12 +81,12 @@ if mode == "Upload CSVs":
         st.session_state.pop("price_csv_df", None)
 
     # News uploader
-    st.markdown("<span style='color:#2563eb; font-weight:700'>News CSV (optional)</span>", unsafe_allow_html=True)
+    st.markdown("**📰 News CSV (optional)**")
     news_file = st.file_uploader(
         "News CSV (date, headline)",
         type=["csv"],
         key="news_upl",
-        label_visibility="collapsed"
+        label_visibility="collapsed",
     )
 
     if news_file:
@@ -103,25 +108,19 @@ if mode == "Upload CSVs":
         "Missing-news strategy",
         ["Do nothing (ignore news)", "Enrich with LLM (needs ≥1)", "Pad with neutral (needs ≥2)"],
         index=0,
-        help=(
-            "Do nothing: ignore all news → neutral every day.\n"
-            "Enrich: use your news (≥1 headline) and generate the missing dates.\n"
-            "Pad: use your news (≥2 headlines) and neutral-fill gaps (no generation)."
-        )
     )
     enrich_flag_csv = fill_strategy_csv == "Enrich with LLM (needs ≥1)"
     pad_neutral_csv = fill_strategy_csv == "Pad with neutral (needs ≥2)"
     ignore_news_csv = fill_strategy_csv == "Do nothing (ignore news)"
-
-    h_sel_csv = st.number_input("Forecast horizon (business days)", min_value=1, max_value=20, value=20, step=1)
 
     can_predict_csv = isinstance(st.session_state.get("price_csv_df"), pd.DataFrame) and not st.session_state[
         "price_csv_df"
     ].empty
     predict_btn = st.button("Predict Price", disabled=not can_predict_csv)
 
-
-#  Mode: Fetch from API
+# ---------------------------------------------------------
+# Mode: Fetch from API
+# ---------------------------------------------------------
 else:
     clear_csv_state()
     with st.form("fetch_controls"):
@@ -137,14 +136,12 @@ else:
         with c1:
             days = st.slider("Lookback Days", min_value=20, max_value=365, value=int(st.session_state.get("days", 90)))
         with c2:
-            h_sel_fetch = st.number_input(
-                "Forecast horizon (business days)", min_value=1, max_value=20, value=20, step=1
-            )
+            st.markdown("**Forecast horizon: fixed 20 business days**")
 
         fill_strategy = st.radio(
             "Missing-news strategy",
             ["Do nothing (ignore news)", "Enrich with LLM (needs ≥1)", "Pad with neutral (needs ≥2)"],
-            index=0
+            index=0,
         )
         enrich_flag = fill_strategy == "Enrich with LLM (needs ≥1)"
         pad_neutral_flag = fill_strategy == "Pad with neutral (needs ≥2)"
@@ -169,7 +166,7 @@ else:
                 r = HTTP.get(
                     f"{API_URL}/price-history",
                     params={"symbol": symbol, "end_date": end_date.strftime("%Y-%m-%d"), "days": int(days)},
-                    timeout=(CONNECT_TIMEOUT, READ_TIMEOUT_FETCH)
+                    timeout=(CONNECT_TIMEOUT, READ_TIMEOUT_FETCH),
                 )
                 r.raise_for_status()
                 data = r.json()
@@ -190,7 +187,9 @@ else:
                     st.session_state.pop("fetched_price_df", None)
                     st.warning("No price data returned.")
 
-#  Prediction logic
+# ---------------------------------------------------------
+# Prediction logic
+# ---------------------------------------------------------
 if "predict_btn" in locals() and predict_btn:
     # Prepare payload
     if mode == "Upload CSVs":
@@ -223,22 +222,15 @@ if "predict_btn" in locals() and predict_btn:
             "enrich": enrich_flag_csv,
             "pad_neutral": pad_neutral_csv,
             "ignore_news": ignore_news_csv,
-            "horizon": int(h_sel_csv),
+            "horizon": 20,
             "return_path": True,
-            "symbol": "CSV"
+            "symbol": "CSV",
         }
 
     else:
         price_df = st.session_state.get("fetched_price_df")
         if price_df is None or price_df.empty:
             st.warning("Fetch price history first.")
-            st.stop()
-
-        if enrich_flag and not st.session_state.get("news_input"):
-            st.error("Enrich requires ≥1 headline above.")
-            st.stop()
-        if pad_neutral_flag and len(st.session_state.get("news_input", [])) < 2:
-            st.error("Pad with neutral requires ≥2 example headlines above.")
             st.stop()
 
         news_records: list[dict[str, str]] = [
@@ -249,9 +241,9 @@ if "predict_btn" in locals() and predict_btn:
             "enrich": enrich_flag,
             "pad_neutral": pad_neutral_flag,
             "ignore_news": ignore_news_flag,
-            "horizon": int(h_sel_fetch),
+            "horizon": 20,
             "return_path": True,
-            "symbol": st.session_state.get("symbol", "^DJI")
+            "symbol": st.session_state.get("symbol", "^DJI"),
         }
 
     # Call API
@@ -261,7 +253,7 @@ if "predict_btn" in locals() and predict_btn:
                 f"{API_URL}/predict-raw",
                 params=params,
                 json=payload,
-                timeout=(CONNECT_TIMEOUT, READ_TIMEOUT_PREDICT)
+                timeout=(CONNECT_TIMEOUT, READ_TIMEOUT_PREDICT),
             )
             r.raise_for_status()
             result = r.json()
@@ -274,16 +266,49 @@ if "predict_btn" in locals() and predict_btn:
             st.error(f"Prediction failed [{status}]: {body or e}")
             st.stop()
 
+    # ---------------------------------------------------------
     # Display results
+    # ---------------------------------------------------------
     st.success("Prediction Complete")
     current_price = float(result.get("current_price", float("nan")))
-    log_return = float(result.get("log_return", float("nan")))
-
     st.write(f"**Current Price:** ${current_price:.2f}")
-    st.write(f"**Next-day Predicted Log Return (h=1):** {log_return:.4f}")
-    st.write(f"**Implied Next-day Price:** ${current_price * np.exp(log_return):.2f}")
 
+    rows = []
+
+    # Rolling mode: detect keys like log_return_5, log_return_20...
+    rolling_keys = [k for k in result.keys() if k.startswith("log_return_")]
+    if rolling_keys:
+        for k in sorted(rolling_keys, key=lambda x: int(x.split("_")[2])):
+            h = int(k.split("_")[2])
+            log_ret = float(result[k])
+            implied_price = current_price * np.exp(log_ret)
+            rows.append({
+                "Horizon": f"{h} days",
+                "Predicted Log Return": f"{log_ret:.4f}",
+                "Implied Adj Close": f"${implied_price:,.2f}"
+            })
+
+    # Step mode: cumulative from log_return_path
+    elif "log_return_path" in result:
+        logret_path = [float(x) for x in result.get("log_return_path", [])]
+        for h in [1, len(logret_path)]:  # you could also show multiple points
+            if len(logret_path) >= h:
+                cum_ret = np.sum(logret_path[:h])
+                implied_price = current_price * np.exp(cum_ret)
+                rows.append({
+                    "Horizon": f"{h} days",
+                    "Predicted Log Return": f"{cum_ret:.4f}",
+                    "Implied Adj Close": f"${implied_price:,.2f}"
+                })
+
+    # Show results
+    if rows:
+        st.subheader("Predicted Return & Implied Price")
+        st.table(pd.DataFrame(rows))
+
+    # ---------------------------------------------------------
     # Plot forecast path
+    # ---------------------------------------------------------
     df_prices = price_df.copy()
     if {"adj_close", "date"} <= set(df_prices.columns):
         df_prices["date"] = pd.to_datetime(df_prices["date"])
@@ -292,11 +317,7 @@ if "predict_btn" in locals() and predict_btn:
         pred_dates = [pd.to_datetime(d) for d in result.get("predicted_dates", [])]
         logret_path = [float(x) for x in result.get("log_return_path", [])]
 
-        # Build forecast path only if horizon > 1
-        if logret_path:
-            pred_prices = (current_price * np.exp(np.cumsum(logret_path))).tolist()
-        else:
-            pred_prices = []
+        pred_prices = (current_price * np.exp(np.cumsum(logret_path))).tolist() if logret_path else []
 
         if pred_dates and pred_prices and len(pred_dates) == len(pred_prices):
             path_df = pd.DataFrame({"date": pred_dates, "price": pred_prices})
@@ -310,7 +331,7 @@ if "predict_btn" in locals() and predict_btn:
             ).properties(
                 width=700,
                 height=380,
-                title=f"Adj Close: Actual and Forecasted (via log-returns) Next {result.get('horizon', 0)} Days"
+                title="Adj Close Forecast – Next 20 Business Days",
             )
             st.subheader("Price Chart")
             st.altair_chart(chart, use_container_width=True)

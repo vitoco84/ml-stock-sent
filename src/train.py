@@ -180,12 +180,6 @@ class ModelTrainer:
         else:
             candidate.fit(X_tr_s, y_tr_s)
 
-    def _maybe_inverse(self, pred: np.ndarray, y_s: Optional[SafeStandardScaler]) -> np.ndarray:
-        """Inverse scale predictions if needed."""
-        if self.y_scale and y_s is not None:
-            pred = y_s.inverse_transform(pred)
-        return pred
-
     @staticmethod
     def _score_metric(y_true: np.ndarray, y_pred: np.ndarray, metric_name: str) -> float:
         """Compute a single metric."""
@@ -245,7 +239,14 @@ class ModelTrainer:
                 pred = np.asarray(candidate.predict(X_va_s))
                 if pred.ndim == 1:
                     pred = pred.reshape(-1, 1)
-                pred = self._maybe_inverse(pred, y_s)
+
+                # Inverse-scale
+                if self.y_scale and y_s is not None:
+                    y_va = y_s.inverse_transform(pd.DataFrame(y_va_s))
+                    pred = y_s.inverse_transform(pd.DataFrame(pred))
+                else:
+                    y_va = np.asarray(y_va).ravel()
+                    pred = pred.ravel()
 
                 # Score, Report, Prune
                 fold_score = self._score_metric(y_va, pred, metric_name)

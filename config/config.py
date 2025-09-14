@@ -59,11 +59,20 @@ class Config:
 
     @classmethod
     def load(cls, path: Path | str | None = None) -> Config:
-        """Load a config file."""
+        """Load a config file, resolving automatically in any environment."""
         if path is None:
             env_path = os.getenv("CONFIG_PATH")
             if env_path:
                 path = Path(env_path)
             else:
-                path = Path(__file__).resolve().parents[2] / "ml-stock-sent" / "config" / "config.yaml"
+                # Walk upwards until we find config/config.yaml
+                cur = Path(__file__).resolve()
+                for parent in cur.parents:
+                    candidate = parent / "config" / "config.yaml"
+                    if candidate.exists():
+                        path = candidate
+                        break
+                else:
+                    raise FileNotFoundError("Could not find config/config.yaml")
+
         return cls(path)

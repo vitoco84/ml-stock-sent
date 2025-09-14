@@ -1,6 +1,6 @@
 {
   "kind": "linreg",
-  "study": "<optuna.study.study.Study object at 0x000001869DCBD760>",
+  "study": "<optuna.study.study.Study object at 0x000001865C955B80>",
   "horizon": 20,
   "include_sentiment": true,
   "best_params": {
@@ -81,7 +81,7 @@
       }
     }
   },
-  "trainer": "<src.train.ModelTrainer object at 0x00000186A59CD1C0>",
+  "trainer": "<src.train.ModelTrainer object at 0x000001866454C5C0>",
   "paths": {
     "model": "..\\data\\models\\linreg.pkl",
     "params_csv": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\linreg_best_params.csv",

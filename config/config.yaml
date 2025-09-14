@@ -15,9 +15,9 @@ data:
 runtime:
   seed: 42
   horizon: 20
-  horizon_list: [1,5,20]
+  horizon_list: [ 1, 5, 20 ]
   lag_horizon: 7
-  n_trials: [30,100]
+  n_trials: [ 30, 100 ]
   n_splits: 3
   n_jobs: 8
   gap: 20

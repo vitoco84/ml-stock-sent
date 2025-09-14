@@ -43,3 +43,6 @@ class PredictionResponse(BaseModel):
     predicted_price_path: Optional[list[float]] = None
     predicted_dates: Optional[list[date]] = None
     last_date: Optional[date] = None
+    log_return_1: Optional[float] = None
+    log_return_5: Optional[float] = None
+    log_return_20: Optional[float] = None
