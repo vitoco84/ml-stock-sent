@@ -1,9 +1,0 @@
-,0
-hidden,"(256, 128, 64)"
-dropout,0.2926641782970718
-use_bn,True
-lr,0.002043300639503526
-epochs,100
-batch_size,512
-weight_decay,1.302886275333651e-05
-random_state,42

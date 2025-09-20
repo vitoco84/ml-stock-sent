@@ -1,6 +1,7 @@
 ,0
-alpha,0.009980068547995338
-l1_ratio,0.9867259022137341
+alpha,0.009982511475068118
+l1_ratio,0.9894612555321152
 max_iter,2500
-selection,cyclic
+eta0,0.0012559995078456183
+learning_rate,constant
 random_state,42

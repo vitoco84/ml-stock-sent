@@ -1,20 +1,28 @@
 # Python cruft
-.venv/
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
 *.pyd
+*.pyo
+*.pyc
+.venv/
 
-# VCS & build
+# Bytecode & artifacts
+*.pkl
+*.joblib
+
+# VCS
 .git/
 .gitignore
+
+# Build & caches
 dist/
 build/
 .pytest_cache/
 .mypy_cache/
 ruff_cache/
+.cache/
 
-# Data & models (keeps builds small / avoids long paths)
+# Hugging Face / Models / Data
 hf-cache/
 .hf/
 .hf_cache/
@@ -22,22 +30,14 @@ data/
 models/
 notebooks/
 
-# OS/IDE
+# IDE / OS
 .DS_Store
 Thumbs.db
 .idea/
 .vscode/
 
-# Python cache
-*.py[cod]
-*.pkl
-*.joblib
-
 # Jupyter
 .ipynb_checkpoints/
-
-# Local cache
-.cache/
 
 # Logs
 logs/

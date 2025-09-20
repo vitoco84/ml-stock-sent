@@ -1,8 +1,7 @@
 from datetime import date
-from typing import List, Optional
+from typing import Optional
 
 from pydantic import BaseModel, Field
-from typing_extensions import Annotated
 
 
 class PriceRow(BaseModel):
@@ -21,31 +20,29 @@ class NewsRow(BaseModel):
     headline: str
 
 class PredictionRequest(BaseModel):
-    """
-    Schema for prediction request.
-    Contains:
-    - A list of price rows
-    - A list of news headlines
-    """
-    price: Annotated[list[PriceRow], Field(max_length=2000)]
-    news: Optional[Annotated[list[NewsRow], Field(max_length=2000)]] = None
+    """Schema for prediction request with prices and optional news."""
+    price: list[PriceRow] = Field(..., max_length=2000)
+    news: Optional[list[NewsRow]] = Field(default=None, max_length=2000)
 
 class PriceHistoryResponse(BaseModel):
     """Schema for price history response."""
-    price: List[PriceRow]
+    price: list[PriceRow]
 
 class NewsHistoryResponse(BaseModel):
     """Schema for news history response."""
-    news: List[NewsRow]
+    news: list[NewsRow]
     message: Optional[str] = None
 
 class PredictionResponse(BaseModel):
-    """Full schema for prediction response."""
+    """Schema for prediction response."""
     horizon: int
-    log_return: float
     current_price: float
+    log_return: float
     predicted_price: float
-    log_return_path: Optional[List[float]] = None
-    predicted_price_path: Optional[List[float]] = None
-    predicted_dates: Optional[List[date]] = None
+    log_return_path: Optional[list[float]] = None
+    predicted_price_path: Optional[list[float]] = None
+    predicted_dates: Optional[list[date]] = None
     last_date: Optional[date] = None
+    log_return_1: Optional[float] = None
+    log_return_5: Optional[float] = None
+    log_return_20: Optional[float] = None

@@ -1,4 +1,4 @@
-# Python
+# Python cruft
 __pycache__/
 *.py[cod]
 *.pyo
@@ -7,22 +7,43 @@ __pycache__/
 env/
 venv/
 ENV/
+.venv/
+
+# Bytecode & artifacts
+*.pkl
+*.joblib
 *.sqlite3
 *.db
-*.log
-*.env
+
+# VCS
+.git/
+.gitignore
+
+# Build & caches
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+ruff_cache/
+.cache/
+
+# Hugging Face / Models / Data
+hf-cache/
+.hf/
+.hf_cache/
+data/
+models/
+notebooks/
 
 # Jupyter & IPython
-.ipynb_checkpoints
+.ipynb_checkpoints/
 
 # IDEs
 .idea/
 *.iml
 *.iws
 *.ipr
-
-# Bytecode
-*.class
+.vscode/
 
 # Assets
 assets/
@@ -35,10 +56,10 @@ Thumbs.db
 *.tar
 *.lock
 
+# Logs
+logs/
+*.log
+
 # Secrets
 secrets.*
-
-# Caching
-.cache/
-*.pkl
-*.joblib
+*.env

@@ -6,7 +6,7 @@ Forecast stock prices by combining:
 - 📊 Historical market data (Yahoo Finance)
 - 📰 News sentiment via [FinBERT](https://huggingface.co/yiyanghkust/finbert-tone)
 - 🤖 Optional headline generation with local LLMs (Ollama)
-- ⚡ A production-ready FastAPI backend + Streamlit dashboard
+- ⚡ A production-ready FastAPI backend and Streamlit dashboard
 
 ---
 
@@ -150,11 +150,10 @@ Fetch recent news headlines via NewsAPI.
 ---
 
 ### `POST /predict-raw`
-Predict next prices using historical **price** data and optional **news**.
+Predict next price log-returns using historical prices, news sentiment, and FinBERT.
 
 **Query params**
 - `symbol` *(str, required)* - Ticker symbol for context (e.g., `AAPL`)
-- `horizon` *(int, default `30`, min `1`, max `30`)* - number of steps to return
 - `return_path` *(bool, default `true`)* - whether to return full H‑step paths
 - `enrich` *(bool, default `false`)* - generate missing headlines locally (requires reachable `OLLAMA_URL`)
 - `pad_neutral` *(bool, default `false`)* - Use provided headlines and fill missing days with neutral sentiment (requires ≥2 headlines, no generation)
@@ -176,16 +175,35 @@ Predict next prices using historical **price** data and optional **news**.
 }
 ```
 
-**Response - `PredictionResponse` (when `return_path=true`)**
+**Response - `PredictionResponse` (Step Target Mode, when `return_path=true`)**
 ```json
 {
-  "horizon": 5,
-  "log_return": 0.0035,
+  "horizon": 20,
   "current_price": 105.0,
+  "log_return": 0.0035,
   "predicted_price": 105.37,
   "log_return_path": [0.0035, 0.0012, 0.0007, -0.0003, 0.0021],
   "predicted_price_path": [105.37, 105.50, 105.57, 105.54, 105.77],
   "predicted_dates": ["2025-01-10", "2025-01-13", "2025-01-14", "2025-01-15", "2025-01-16"],
+  "last_date": "2025-01-09"
+}
+```
+**Response - `PredictionResponse` (Rolling Target Mode, when `return_path=true`)**
+```json
+{
+  "horizon": [1, 5, 20],
+  "current_price": 105.0,
+  "log_return_1": -0.0021,
+  "predicted_price_1": 104.78,
+  "log_return_5": 0.0065,
+  "predicted_price_5": 105.69,
+  "log_return_20": 0.0123,
+  "predicted_price_20": 106.29,
+  "log_return": -0.0021,
+  "predicted_price": 106.29,
+  "log_return_path": [-0.0001, -0.0001, ...], 
+  "predicted_price_path": [105.8, 105.9, ...],
+  "predicted_dates": ["2025-01-10", "2025-01-13", "..."],
   "last_date": "2025-01-09"
 }
 ```
@@ -206,7 +224,7 @@ Predict next prices using historical **price** data and optional **news**.
 
 **cURL example**
 ```bash
-curl -X POST "http://localhost:8000/predict-raw?symbol=AAPL&horizon=5&return_path=true&ignore_news=false&enrich=false&pad_neutral=true" \
+curl -X POST "http://localhost:8000/predict-raw?symbol=AAPL&return_path=true&ignore_news=false&enrich=false&pad_neutral=true" \
   -H "Content-Type: application/json" \
   -d '{
         "price":[
@@ -227,17 +245,11 @@ curl -X POST "http://localhost:8000/predict-raw?symbol=AAPL&horizon=5&return_pat
 1. **01_eda.ipynb** - Exploratory Data Analysis
 2. **02_sentiment.ipynb** - Sentiment analysis with FinBERT
 3. **03_feature.ipynb** - Feature engineering
-4. **04_adfulller_test.ipynb** - Stationarity test (Augmented Dickey–Fuller)
-5. **05_linreg.ipynb** - Linear Regression Model
-6. **06_linreg_wo_sent.ipynb** - Linear Regression without Sentiment
-7. **07_xgboost.ipynb** - XGBoost Model (RT: ~20min)
-8. **08_random_forest.ipynb** - Random Forest Model (RT: ~30min)
-9. **09_mlp.ipynb** - Feed Forward Multi Layer Perceptron
-10. **10_cnn.ipynb** - Convolutional Neural Network
-11. **11_lstm.ipynb** - Long Short-term Memory
-12. **12_stacking.ipynb** - Stacking Model (RT: ~1h)
-13. **13_results_plots.ipynb** - Combined Plots
-14. **14_shap.ipynb** - Model evaluation and interpretability (SHAP)
+4. **04_pipeline.ipynb** - Train and Tune Models (linreg, xgboost, random_forest, cnn and lstm)
+5. **05_eval.ipynb** - Stationarity test (Augmented Dickey–Fuller) and interpretability (SHAP)
+6. **06_results_plots.ipynb** - Combined Plots and Results
+
+> Note: The Notebooks should be run in order.
 
 ---
 
@@ -317,21 +329,26 @@ docker compose down -v # removes volumes
 ```
 Status:
 ```bash
+docker ps -a
 docker compose ps
 ```
 Prune:
 ```bash
 docker image prune
+docker image prune -af # -af remove all unused and skip confirmation
 ```
 Ollama:
 ```bash
+docker pull ollama/ollama:latest
+
+# Run docker compose up then pull model
 docker exec -it ollama ollama pull llama3 # first time only pull ollama llama3
-docker exec -it ollama ollama list
+docker exec -it ollama ollama list # list installed models
 ```
 Logs:
 ```bash
-docker compose logs api --tail=200
-docker compose logs ui --tail=200
+docker compose logs -f api
+docker compose logs -f ui
 ```
 
 ---
@@ -358,7 +375,7 @@ This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for d
 - [ ] Transfer Learning and Fine-Tuning
 - [ ] Write **academic-style report** (thesis-like)
 - [ ] Prepare **PowerPoint** presentation
-- [ ] Optional: Deploy demo API + Streamlit to cloud (Render / Fly.io / AWS)
+- [ ] Optional: Deploy demo API and Streamlit to cloud (Render / Fly.io / AWS)
 - [ ] If deployed:
     - [ ] Add authentication
     - [ ] Add rate-limiting

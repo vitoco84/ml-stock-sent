@@ -7,18 +7,59 @@ from src.data import merge_price_news
 from src.sentiment import FinBERT
 
 
+def _make_targets(
+        df: pd.DataFrame,
+        forecast_horizon: int,
+        target_mode: str,
+        custom_horizons: Optional[list[int]]
+) -> pd.DataFrame:
+    if target_mode == "step":
+        if forecast_horizon > 1:
+            for h in range(1, forecast_horizon + 1):
+                df[f"target_{h}"] = df["log_return"].shift(-h)
+        else:
+            df["target"] = df["log_return"].shift(-1)
+    elif target_mode == "rolling":
+        horizons = custom_horizons or [5, 20]
+        for h in horizons:
+            df[f"target_{h}"] = df["log_return"].rolling(h).sum().shift(-h)
+    else:
+        raise ValueError(f"Unknown target_mode={target_mode}")
+    return df
+
+def _make_lags(df: pd.DataFrame, back_horizon: int) -> pd.DataFrame:
+    for k in range(1, back_horizon + 1):
+        df[f"lag_{k}"] = df["log_return"].shift(k)
+    return df
+
+def _make_ohlc_features(df: pd.DataFrame) -> pd.DataFrame:
+    for c in ["open", "high", "low", "close", "adj_close", "volume"]:
+        if c in df.columns:
+            val = np.log1p(df[c]) if c == "volume" else df[c]
+            df[f"{c}_l"] = val.shift(1)
+    return df
+
 def create_features_and_target(
         df: pd.DataFrame,
-        forecast_horizon: int = 1,
-        back_horizon: int = 7,
-        training: bool = False
+        forecast_horizon: int,
+        back_horizon: int,
+        training: bool = False,
+        *,
+        target_mode: str,
+        custom_horizons: Optional[list[int]] = None
 ) -> pd.DataFrame:
     """
+    Create features and targets from price and sentiment data.
+
     Features:
-      - Sliding lagged log returns: lag_1 ... lag_{n_lags}
-      - Calendar: day-of-week
-    Targets:
-      - Multi-step log return targets (target_1 ... target_H), or 'target' for 1-step
+      - OHLC shifted features
+      - Calendar (day of week)
+      - Lagged log returns
+      - Rolling momentum
+
+    Target mode:
+      - "step": standard t+1, t+2, …, t+H log returns
+      - "rolling": cumulative log return over given horizons (e.g. 5, 20 days)
     """
     df = df.copy()
     df["date"] = pd.to_datetime(df["date"])
@@ -31,102 +72,82 @@ def create_features_and_target(
     df["log_return"] = np.log(price / price.shift(1))
 
     # Targets
-    if forecast_horizon > 1:
-        for h in range(1, forecast_horizon + 1):
-            df[f"target_{h}"] = df["log_return"].shift(-h)
-    else:
-        df["target"] = df["log_return"].shift(-1)
+    df = _make_targets(df, forecast_horizon, target_mode, custom_horizons)
 
-    # Lags of log-returns
-    for k in range(1, back_horizon + 1):
-        df[f"lag_{k}"] = df["log_return"].shift(k)
+    # Lag features
+    df = _make_lags(df, back_horizon)
 
-    # OHLC Shifted
-    df["open_l"] = df["open"].shift(1)
-    df["high_l"] = df["high"].shift(1)
-    df["low_l"] = df["low"].shift(1)
-    df["close_l"] = df["close"].shift(1)
-    df["adj_close_l"] = df["adj_close"].shift(1)
-    df["volume_l"] = np.log1p(df["volume"].shift(1).astype(float))
+    # Rolling momentum
+    df["mom_10"] = np.log(df["adj_close"] / df["adj_close"].shift(10))
 
-    # Rolling
-    df["ret_mean_5"] = df["log_return"].shift(1).rolling(5).mean()
-    df["ret_std_5"]  = df["log_return"].shift(1).rolling(5).std()
+    # OHLC features
+    df = _make_ohlc_features(df)
 
-    # Momentum
-    df["mom_10"] = np.log(df["adj_close"].shift(1) / df["adj_close"].shift(11))
-
-    # Calendar
+    # Calendar features
     df["dow"] = df["date"].dt.dayofweek.astype(int)
 
-    #  Keep only rows with full features and targets
+    # Drop incomplete rows
     if training:
-        return df.iloc[back_horizon: len(df) - forecast_horizon].copy()
-    else:
-        # Inference: keep latest rows even if targets are NaN
-        return df.iloc[back_horizon:].copy()
+        return df.iloc[max(back_horizon, 10): len(df) - forecast_horizon].copy()
+    return df.iloc[back_horizon:].copy()
 
-def _neutral_sentiment(max_embedding_dims, price_dates_norm):
+def _neutral_sentiment(max_embedding_dims: int, price_dates_norm: pd.Series) -> pd.DataFrame:
+    """Return neutral (zeroed) sentiment embeddings aligned with dates."""
     daily_sentiment = pd.DataFrame({"date": price_dates_norm})
-    daily_sentiment["pos"] = 0.0
-    daily_sentiment["neg"] = 0.0
-    daily_sentiment["neu"] = 0.0
-    daily_sentiment["pos_minus_neg"] = 0.0
+    base_cols = {"pos": 0.0, "neg": 0.0, "neu": 0.0, "pos_minus_neg": 0.0}
+    for k, v in base_cols.items():
+        daily_sentiment[k] = v
     for i in range(max_embedding_dims):
         daily_sentiment[f"emb_{i}"] = 0.0
     return daily_sentiment
 
-def _ensure_embeddings(daily_sentiment, max_embedding_dims):
+def _ensure_embeddings(daily_sentiment: pd.DataFrame, max_embedding_dims: int) -> None:
+    """Ensure sentiment DataFrame has embedding columns up to max_embedding_dims."""
     for i in range(max_embedding_dims):
         col = f"emb_{i}"
         if col not in daily_sentiment.columns:
             daily_sentiment[col] = 0.0
 
-def _fill_missing_neutral(daily_sentiment, fill_missing_neutral, max_embedding_dims, price_dates_norm):
-    if fill_missing_neutral:
-        ds = daily_sentiment.copy()
-        ds["date"] = pd.to_datetime(ds["date"]).dt.normalize()
+def _fill_missing_neutral(
+        daily_sentiment: pd.DataFrame,
+        fill_missing_neutral: bool,
+        max_embedding_dims: int,
+        price_dates_norm: pd.Series,
+) -> pd.DataFrame:
+    """Fill missing dates and sentiment values with neutral placeholders."""
+    if not fill_missing_neutral:
+        return daily_sentiment
 
-        emb_cols = [c for c in ds.columns if c.startswith("emb_")]
-        if not emb_cols and max_embedding_dims:
-            emb_cols = [f"emb_{i}" for i in range(max_embedding_dims)]
-            for c in emb_cols:
-                ds[c] = 0.0
+    ds = daily_sentiment.copy()
+    ds["date"] = pd.to_datetime(ds["date"]).dt.normalize()
 
-        for c in ["pos", "neg", "neu", "pos_minus_neg", *emb_cols]:
-            if c not in ds.columns:
-                ds[c] = 0.0
+    emb_cols = [c for c in ds.columns if c.startswith("emb_")]
+    if not emb_cols and max_embedding_dims:
+        emb_cols = [f"emb_{i}" for i in range(max_embedding_dims)]
+        for c in emb_cols:
+            ds[c] = 0.0
 
-        ds = (
-            ds.set_index("date")
-            .reindex(price_dates_norm.unique())
-            .reset_index()
-            .fillna(0.0)
-        )
-        daily_sentiment = ds
-    return daily_sentiment
+    for c in ["pos", "neg", "neu", "pos_minus_neg", *emb_cols]:
+        if c not in ds.columns:
+            ds[c] = 0.0
 
-def _drop_target_columns(features_df, forecast_horizon):
-    # Drop Targets, keep only last feature row for inference
+    ds = (
+        ds.set_index("date")
+        .reindex(price_dates_norm.unique())
+        .reset_index()
+        .fillna(0.0)
+    )
+    return ds
+
+def _drop_target_columns(features_df: pd.DataFrame, forecast_horizon: int) -> pd.DataFrame:
+    """Remove target columns from features (for inference)."""
     target_cols = [f"target_{i}" for i in range(1, forecast_horizon + 1)]
     if "target" in features_df.columns:
         target_cols.append("target")
-    features_df = features_df.drop(columns=[c for c in target_cols if c in features_df.columns], errors="ignore")
-    return features_df
+    return features_df.drop(columns=[c for c in target_cols if c in features_df.columns], errors="ignore")
 
-def generate_full_feature_row(
-        price_df: pd.DataFrame,
-        news_df: Optional[pd.DataFrame],
-        sentiment_model: Optional[FinBERT],
-        *,
-        forecast_horizon: int = 30,
-        back_horizon: int = 7,
-        max_embedding_dims: int = 17,
-        fill_missing_neutral: bool = True
-) -> pd.DataFrame:
-    """Generate a full feature row."""
+def _generate_feat_target(fill_missing_neutral, max_embedding_dims, news_df, price_df, sentiment_model):
     price_dates_norm = pd.to_datetime(price_df["date"]).dt.normalize()
-
     if sentiment_model is None or news_df is None or news_df.empty:
         daily_sentiment = _neutral_sentiment(max_embedding_dims, price_dates_norm)
     else:
@@ -135,19 +156,75 @@ def generate_full_feature_row(
         daily_sentiment.drop(columns=["headline_count"], inplace=True, errors="ignore")
 
         daily_sentiment = _fill_missing_neutral(
-            daily_sentiment,
-            fill_missing_neutral,
-            max_embedding_dims,
-            price_dates_norm
+            daily_sentiment, fill_missing_neutral, max_embedding_dims, price_dates_norm
         )
-
         _ensure_embeddings(daily_sentiment, max_embedding_dims)
-
     merged = merge_price_news(price_df, daily_sentiment)
-    features_df = create_features_and_target(merged, forecast_horizon, back_horizon)
+    return merged
+
+def generate_full_feature_row(
+        price_df: pd.DataFrame,
+        news_df: Optional[pd.DataFrame],
+        sentiment_model: Optional[FinBERT],
+        *,
+        forecast_horizon: int,
+        back_horizon: int,
+        max_embedding_dims: int,
+        fill_missing_neutral: bool = True,
+        target_mode: str,
+        custom_horizons: Optional[list[int]] = None
+) -> pd.DataFrame:
+    """
+    Generate the latest full feature row for inference.
+
+    Combines price history, engineered features, and optional FinBERT sentiment.
+    """
+    merged = _generate_feat_target(fill_missing_neutral, max_embedding_dims, news_df, price_df, sentiment_model)
+    features_df = create_features_and_target(
+        merged,
+        forecast_horizon=forecast_horizon,
+        back_horizon=back_horizon,
+        training=False,
+        target_mode=target_mode,
+        custom_horizons=custom_horizons
+    )
 
     if features_df.empty:
         raise ValueError("Feature DataFrame is empty. Likely due to insufficient price history.")
 
     features_df = _drop_target_columns(features_df, forecast_horizon)
     return features_df.tail(1).copy()
+
+def generate_training_data(
+        price_df: pd.DataFrame,
+        news_df: Optional[pd.DataFrame],
+        sentiment_model: Optional[FinBERT],
+        *,
+        forecast_horizon: int,
+        back_horizon: int,
+        max_embedding_dims: int,
+        fill_missing_neutral: bool = True,
+        target_mode: str,
+        custom_horizons: Optional[list[int]] = None
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Generate features and targets for model fine-tuning on a new stock.
+    """
+    merged = _generate_feat_target(fill_missing_neutral, max_embedding_dims, news_df, price_df, sentiment_model)
+    features_df = create_features_and_target(
+        merged,
+        forecast_horizon=forecast_horizon,
+        back_horizon=back_horizon,
+        training=True,
+        target_mode=target_mode,
+        custom_horizons=custom_horizons
+    )
+
+    target_cols = [c for c in features_df.columns if c.startswith("target")]
+    if not target_cols:
+        raise ValueError("No target columns found for fine-tuning.")
+
+    X = features_df.drop(columns=target_cols + ["date"], errors="ignore")
+    y = features_df[target_cols]
+
+    return X, y
