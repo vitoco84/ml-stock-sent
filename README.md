@@ -329,21 +329,26 @@ docker compose down -v # removes volumes
 ```
 Status:
 ```bash
+docker ps -a
 docker compose ps
 ```
 Prune:
 ```bash
 docker image prune
+docker image prune -af # -af remove all unused and skip confirmation
 ```
 Ollama:
 ```bash
+docker pull ollama/ollama:latest
+
+# Run docker compose up then pull model
 docker exec -it ollama ollama pull llama3 # first time only pull ollama llama3
-docker exec -it ollama ollama list
+docker exec -it ollama ollama list # list installed models
 ```
 Logs:
 ```bash
-docker compose logs api --tail=200
-docker compose logs ui --tail=200
+docker compose logs -f api
+docker compose logs -f ui
 ```
 
 ---

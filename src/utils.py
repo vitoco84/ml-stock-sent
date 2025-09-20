@@ -92,12 +92,12 @@ def results_to_df(results, key: Union[str, list[str]]) -> pd.DataFrame:
 
     return pd.concat(dfs, ignore_index=True)
 
-def _to_1d_float(arr) -> np.ndarray:
+def _to_float_array(arr) -> np.ndarray:
     if arr is None:
         return np.array([], dtype=float)
-    a = np.asarray(arr).ravel()
-    a = pd.to_numeric(pd.Series(a), errors="coerce").to_numpy(dtype=float)
-    return a[np.isfinite(a)]
+    a = np.asarray(arr)
+    a = pd.DataFrame(a).apply(pd.to_numeric, errors="coerce").to_numpy(dtype=float)
+    return a
 
 def load_results_from_dir(out_dir: Path, load_arrays: bool = True) -> list[dict]:
     results = []
@@ -109,9 +109,9 @@ def load_results_from_dir(out_dir: Path, load_arrays: bool = True) -> list[dict]
             npz_path = Path(res["paths"]["preds_npz"])
             if npz_path.exists():
                 with np.load(npz_path, allow_pickle=True) as data:
-                    res["y_pred_val"] = _to_1d_float(data.get("y_pred_val"))
-                    res["y_pred_test"] = _to_1d_float(data.get("y_pred_test"))
-                    res["y_pred_last"] = _to_1d_float(data.get("y_pred_last"))
+                    res["y_pred_val"] = _to_float_array(data.get("y_pred_val"))
+                    res["y_pred_test"] = _to_float_array(data.get("y_pred_test"))
+                    res["y_pred_last"] = _to_float_array(data.get("y_pred_last"))
 
             test_idx_path = Path(res["paths"]["test_index_npy"])
             if test_idx_path.exists():

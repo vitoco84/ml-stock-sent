@@ -1,0 +1,10 @@
+,0
+units,64
+dense_units,64
+dropout,0.17881998330222504
+lr,0.001597294020623316
+epochs,60
+batch_size,16
+bidirectional,False
+weight_decay,1.3142936602521716e-05
+random_state,42
