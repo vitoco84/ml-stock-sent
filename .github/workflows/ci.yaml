@@ -29,7 +29,9 @@ jobs:
 
       - name: Run tests with coverage
         run: |
-          pytest --cov=src tests/ -m "not integration and not slow"
+          pytest --cov=src tests/ -m "not integration and not slow" \
+            --cov-report=xml \
+            --junitxml=pytest-report.xml
 
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@v2
