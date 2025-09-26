@@ -19,6 +19,25 @@ from src.train import ModelTrainer
 from src.utils import set_seed
 
 
+def sign_strategy_returns(y_true: pd.DataFrame, y_pred: np.ndarray) -> pd.DataFrame:
+    """
+    Compute cumulative returns for a simple sign-based strategy.
+    - Long if prediction > 0, short if prediction < 0.
+    - Compare vs buy&hold and riskless asset.
+    """
+    y_true = np.asarray(y_true).ravel()
+    y_pred = np.asarray(y_pred).ravel()
+
+    signal = np.sign(y_pred)
+    strat_returns = signal * y_true
+
+    df = pd.DataFrame({
+        "strategy": np.cumsum(strat_returns),
+        "buy_hold": np.cumsum(y_true),
+        "riskless": np.zeros_like(y_true),
+    })
+    return df
+
 def run_experiments(
         df: pd.DataFrame,
         out_dir: Path,
@@ -86,7 +105,7 @@ def _run(
 
     # Data split and features
     train, val, test, forecast = time_series_split(
-df_full, train_ratio=train_ratio, val_ratio=val_ratio, horizon=forecast_horizon
+        df_full, train_ratio=train_ratio, val_ratio=val_ratio, horizon=forecast_horizon
     )
 
     drop_cols = ["open", "high", "low", "close", "volume", "adj_close"]
@@ -197,6 +216,10 @@ df_full, train_ratio=train_ratio, val_ratio=val_ratio, horizon=forecast_horizon
         with open(metrics_path, "w") as f:
             json.dump(metrics_test, f, indent=2)
 
+    # Economic sanity check: sign-based strategy
+    strat_df = sign_strategy_returns(y_test, y_pred_test)
+    strat_cum = strat_df.iloc[-1].to_dict()
+
     # Baseline: predict last observed return at each horizon
     if target_mode == "rolling":
         y_pred_naive = np.zeros_like(y_test)
@@ -226,6 +249,7 @@ df_full, train_ratio=train_ratio, val_ratio=val_ratio, horizon=forecast_horizon
         "include_sentiment": exp.include_sentiment,
         "best_params": best_params,
         "metrics": {"test": metrics_test, "baseline": baseline_metrics},
+        "strategy": strat_cum,
         "trainer": trainer,
         "paths": {
             "model": str(model_path),

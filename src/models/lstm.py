@@ -75,12 +75,12 @@ class LSTMModel(TorchBaseNN):
     @staticmethod
     def search_space(trial) -> dict:
         return {
-            "units": trial.suggest_int("units", 16, 64, step=16),
-            "dense_units": trial.suggest_int("dense_units", 16, 64, step=16),
-            "dropout": trial.suggest_float("dropout", 0.0, 0.3),
-            "lr": trial.suggest_float("lr", 5e-4, 3e-3, log=True),
-            "epochs": trial.suggest_int("epochs", 20, 100, step=20),
+            "units": trial.suggest_categorical("units", [16, 32]),
+            "dense_units": trial.suggest_categorical("dense_units", [16, 32]),
+            "dropout": trial.suggest_float("dropout", 0.3, 0.5),
+            "lr": trial.suggest_categorical("lr", [1e-3, 5e-4]),
+            "epochs": trial.suggest_int("epochs", 20, 30, step=10),
             "batch_size": trial.suggest_categorical("batch_size", [16, 32]),
             "bidirectional": trial.suggest_categorical("bidirectional", [False]),
-            "weight_decay": trial.suggest_float("weight_decay", 1e-6, 1e-4, log=True)
+            "weight_decay": trial.suggest_categorical("weight_decay", [1e-6, 1e-5])
         }

@@ -1,8 +1,8 @@
 {
-  "kind": "linreg",
-  "study": "<optuna.study.study.Study object at 0x0000020662DD53A0>",
+  "kind": "linreg_wo_sent",
+  "study": "<optuna.study.study.Study object at 0x00000203E55F4710>",
   "horizon": 20,
-  "include_sentiment": true,
+  "include_sentiment": false,
   "best_params": {
     "alpha": 0.01,
     "l1_ratio": 0.8324426408004217,
@@ -15,36 +15,36 @@
   "metrics": {
     "test": {
       "aggregate": {
-        "mae": 0.021740643488002056,
-        "mse": 0.0009596910001366339,
-        "rmse": 0.030978879904487087,
-        "r2": -0.05402723896383477,
-        "directional_accuracy": 0.47676419965576594
+        "mae": 0.02111946113711714,
+        "mse": 0.0009369296100031519,
+        "rmse": 0.030609305937952136,
+        "r2": -0.029028437064101187,
+        "directional_accuracy": 0.5077452667814114
       },
       "per_horizon": {
         "1": {
           "target_std": 0.01094026708934661,
-          "mae": 0.008357045398622292,
-          "mse": 0.0001247941930545459,
-          "rmse": 0.011171132129490991,
-          "r2": -0.048052283587503464,
-          "directional_accuracy": 0.5233160621761658
+          "mae": 0.008187661284050672,
+          "mse": 0.00011974243674886406,
+          "rmse": 0.010942688734898022,
+          "r2": -0.005626393386159778,
+          "directional_accuracy": 0.5181347150259067
         },
         "2": {
           "target_std": 0.02379922238546784,
-          "mae": 0.01878657520904375,
-          "mse": 0.0006015892131682019,
-          "rmse": 0.0245273156535362,
-          "r2": -0.06762547251151063,
-          "directional_accuracy": 0.4329896907216495
+          "mae": 0.0179448861270751,
+          "mse": 0.0005734463002495388,
+          "rmse": 0.023946738822844725,
+          "r2": -0.017680942182578097,
+          "directional_accuracy": 0.4381443298969072
         },
         "3": {
           "target_std": 0.04531775373336139,
-          "mae": 0.038078309856340115,
-          "mse": 0.002152689594187154,
-          "rmse": 0.04639708605275933,
-          "r2": -0.053632315829094335,
-          "directional_accuracy": 0.4742268041237113
+          "mae": 0.037225836000225644,
+          "mse": 0.002117600093011053,
+          "rmse": 0.046017389028616705,
+          "r2": -0.03645778565749147,
+          "directional_accuracy": 0.5670103092783505
         }
       }
     },
@@ -89,19 +89,19 @@
     }
   },
   "strategy": {
-    "strategy": -0.3173484988003275,
+    "strategy": 0.49902865165141935,
     "buy_hold": 0.6299693777873681,
     "riskless": 0.0
   },
-  "trainer": "<src.train.ModelTrainer object at 0x000002066AB9D730>",
+  "trainer": "<src.train.ModelTrainer object at 0x00000203ED21C0B0>",
   "paths": {
-    "model": "..\\data\\models\\linreg.pkl",
-    "params_csv": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\linreg_best_params.csv",
-    "metrics_json": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\linreg_metrics_test.json",
-    "baseline_metrics_json": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\linreg_metrics_test_naive.json",
-    "preds_npz": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\linreg_preds.npz",
-    "test_index_npy": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\linreg_test_index.npy",
-    "features_csv": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\linreg_features.csv",
-    "X_forecast_parquet": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\linreg_X_forecast.parquet"
+    "model": "..\\data\\models\\linreg_wo_sent.pkl",
+    "params_csv": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\linreg_wo_sent_best_params.csv",
+    "metrics_json": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\linreg_wo_sent_metrics_test.json",
+    "baseline_metrics_json": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\linreg_wo_sent_metrics_test_naive.json",
+    "preds_npz": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\linreg_wo_sent_preds.npz",
+    "test_index_npy": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\linreg_wo_sent_test_index.npy",
+    "features_csv": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\linreg_wo_sent_features.csv",
+    "X_forecast_parquet": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\linreg_wo_sent_X_forecast.parquet"
   }
 }

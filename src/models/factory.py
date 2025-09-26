@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Protocol, Type
 
 from config.config import Config
 from src.models.base import Base
@@ -29,61 +29,23 @@ class Experiment:
     build: ModelBuilder
     include_sentiment: bool
 
-experiments = [
-    Experiment(
-        name="linreg",
-        build=lambda horizon, seed, n_jobs: LinearElasticNet(
-            horizon=HORIZON,
-            random_state=SEED,
-            n_jobs=N_JOBS,
-            multioutput=True
-        ),
-        include_sentiment=True
-    ),
-    Experiment(
-        name="linreg_wo_sent",
-        build=lambda horizon, seed, n_jobs: LinearElasticNet(
-            horizon=HORIZON,
-            random_state=SEED,
-            n_jobs=N_JOBS,
-            multioutput=True
-        ),
-        include_sentiment=False
-    ),
-    Experiment(
-        name="xgboost",
-        build=lambda horizon, seed, n_jobs: XGBoost(
-            horizon=HORIZON,
-            random_state=SEED,
-            n_jobs=N_JOBS
-        ),
-        include_sentiment=True,
-    ),
-    Experiment(
-        name="random_forest",
-        build=lambda horizon, seed, n_jobs: RandomForest(
-            horizon=HORIZON,
-            random_state=SEED,
-            n_jobs=N_JOBS
-        ),
-        include_sentiment=True,
-    ),
-    Experiment(
-        name="cnn",
-        build=lambda horizon, seed, n_jobs: CNNModel(
-            horizon=HORIZON,
-            random_state=SEED,
-            n_jobs=N_JOBS
-        ),
-        include_sentiment=True
-    ),
-    Experiment(
-        name="lstm",
-        build=lambda horizon, seed, n_jobs: LSTMModel(
-            horizon=HORIZON,
-            random_state=SEED,
-            n_jobs=N_JOBS
-        ),
-        include_sentiment=True
+def make_builder(model_cls: Type[Base]) -> ModelBuilder:
+    return lambda horizon, seed, n_jobs: model_cls(
+        horizon=HORIZON,
+        random_state=SEED,
+        n_jobs=N_JOBS,
     )
-]
+
+base_models: dict[str, Type[Base]] = {
+    "linreg": LinearElasticNet,
+    "xgboost": XGBoost,
+    "random_forest": RandomForest,
+    "cnn": CNNModel,
+    "lstm": LSTMModel,
+}
+
+experiments: list[Experiment] = []
+for name, cls in base_models.items():
+    builder = make_builder(cls)
+    experiments.append(Experiment(name=name, build=builder, include_sentiment=True))
+    experiments.append(Experiment(name=f"{name}_wo_sent", build=builder, include_sentiment=False))
