@@ -142,10 +142,7 @@ def _run(
     out_path.mkdir(parents=True, exist_ok=True)
 
     if save:
-        pd.DataFrame({"feature": feature_cols}).to_csv(out_path / f"{exp.name}_features.csv", index=False)
         X_test.to_parquet(out_path / f"{exp.name}_X_test.parquet", index=False)
-        X_train.to_parquet(out_path / f"{exp.name}_X_train.parquet", index=False)
-        X_forecast.to_parquet(out_path / f"{exp.name}_X_forecast.parquet", index=False)
 
     # Preprocessor and Config
     preprocessor, _ = get_preprocessor(X_train_sub, exp.name)
@@ -211,10 +208,6 @@ def _run(
 
     # Metrics
     metrics_test = trainer.evaluate(X_test, y_test)
-    metrics_path = out_path / f"{exp.name}_metrics_test.json"
-    if save:
-        with open(metrics_path, "w") as f:
-            json.dump(metrics_test, f, indent=2)
 
     # Economic sanity check: sign-based strategy
     strat_df = sign_strategy_returns(y_test, y_pred_test)
@@ -228,15 +221,6 @@ def _run(
         y_pred_naive = np.tile(last_return, (len(y_test), 1))
 
     baseline_metrics = metrics(np.asarray(y_test), y_pred_naive, y_insample=np.asarray(y_train))
-    baseline_path = out_path / f"{exp.name}_metrics_test_naive.json"
-    if save:
-        with open(baseline_path, "w") as f:
-            json.dump(baseline_metrics, f, indent=2)
-
-    # Save artifacts
-    params_path = out_path / f"{exp.name}_best_params.csv"
-    if save:
-        pd.Series(best_params).to_csv(params_path)
 
     model_path = ""
     if save:
@@ -253,9 +237,9 @@ def _run(
         "trainer": trainer,
         "paths": {
             "model": str(model_path),
-            "params_csv": str(params_path),
-            "metrics_json": str(metrics_path),
-            "baseline_metrics_json": str(baseline_path),
+            "params_csv": str(out_path / f"{exp.name}_best_params.csv"),
+            "metrics_json": str(out_path / f"{exp.name}_metrics_test.json"),
+            "baseline_metrics_json": str(out_path / f"{exp.name}_metrics_test_naive.json"),
             "preds_npz": str(out_path / f"{exp.name}_preds.npz"),
             "test_index_npy": str(out_path / f"{exp.name}_test_index.npy"),
             "features_csv": str(out_path / f"{exp.name}_features.csv"),

@@ -1,16 +1,16 @@
-# 📈 Stock Market Forecast with FinBERT Sentiment Analysis
+# Stock Market Forecast with FinBERT Sentiment Analysis
 
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=vitoco84_ml-stock-sent&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=vitoco84_ml-stock-sent)
 
 Forecast stock prices by combining:
-- 📊 Historical market data (Yahoo Finance)
-- 📰 News sentiment via [FinBERT](https://huggingface.co/yiyanghkust/finbert-tone)
-- 🤖 Optional headline generation with local LLMs (Ollama)
-- ⚡ A production-ready FastAPI backend and Streamlit dashboard
+- Historical market data (Yahoo Finance)
+- News sentiment via [FinBERT](https://huggingface.co/yiyanghkust/finbert-tone)
+- Optional headline generation with local LLMs (Ollama)
+- A production-ready FastAPI backend and Streamlit dashboard
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 - Python **3.10+**
@@ -35,7 +35,7 @@ pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 
 - `src/` - models, data processing, feature engineering, model training
 - `app/api/` - FastAPI application
@@ -47,7 +47,7 @@ pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 
 ---
 
-## ⚡ FastAPI (Backend)
+## FastAPI (Backend)
 
 Start the API:
 ```bash
@@ -76,7 +76,7 @@ CORS_ORIGINS=["http://localhost:8501","http://localhost:3000"]
 
 ---
 
-## 📡 API Endpoints and Schemas
+## API Endpoints and Schemas
 
 ### `GET /healthz`
 **Response**
@@ -240,20 +240,20 @@ curl -X POST "http://localhost:8000/predict-raw?symbol=AAPL&return_path=true&ign
 
 ---
 
-## 📓 Notebooks (Pipeline)
+## Notebooks (Pipeline)
 
 1. **01_eda.ipynb** - Exploratory Data Analysis
 2. **02_sentiment.ipynb** - Sentiment analysis with FinBERT
 3. **03_feature.ipynb** - Feature engineering
 4. **04_pipeline.ipynb** - Train and Tune Models (linreg, xgboost, random_forest, cnn and lstm)
 5. **05_eval.ipynb** - Stationarity test (Augmented Dickey–Fuller) and interpretability (SHAP)
-6. **06_results_plots.ipynb** - Combined Plots and Results
+6. **06_results.ipynb** - Results
 
 > Note: The Notebooks should be run in order.
 
 ---
 
-## ✅ Testing
+## Testing
 
 Run all tests:
 ```bash
@@ -274,7 +274,7 @@ pytest --cov=src --cov-report=html
 
 ---
 
-## 📰 Ollama (Optional LLM)
+## Ollama (Optional LLM)
 
 Generate synthetic news for testing:
 
@@ -298,7 +298,7 @@ OLLAMA_BASE=http://ollama:11434
 
 ---
 
-## 📊 Streamlit UI
+## Streamlit UI
 
 Launch dashboard:
 ```bash
@@ -308,7 +308,7 @@ Open <http://localhost:8501>
 
 ---
 
-## 🐳 Docker Compose
+## Docker Compose
 
 Generate per-module requirements:
 ```bash
@@ -353,24 +353,24 @@ docker compose logs -f ui
 
 ---
 
-## 📌 Notes
+## Notes
 
 - Keep `.env` (with secrets like `NEWS_API_KEY`) **out of version control**.
 - Tail logs: `tail -f ollama.log uvicorn.log`
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 - Thanks for considering a contribution! Issues, PRs, and ideas are welcome.
 
 ---
 
-## 📜 License
+## License
 
 This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for details.
 
-## 📝 TODO
+## TODO
 
 - [ ] Transfer Learning and Fine-Tuning
 - [ ] Write **academic-style report** (thesis-like)

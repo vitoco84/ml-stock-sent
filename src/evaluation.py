@@ -26,7 +26,7 @@ class SHAPExplainer:
         self.background_sample_size = background_sample_size
 
         if self.preprocessor is not None:
-            self.X_bg = self.preprocessor.transform(background_data)
+            self.X_bg = self.preprocessor.transform(background_data) # type: ignore[override]
         else:
             self.X_bg = background_data
 
@@ -36,7 +36,7 @@ class SHAPExplainer:
 
     def explain(self, X: pd.DataFrame) -> list:
         """Return SHAP values for X. Always returns a list (one per output)."""
-        X_proc = self.preprocessor.transform(X) if self.preprocessor else X
+        X_proc = self.preprocessor.transform(X) if self.preprocessor else X # type: ignore[override]
         model = self._unwrap(self.model)
 
         if isinstance(model, MultiOutputRegressor):

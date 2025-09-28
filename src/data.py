@@ -9,13 +9,11 @@ from joblib import Memory
 from pandas.tseries.offsets import BDay
 from requests import RequestException
 
-from config.config import Config
 from src.logger import get_logger
 
 
 logger = get_logger(__name__)
 memory = Memory(location=Path(".cache"), verbose=0)
-
 
 def _rename_columns(df: pd.DataFrame) -> pd.DataFrame:
     """Return a DataFrame with normalized (lowercase, snake_case) column names."""
