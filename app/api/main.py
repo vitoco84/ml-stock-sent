@@ -120,29 +120,30 @@ def fetch_news_history(
 def post_predict_from_raw(
         request_body: PredictionRequest,
         request: Request,
-        enrich: bool = Query(False, description="Generate missing headlines using local LLM"),
-        pad_neutral: bool = Query(False, description="Use provided news and neutral-fill gaps (needs ≥2)"),
         ignore_news: bool = Query(False, description="Ignore all news (neutral every day)"),
         return_path: bool = Query(True, description="Whether to return the full H-step path"),
         symbol: str = Query("^DJI", description="Ticker symbol (e.g., AAPL)")
 ) -> PredictionResponse:
     """Predict next price log-returns from prices and optional news."""
-    if ignore_news and (enrich or pad_neutral):
-        raise HTTPException(400, "Invalid strategy: 'ignore_news' cannot be combined with 'enrich' or 'pad_neutral'.")
-    if enrich and pad_neutral:
-        raise HTTPException(400, "Choose exactly one strategy: enrich OR pad_neutral OR ignore_news.")
-
     price_df = _process_price_df(request_body)
     price_dates = price_df["date"].dt.strftime("%Y-%m-%d").tolist()
 
     news_df = _process_news_df(
-        request_body, price_dates, enrich=enrich, pad_neutral=pad_neutral, ignore_news=ignore_news, symbol=symbol
+        request_body,
+        price_dates,
+        ignore_news=ignore_news,
+        symbol=symbol
     )
 
     feature_row = _generate_features(
-        price_df, news_df, request.app.state.sentiment_model, cfg.runtime.horizon, pad_neutral
+        price_df,
+        news_df,
+        request.app.state.sentiment_model,
+        cfg.runtime.horizon
     )
+
     horizon = cfg.runtime.horizon if cfg.runtime.target_mode == "step"  else cfg.runtime.horizon_list
+
     return _make_prediction(
         feature_row,
         request.app.state.model,
@@ -193,8 +194,7 @@ def fine_tune_model(
         price_df,
         pd.DataFrame(),
         None,
-        cfg.runtime.horizon,
-        pad_neutral=False
+        cfg.runtime.horizon
     )
 
     horizon = cfg.runtime.horizon if cfg.runtime.target_mode == "step"  else cfg.runtime.horizon_list

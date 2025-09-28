@@ -58,69 +58,56 @@ def _process_news_df(
         request_body: PredictionRequest,
         price_dates: list[str],
         *,
-        enrich: bool,
-        pad_neutral: bool,
         ignore_news: bool,
         symbol: str
 ) -> pd.DataFrame:
-    """Validate and normalize news data, optionally enrich or pad."""
-    news_payload = getattr(request_body, "news", None) or []
-    if len(news_payload) > 2000:
-        raise HTTPException(400, "News data exceeds 2000-row limit.")
-
-    if news_payload:
-        try:
-            df = pd.DataFrame([to_dict(row) for row in news_payload])
-            df["date"] = pd.to_datetime(df["date"]).dt.normalize()
-        except Exception:
-            logger.exception("Invalid `news` payload")
-            raise HTTPException(422, "`news` payload malformed. Expect list of {date, headline}.")
-    else:
-        df = pd.DataFrame(columns=["date", "headline"])
-
+    """Validate and normalize news data. Two modes only:
+       - ignore_news=True → return empty df
+       - ignore_news=False → require ≥1 headline, auto-enrich missing dates with LLM
+    """
     if ignore_news:
         return pd.DataFrame(columns=["date", "headline"])
 
-    if not df.empty:
-        df = (
-            df.sort_values(["date"])
-            .groupby("date", as_index=False)
-            .head(20)
-            .tail(1000)
-        )
+    news_payload = getattr(request_body, "news", None) or []
+    if len(news_payload) > 2000:
+        raise HTTPException(400, "News data exceeds 2000-row limit.")
+    if not news_payload:
+        raise HTTPException(422, "At least one headline is required when using news.")
+
+    try:
+        df = pd.DataFrame([to_dict(row) for row in news_payload])
+        df["date"] = pd.to_datetime(df["date"]).dt.normalize()
+        df = df.sort_values("date").groupby("date", as_index=False).head(20).tail(1000)
+    except Exception:
+        logger.exception("Invalid `news` payload")
+        raise HTTPException(422, "`news` payload malformed. Expect list of {date, headline}.")
+
+    real_news: list[dict[str, str]] = [
+        {"date": str(pd.to_datetime(row["date"]).strftime("%Y-%m-%d")),
+         "headline": str(row["headline"])}
+        for row in df.to_dict(orient="records")
+    ]
 
     ollama_base = settings.ollama_base
-    ollama_ok = _ollama_alive(ollama_base)
+    if not _ollama_alive(ollama_base):
+        raise HTTPException(500, "Local LLM backend not available for news enrichment.")
 
-    if enrich and ollama_ok:
-        if df.empty:
-            raise HTTPException(422, "Enrich requires ≥1 seed headline.")
-
-        real_news: list[dict[str, str]] = [
-            {str(k): str(v) for k, v in row.items()} for row in df.to_dict(orient="records")
-        ]
-
-        enriched = enrich_news_with_generated(
-            price_dates=price_dates,
-            real_news=real_news,
-            symbol=symbol,
-            url_llm=f"{ollama_base.rstrip('/')}/api/generate",
-            model_llm=settings.ollama_model
-        )
-        df = pd.DataFrame(enriched)
-        df["date"] = pd.to_datetime(df["date"]).dt.normalize()
-
-    if pad_neutral and (df.empty or len(df) < 2):
-        raise HTTPException(422, "Pad-neutral requires ≥2 headlines and does not generate news.")
-
+    enriched = enrich_news_with_generated(
+        price_dates=price_dates,
+        real_news=real_news,
+        symbol=symbol,
+        url_llm=f"{ollama_base.rstrip('/')}/api/generate",
+        model_llm=settings.ollama_model,
+    )
+    df = pd.DataFrame(enriched)
+    df["date"] = pd.to_datetime(df["date"]).dt.normalize()
     return df
 
 def _generate_features(
         price_df: pd.DataFrame,
         news_df: pd.DataFrame,
         sentiment_model: Any,
-        horizon: int,
-        pad_neutral: bool
+        horizon: int
 ) -> pd.DataFrame:
     """Generate model-ready feature row."""
     try:
@@ -131,6 +118,7 @@ def _generate_features(
                 None,
                 forecast_horizon=horizon,
                 back_horizon=cfg.runtime.lag_horizon,
+                fill_missing_neutral=True,
                 max_embedding_dims=cfg.runtime.max_sentiment_embeddings,
                 target_mode=cfg.runtime.target_mode
             )
@@ -141,7 +129,7 @@ def _generate_features(
             sentiment_model,
             forecast_horizon=horizon,
             back_horizon=cfg.runtime.lag_horizon,
-            fill_missing_neutral=pad_neutral,
+            fill_missing_neutral=False,
             max_embedding_dims=cfg.runtime.max_sentiment_embeddings,
             target_mode=cfg.runtime.target_mode
         )
