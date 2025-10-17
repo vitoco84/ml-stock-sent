@@ -14,7 +14,7 @@ API_URL: str = os.getenv("API_URL", "http://localhost:8000")
 CONNECT_TIMEOUT, READ_TIMEOUT_FETCH, READ_TIMEOUT_PREDICT = 5.0, 15.0, 180.0
 
 st.set_page_config(page_title="Stock Prediction App", layout="centered")
-st.title("^DJI Stock Prediction App")
+st.title("Stock Prediction App")
 
 @st.cache_resource
 def get_http() -> requests.Session:
