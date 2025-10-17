@@ -64,6 +64,7 @@ def metrics(y_true: np.ndarray, y_pred: np.ndarray, y_insample: np.ndarray = Non
         for h in range(yt.shape[1]):
             mse_h = mean_squared_error(yt[:, h], yp[:, h])
             per_h[h + 1] = {
+                "target_std": float(np.std(yt[:, h], ddof=1)),
                 "mae": float(mean_absolute_error(yt[:, h], yp[:, h])),
                 "mse": float(mse_h),
                 "rmse": float(np.sqrt(mse_h)),

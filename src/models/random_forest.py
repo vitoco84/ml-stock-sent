@@ -63,19 +63,11 @@ class RandomForest(Base):
 
     @staticmethod
     def search_space(trial) -> dict:
-        bootstrap = trial.suggest_categorical("bootstrap", [True, False])
-
-        max_depth = trial.suggest_int("max_depth", 6, 20)
-        if trial.suggest_categorical("use_max_depth", [True, False]) is False:
-            max_depth = None
-
         return {
-            "n_estimators": trial.suggest_int("n_estimators", 100, 600, step=100),
-            "max_depth": max_depth,
-            "min_samples_split": trial.suggest_int("min_samples_split", 2, 20),
-            "min_samples_leaf": trial.suggest_int("min_samples_leaf", 2, 10),
-            "max_features": trial.suggest_categorical("max_features", ["sqrt", "log2", 0.3, 0.5, 0.8]),
-            "bootstrap": bootstrap,
-            "max_samples": trial.suggest_float("max_samples", 0.5, 0.9) if bootstrap else None,
-            "criterion": trial.suggest_categorical("criterion", ["squared_error", "absolute_error"]),
+            "n_estimators": trial.suggest_categorical("n_estimators", [100, 200, 300]),
+            "max_depth": trial.suggest_int("max_depth", 4, 8),
+            "min_samples_split": trial.suggest_int("min_samples_split", 2, 10),
+            "min_samples_leaf": trial.suggest_int("min_samples_leaf", 5, 15),
+            "max_features": trial.suggest_categorical("max_features", ["sqrt", "log2"]),
+            "bootstrap": trial.suggest_categorical("bootstrap", [True, False])
         }

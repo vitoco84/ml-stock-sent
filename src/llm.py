@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+from concurrent.futures import as_completed, ThreadPoolExecutor
 from typing import List
 
 import pandas as pd
@@ -11,20 +13,74 @@ from src.logger import get_logger
 
 logger = get_logger(__name__)
 
+def _generate_batch(symbol, batch, url, model, examples_block):
+    """Generate headlines for a batch of dates (single API call)."""
+    batch_str = "\n".join(f"- {pd.to_datetime(d).strftime('%Y-%m-%d')}" for d in batch)
+    prompt = (
+        f"You are a financial news editor. Write concise, realistic headlines for '{symbol}'.\n"
+        f"Dates:\n{batch_str}\n"
+        f"{examples_block}"
+        "Requirements:\n"
+        "- One headline per date.\n"
+        "- ≤ 14 words; no emojis.\n"
+        "- Neutral, analytical tone (Reuters/Bloomberg style).\n"
+        "Output format:\n"
+        "YYYY-MM-DD: headline\n"
+        "YYYY-MM-DD: headline\n"
+    )
+
+    results: list[dict[str, str]] = []
+    try:
+        response = requests.post(
+            url,
+            json={"model": model, "prompt": prompt, "stream": False},
+            timeout=30,
+        )
+        response.raise_for_status()
+        raw_text = response.json().get("response", "").strip()
+
+        # Parse lines like "YYYY-MM-DD: headline"
+        for line in raw_text.splitlines():
+            m = re.match(r"(\d{4}-\d{2}-\d{2})[:\- ]+(.*)", line.strip())
+            if m:
+                d, h = m.groups()
+                h = h.strip()
+                if len(h.split()) > 14:
+                    h = " ".join(h.split()[:14])
+                results.append({"date": d, "headline": h})
+
+        # Fallback if nothing parsed
+        if not results:
+            for d in batch:
+                date_str = pd.to_datetime(d).strftime("%Y-%m-%d")
+                results.append({"date": date_str, "headline": f"{symbol} news on {date_str} (auto-generated)"})
+
+    except RequestException as e:
+        logger.warning(f"Failed to generate headlines for batch {batch}: {e}")
+        for d in batch:
+            date_str = pd.to_datetime(d).strftime("%Y-%m-%d")
+            results.append({"date": date_str, "headline": f"{symbol} news on {date_str} (auto-generated)"})
+
+    return results
+
 def generate_local_headlines(
         symbol: str,
         dates: List[str],
         url: str,
         model: str = "llama3",
         seed_examples: List[str] | None = None,
+        batch_size: int = 10,
+        max_workers: int = 4
 ) -> list[dict[str, str]]:
     """
     Generate realistic financial headlines using an LLM.
-    Falls back to generic placeholders if API fails.
+    - Batches dates to reduce API calls.
+    - Runs batches in parallel for speed.
     """
     logger.info(f"Generating {len(dates)} local headlines via LLM ({model}) for {symbol}")
     headlines: list[dict[str, str]] = []
 
+    # Prepare seed examples
     seed_examples = [s.strip() for s in (seed_examples or []) if isinstance(s, str) and s.strip()]
     seed_examples = seed_examples[:10]
 
@@ -37,42 +93,17 @@ def generate_local_headlines(
             "Follow the tone, specificity, and phrasing patterns above.\n"
         )
 
-    for date in dates:
-        date_str = pd.to_datetime(date).strftime("%Y-%m-%d")
-        prompt = (
-            f"You are a financial news editor. Write one realistic, concise headline for '{symbol}' dated {date_str}."
-            f"{examples_block}"
-            "Requirements:\n"
-            "- ≤ 14 words; no emojis.\n"
-            "- Do not copy the examples verbatim; keep plausibility.\n"
-            "- Neutral to mildly analytical tone (Reuters/Bloomberg-like).\n"
-            "Headline:"
-        )
+    # Split dates into batches
+    batches = [dates[i: i + batch_size] for i in range(0, len(dates), batch_size)]
 
-        text: str
-        try:
-            response = requests.post(
-                url,
-                json={"model": model, "prompt": prompt, "stream": False},
-                timeout=10,
-            )
-            response.raise_for_status()
-            try:
-                result = response.json()
-                text = result.get("response", "").strip() or f"{symbol} news on {date_str} (auto-generated)"
-            except ValueError:
-                logger.error(f"Invalid JSON response for {date_str}")
-                text = f"{symbol} news on {date_str} (auto-generated)"
-        except RequestException as e:
-            logger.warning(f"Failed to generate headline for {date_str}: {e}")
-            text = f"{symbol} news on {date_str} (auto-generated)"
-
-        # Enforce max 14 words
-        if len(text.split()) > 14:
-            text = " ".join(text.split()[:14])
-
-        logger.debug(f"Generated headline for {date_str}: {text}")
-        headlines.append({"date": date_str, "headline": text})
+    # Run batches in parallel
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {
+            executor.submit(_generate_batch, symbol, batch, url, model, examples_block): batch
+            for batch in batches
+        }
+        for future in as_completed(futures):
+            headlines.extend(future.result())
 
     return headlines
 

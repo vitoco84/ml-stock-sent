@@ -19,6 +19,25 @@ from src.train import ModelTrainer
 from src.utils import set_seed
 
 
+def sign_strategy_returns(y_true: pd.DataFrame, y_pred: np.ndarray) -> pd.DataFrame:
+    """
+    Compute cumulative returns for a simple sign-based strategy.
+    - Long if prediction > 0, short if prediction < 0.
+    - Compare vs buy&hold and riskless asset.
+    """
+    y_true = np.asarray(y_true).ravel()
+    y_pred = np.asarray(y_pred).ravel()
+
+    signal = np.sign(y_pred)
+    strat_returns = signal * y_true
+
+    df = pd.DataFrame({
+        "strategy": np.cumsum(strat_returns),
+        "buy_hold": np.cumsum(y_true),
+        "riskless": np.zeros_like(y_true),
+    })
+    return df
+
 def run_experiments(
         df: pd.DataFrame,
         out_dir: Path,
@@ -86,7 +105,7 @@ def _run(
 
     # Data split and features
     train, val, test, forecast = time_series_split(
-df_full, train_ratio=train_ratio, val_ratio=val_ratio, horizon=forecast_horizon
+        df_full, train_ratio=train_ratio, val_ratio=val_ratio, horizon=forecast_horizon
     )
 
     drop_cols = ["open", "high", "low", "close", "volume", "adj_close"]
@@ -123,10 +142,7 @@ df_full, train_ratio=train_ratio, val_ratio=val_ratio, horizon=forecast_horizon
     out_path.mkdir(parents=True, exist_ok=True)
 
     if save:
-        pd.DataFrame({"feature": feature_cols}).to_csv(out_path / f"{exp.name}_features.csv", index=False)
         X_test.to_parquet(out_path / f"{exp.name}_X_test.parquet", index=False)
-        X_train.to_parquet(out_path / f"{exp.name}_X_train.parquet", index=False)
-        X_forecast.to_parquet(out_path / f"{exp.name}_X_forecast.parquet", index=False)
 
     # Preprocessor and Config
     preprocessor, _ = get_preprocessor(X_train_sub, exp.name)
@@ -192,10 +208,10 @@ df_full, train_ratio=train_ratio, val_ratio=val_ratio, horizon=forecast_horizon
 
     # Metrics
     metrics_test = trainer.evaluate(X_test, y_test)
-    metrics_path = out_path / f"{exp.name}_metrics_test.json"
-    if save:
-        with open(metrics_path, "w") as f:
-            json.dump(metrics_test, f, indent=2)
+
+    # Economic sanity check: sign-based strategy
+    strat_df = sign_strategy_returns(y_test, y_pred_test)
+    strat_cum = strat_df.iloc[-1].to_dict()
 
     # Baseline: predict last observed return at each horizon
     if target_mode == "rolling":
@@ -205,15 +221,6 @@ df_full, train_ratio=train_ratio, val_ratio=val_ratio, horizon=forecast_horizon
         y_pred_naive = np.tile(last_return, (len(y_test), 1))
 
     baseline_metrics = metrics(np.asarray(y_test), y_pred_naive, y_insample=np.asarray(y_train))
-    baseline_path = out_path / f"{exp.name}_metrics_test_naive.json"
-    if save:
-        with open(baseline_path, "w") as f:
-            json.dump(baseline_metrics, f, indent=2)
-
-    # Save artifacts
-    params_path = out_path / f"{exp.name}_best_params.csv"
-    if save:
-        pd.Series(best_params).to_csv(params_path)
 
     model_path = ""
     if save:
@@ -226,12 +233,13 @@ df_full, train_ratio=train_ratio, val_ratio=val_ratio, horizon=forecast_horizon
         "include_sentiment": exp.include_sentiment,
         "best_params": best_params,
         "metrics": {"test": metrics_test, "baseline": baseline_metrics},
+        "strategy": strat_cum,
         "trainer": trainer,
         "paths": {
             "model": str(model_path),
-            "params_csv": str(params_path),
-            "metrics_json": str(metrics_path),
-            "baseline_metrics_json": str(baseline_path),
+            "params_csv": str(out_path / f"{exp.name}_best_params.csv"),
+            "metrics_json": str(out_path / f"{exp.name}_metrics_test.json"),
+            "baseline_metrics_json": str(out_path / f"{exp.name}_metrics_test_naive.json"),
             "preds_npz": str(out_path / f"{exp.name}_preds.npz"),
             "test_index_npy": str(out_path / f"{exp.name}_test_index.npy"),
             "features_csv": str(out_path / f"{exp.name}_features.csv"),

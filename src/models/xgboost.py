@@ -193,24 +193,17 @@ class XGBoost(Base):
     @staticmethod
     def search_space(trial) -> dict:
         space = {
-            "n_estimators": trial.suggest_int("n_estimators", 100, 600, step=100),
-            "learning_rate": trial.suggest_float("learning_rate", 0.05, 0.2, log=True),
+            "n_estimators": trial.suggest_categorical("n_estimators", [200, 300, 400]),
+            "learning_rate": trial.suggest_categorical("learning_rate", [0.05, 0.1, 0.15]),
             "max_depth": trial.suggest_int("max_depth", 2, 6),
-            "min_child_weight": trial.suggest_float("min_child_weight", 0.5, 5.0, log=True),
+            "min_child_weight": trial.suggest_float("min_child_weight", 1.0, 5.0),
             "reg_alpha": trial.suggest_float("reg_alpha", 0.0, 1.0),
-            "reg_lambda": trial.suggest_float("reg_lambda", 0.1, 5.0),
-            "gamma": trial.suggest_float("gamma", 0.0, 2.0),
-            "max_bin": trial.suggest_int("max_bin", 128, 256, step=64),
-            "grow_policy": trial.suggest_categorical("grow_policy", ["depthwise"]),
-            "objective": trial.suggest_categorical("objective", ["reg:squarederror", "reg:absoluteerror"]),
-            "eval_metric": trial.suggest_categorical("eval_metric", ["rmse", "mae"]),
+            "reg_lambda": trial.suggest_float("reg_lambda", 0.5, 2.0),
+            "gamma": trial.suggest_float("gamma", 0.0, 1.0),
             "subsample": trial.suggest_float("subsample", 0.7, 1.0),
             "colsample_bytree": trial.suggest_float("colsample_bytree", 0.7, 1.0),
-            "tree_method": "hist"
+            "eval_metric": trial.suggest_categorical("eval_metric", ["rmse", "mae"]),
+            "tree_method": "hist",
+            "grow_policy": "depthwise"
         }
-        if space["grow_policy"] == "lossguide":
-            space["max_leaves"] = trial.suggest_int("max_leaves", 64, 1024, step=64)
-            space["max_depth"] = 0
-        else:
-            space["max_leaves"] = 0
         return space

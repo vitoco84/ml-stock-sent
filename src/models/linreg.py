@@ -82,11 +82,10 @@ class LinearElasticNet(Base):
     @staticmethod
     def search_space(trial) -> dict:
         return {
-            "alpha": trial.suggest_float("alpha", 1e-5, 1e-2, log=True),
+            "alpha": trial.suggest_categorical("alpha", [1e-5, 1e-4, 1e-3, 1e-2]),
             "l1_ratio": trial.suggest_float("l1_ratio", 0.0, 1.0),
-            "max_iter": trial.suggest_int("max_iter", 1000, 3000, step=500),
-            "eta0": trial.suggest_float("eta0", 1e-3, 1e-1, log=True),
-            "learning_rate": trial.suggest_categorical(
-                "learning_rate", ["constant", "optimal"]
-            )
+            "penalty": trial.suggest_categorical("penalty", ["l1", "l2", "elasticnet"]),
+            "max_iter": 2000,
+            "learning_rate": "constant",
+            "eta0": 0.01
         }
