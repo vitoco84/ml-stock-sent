@@ -245,7 +245,7 @@ curl -X POST "http://localhost:8000/predict-raw?symbol=AAPL&return_path=true&ign
 1. **01_eda.ipynb** - Exploratory Data Analysis
 2. **02_sentiment.ipynb** - Sentiment analysis with FinBERT
 3. **03_feature.ipynb** - Feature engineering
-4. **04_pipeline.ipynb** - Train and Tune Models (linreg, xgboost, random_forest, cnn and lstm)
+4. **04_pipeline.ipynb** - Train and Tune Models (linreg, xgboost, random_forest and lstm)
 5. **05_eval.ipynb** - Stationarity test (Augmented Dickey–Fuller) and interpretability (SHAP)
 6. **06_results.ipynb** - Results
 

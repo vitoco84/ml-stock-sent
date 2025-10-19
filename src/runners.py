@@ -115,7 +115,7 @@ def _run(
         target_cols = [c for c in df_full.columns if c == "target" or c.startswith("target_")]
     feature_cols = [c for c in df_full.columns if c not in target_cols + ["date"] + drop_cols]
 
-    if exp.name.lower() in {"cnn", "lstm"}:
+    if exp.name.lower() in {"lstm", "lstm_wo_sent"}:
         feature_cols = [c for c in feature_cols if c.startswith("lag_")]
     else:
         feature_cols = [c for c in feature_cols if not c.startswith("lag_") and c != "log_return"]
@@ -153,7 +153,7 @@ def _run(
     base_model = exp.build(forecast_horizon, random_state, n_jobs)
 
     if getattr(base_model, "input_mode", "tabular") == "sequence":
-        assert any(c.startswith("lag_") for c in feature_cols), "CNN and LSTM require lag_* features."
+        assert any(c.startswith("lag_") for c in feature_cols), "LSTM require lag_* features."
 
     trainer = ModelTrainer(
         model=base_model,
@@ -170,7 +170,7 @@ def _run(
         sampler=optuna.samplers.TPESampler(seed=random_state),
         pruner=optuna.pruners.MedianPruner(n_startup_trials=5, n_warmup_steps=1)
     )
-    walk_forward = True if exp.name in ["lstm", "cnn"] else False
+    walk_forward = exp.name.lower() in {"lstm", "lstm_wo_sent"}
     study.optimize(
         lambda tr: trainer.objective(tr, X_train_sub, y_train_sub, n_splits=n_splits, walk_forward=walk_forward),
         n_trials=n_trials

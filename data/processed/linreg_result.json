@@ -1,6 +1,6 @@
 {
   "kind": "linreg",
-  "study": "<optuna.study.study.Study object at 0x0000021214CEEB70>",
+  "study": "<optuna.study.study.Study object at 0x000001F9643B0860>",
   "horizon": 20,
   "include_sentiment": true,
   "best_params": {
@@ -93,7 +93,7 @@
     "buy_hold": 0.6299693777873681,
     "riskless": 0.0
   },
-  "trainer": "<src.train.ModelTrainer object at 0x000002121D45DAF0>",
+  "trainer": "<src.train.ModelTrainer object at 0x000001F964639070>",
   "paths": {
     "model": "..\\data\\models\\linreg.pkl",
     "params_csv": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\linreg_best_params.csv",

@@ -12,7 +12,7 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 
 class IdentityTransformer(BaseEstimator, TransformerMixin):
-    """No-op transformer for models expecting raw DataFrames (e.g. CNN/LSTM)."""
+    """No-op transformer for models expecting raw DataFrames (e.g. LSTM)."""
 
     def __init__(self, copy: bool = False) -> None:
         self.copy = copy
@@ -27,13 +27,13 @@ def get_preprocessor(X: pd.DataFrame, model_name: str) -> Tuple[Pipeline, list[s
     """
     Build preprocessing pipeline for a given model type.
 
-    - CNN/LSTM: no-op (preserve raw lagged features like log returns)
+    - LSTM: no-op (preserve raw lagged features like log returns)
     - RandomForest/XGBoost: imputation only
     - Others (linear/MLP): imputation and scaling
     """
 
     # Torch sequence models expect raw lag_* features, no preprocessing
-    if model_name.lower() in {"cnn", "lstm"}:
+    if model_name.lower() in {"lstm", "lstm_wo_sent"}:
         return Pipeline([("identity", IdentityTransformer())], memory=None), list(X.columns)
 
     # Separate numeric vs categorical

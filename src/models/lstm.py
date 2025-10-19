@@ -22,17 +22,31 @@ class _LSTMNet(nn.Module):
         super().__init__()
         self.lstm = nn.LSTM(input_size=1, hidden_size=units, batch_first=True, bidirectional=bidirectional)
         self.dropout = nn.Dropout(dropout)
-        self.fc1 = nn.Linear(units * (2 if bidirectional else 1), dense_units)
-        self.relu = nn.ReLU()
-        self.fc2 = nn.Linear(dense_units, output_dim)
+        self.head = nn.Sequential(
+            nn.Linear(units * (2 if bidirectional else 1), dense_units),
+            nn.ReLU(),
+            nn.Linear(dense_units, output_dim),
+        )
+        self._init_weights()
+
+    def _init_weights(self):
+        for name, p in self.lstm.named_parameters():
+            if "weight_ih" in name:
+                nn.init.xavier_uniform_(p)
+            elif "weight_hh" in name:
+                nn.init.orthogonal_(p)
+            elif "bias" in name:
+                nn.init.zeros_(p)
+        for m in self.head:
+            if isinstance(m, nn.Linear):
+                nn.init.kaiming_uniform_(m.weight, nonlinearity="relu")
+                nn.init.zeros_(m.bias)
 
     def forward(self, x: Tensor) -> Tensor:
-        # input (N, T, 1)
         out, _ = self.lstm(x)
-        out = out[:, -1, :]  # last hidden state
+        out = out[:, -1, :]
         out = self.dropout(out)
-        out = self.relu(self.fc1(out))
-        return self.fc2(out)
+        return self.head(out)
 
 @dataclass
 class LSTMModel(TorchBaseNN):
@@ -75,12 +89,12 @@ class LSTMModel(TorchBaseNN):
     @staticmethod
     def search_space(trial) -> dict:
         return {
-            "units": trial.suggest_categorical("units", [16, 32]),
-            "dense_units": trial.suggest_categorical("dense_units", [16, 32]),
-            "dropout": trial.suggest_float("dropout", 0.3, 0.5),
-            "lr": trial.suggest_categorical("lr", [1e-3, 5e-4]),
-            "epochs": trial.suggest_int("epochs", 20, 30, step=10),
-            "batch_size": trial.suggest_categorical("batch_size", [16, 32]),
-            "bidirectional": trial.suggest_categorical("bidirectional", [False]),
-            "weight_decay": trial.suggest_categorical("weight_decay", [1e-6, 1e-5])
+            "units": trial.suggest_categorical("units", [64, 128, 256]),
+            "dense_units": trial.suggest_categorical("dense_units", [32, 64, 128]),
+            "dropout": trial.suggest_float("dropout", 0.0, 0.15),
+            "lr": trial.suggest_float("lr", 1e-5, 5e-4, log=True),
+            "weight_decay": trial.suggest_float("weight_decay", 1e-7, 1e-4, log=True),
+            "epochs": trial.suggest_int("epochs", 300, 600, step=100),
+            "batch_size": trial.suggest_categorical("batch_size", [16, 32, 64]),
+            "bidirectional": trial.suggest_categorical("bidirectional", [False, True])
         }

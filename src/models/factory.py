@@ -5,7 +5,6 @@ from typing import Protocol, Type
 
 from config.config import Config
 from src.models.base import Base
-from src.models.cnn import CNNModel
 from src.models.linreg import LinearElasticNet
 from src.models.lstm import LSTMModel
 from src.models.random_forest import RandomForest
@@ -40,8 +39,7 @@ base_models: dict[str, Type[Base]] = {
     "linreg": LinearElasticNet,
     "xgboost": XGBoost,
     "random_forest": RandomForest,
-    "cnn": CNNModel,
-    "lstm": LSTMModel,
+    "lstm": LSTMModel
 }
 
 experiments: list[Experiment] = []

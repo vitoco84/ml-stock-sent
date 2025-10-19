@@ -15,7 +15,7 @@ from src.models.base import Base
 
 class TorchBaseNN(Base):
     """
-    Base class for PyTorch models (CNN, LSTM).
+    Base class for PyTorch models like CNN or LSTM.
 
     Features:
     - input_mode: "tabular" => (N, F, 1), "sequence" => (N, T, 1) from lag_* columns
@@ -76,8 +76,10 @@ class TorchBaseNN(Base):
             raise RuntimeError("Model not trained. Call fit/train first.")
         self._net.eval()
         X_t = self._to_tensor(X).to(self.device)
-        with torch.no_grad(), torch.amp.autocast(self.device, enabled=True):
-            return self._net(X_t).cpu().numpy()
+        use_amp = bool(getattr(self, "use_amp", False))
+        with torch.no_grad(), torch.amp.autocast(self.device, enabled=use_amp):
+            out = self._net(X_t)
+        return out.cpu().numpy()
 
     def _resolve_hparams(
             self,

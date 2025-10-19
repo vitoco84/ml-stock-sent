@@ -233,17 +233,30 @@ def plot_return_overlay(
     if target_mode == "step":
         if "log_return" in df.columns:
             y_true = df["log_return"].to_numpy(dtype=float)
-        else:
+        elif "target_1" in df.columns:
             y_true = df["target_1"].to_numpy(dtype=float)
+        elif "target" in df.columns:
+            y_true = df["target"].to_numpy(dtype=float)
+        else:
+            raise ValueError("No valid target column found for step mode.")
 
         fig, ax = plt.subplots(figsize=(12, 5))
         ax.plot(dates, y_true, "--", label=f"Actual ({phase})", linewidth=2)
 
         for res in results:
-            y_pred = np.asarray(res.get(pred_key)).ravel()
+            y_pred = np.asarray(res.get(pred_key))
+            if y_pred.ndim == 2 and y_pred.shape[1] > 1:
+                y_pred = y_pred[:, 0]
+            y_pred = y_pred.ravel()
+
             n = min(len(y_true), len(y_pred))
             if n > 0:
-                ax.plot(dates[:n], y_pred[:n], label=f"{res.get('kind', 'model')} ({phase})", linewidth=2)
+                ax.plot(
+                    dates[:n],
+                    y_pred[:n],
+                    label=f"{res.get('kind', 'model')} ({phase})",
+                    linewidth=2
+                )
 
         ax.set_title(f"Actual vs Predicted Log Returns ({phase.capitalize()})")
         ax.set_xlabel("Date")
@@ -262,10 +275,22 @@ def plot_return_overlay(
             ax.plot(dates, y_true, "--", label=f"Actual {col} ({phase})", linewidth=2)
 
             for res in results:
-                y_pred = np.asarray(res.get(pred_key)).ravel()
-                n = min(len(y_true), len(y_pred))
+                y_pred = np.asarray(res.get(pred_key))
+
+                if y_pred.ndim == 2 and y_pred.shape[1] >= len(cols):
+                    col_idx = cols.index(col)
+                    y_pred_col = y_pred[:, col_idx]
+                else:
+                    y_pred_col = y_pred.ravel()
+
+                n = min(len(y_true), len(y_pred_col))
                 if n > 0:
-                    ax.plot(dates[:n], y_pred[:n], label=f"{res.get('kind', 'model')} {col} ({phase})", linewidth=2)
+                    ax.plot(
+                        dates[:n],
+                        y_pred_col[:n],
+                        label=f"{res.get('kind', 'model')} {col} ({phase})",
+                        linewidth=2
+                    )
 
             ax.set_title(f"Actual vs Predicted {col} (Rolling mode)")
             ax.grid(True, alpha=0.25)
@@ -273,6 +298,9 @@ def plot_return_overlay(
 
         axes[-1].set_xlabel("Date")
         axes[0].set_ylabel("Return")
+
+    else:
+        raise ValueError(f"Unknown target_mode: {target_mode}")
 
     _finalize_figure(fig, path, save=save)
 

@@ -60,10 +60,25 @@ class ModelTrainer:
     ) -> Tuple[Any, np.ndarray, Optional[np.ndarray]]:
         """
         Prepare features (fit/transform).
-        For sequence models, preprocessing is skipped.
+        For sequence models (e.g., LSTM), standardize only lag_* columns and
+        return DataFrames so downstream _to_tensor can pick up lag ordering.
         """
         if self.is_sequence:
-            return None, X_tr, X_va
+            lag_cols = [c for c in X_tr.columns if c.startswith("lag_")]
+            if not lag_cols:
+                return None, X_tr, X_va
+
+            lag_scaler = SafeStandardScaler()
+
+            X_tr_scaled = X_tr.copy()
+            X_tr_scaled[lag_cols] = lag_scaler.fit_transform(X_tr[lag_cols])
+
+            X_va_scaled = None
+            if X_va is not None:
+                X_va_scaled = X_va.copy()
+                X_va_scaled[lag_cols] = lag_scaler.transform(X_va[lag_cols])
+
+            return lag_scaler, X_tr_scaled, X_va_scaled
 
         pre_est = pre or StandardScaler()
         pre_ = clone(pre_est)
@@ -100,7 +115,9 @@ class ModelTrainer:
         self.y_scaler = y_s
         self.preprocessor = pre_
 
-        if hasattr(self.model, "train") and X_val is not None and y_val is not None:
+        if hasattr(self.model, "fit_with_val") and X_val is not None and y_val is not None:
+            self.model.fit_with_val(X_tr_s, y_tr_s, X_va_s, y_va_s)
+        elif hasattr(self.model, "train") and X_val is not None and y_val is not None:
             self.model.train(X_tr_s, y_tr_s, X_va_s, y_va_s)
         else:
             self.model.fit(X_tr_s, y_tr_s)
@@ -108,11 +125,20 @@ class ModelTrainer:
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         """Predict with trained model. Inverse-scales if needed."""
-        X_s = (
-            self.preprocessor.transform(X)
-            if (self.preprocessor is not None and not self.is_sequence)
-            else X
-        )
+        if self.is_sequence:
+            X_s = X
+            if self.preprocessor is not None:
+                lag_cols = [c for c in X.columns if c.startswith("lag_")]
+                if lag_cols:
+                    X_s = X.copy()
+                    X_s[lag_cols] = self.preprocessor.transform(X[lag_cols])
+        else:
+            X_s = (
+                self.preprocessor.transform(X)
+                if self.preprocessor is not None
+                else X
+            )
+
         pred = np.asarray(self.model.predict(X_s))
         if pred.ndim == 1:
             pred = pred.reshape(-1, 1)
