@@ -201,8 +201,8 @@ Predict next price log-returns using historical prices, news sentiment, and FinB
   "predicted_price_20": 106.29,
   "log_return": -0.0021,
   "predicted_price": 106.29,
-  "log_return_path": [-0.0001, -0.0001, ...], 
-  "predicted_price_path": [105.8, 105.9, ...],
+  "log_return_path": [-0.0001, -0.0001, "..."], 
+  "predicted_price_path": [105.8, 105.9, "..."],
   "predicted_dates": ["2025-01-10", "2025-01-13", "..."],
   "last_date": "2025-01-09"
 }
@@ -373,13 +373,7 @@ This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for d
 ## TODO
 
 - [ ] Transfer Learning and Fine-Tuning
-- [ ] Write **academic-style report** (thesis-like)
-- [ ] Prepare **PowerPoint** presentation
 - [ ] Optional: Deploy demo API and Streamlit to cloud (Render / Fly.io / AWS)
-- [ ] If deployed:
-    - [ ] Add authentication
-    - [ ] Add rate-limiting
-    - [ ] Add request logging
 - [ ] Optional: Add monitoring and logging integration (Prometheus/Grafana)
 - [ ] Optional: Add Model Tracking MLFlow
 - [ ] Optional: Pipeline Orchestration: data -> train -> eval -> register -> deploy -> monitor
