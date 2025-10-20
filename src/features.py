@@ -194,37 +194,3 @@ def generate_full_feature_row(
 
     features_df = _drop_target_columns(features_df, forecast_horizon)
     return features_df.tail(1).copy()
-
-def generate_training_data(
-        price_df: pd.DataFrame,
-        news_df: Optional[pd.DataFrame],
-        sentiment_model: Optional[FinBERT],
-        *,
-        forecast_horizon: int,
-        back_horizon: int,
-        max_embedding_dims: int,
-        fill_missing_neutral: bool = True,
-        target_mode: str,
-        custom_horizons: Optional[list[int]] = None
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """
-    Generate features and targets for model fine-tuning on a new stock.
-    """
-    merged = _generate_feat_target(fill_missing_neutral, max_embedding_dims, news_df, price_df, sentiment_model)
-    features_df = create_features_and_target(
-        merged,
-        forecast_horizon=forecast_horizon,
-        back_horizon=back_horizon,
-        training=True,
-        target_mode=target_mode,
-        custom_horizons=custom_horizons
-    )
-
-    target_cols = [c for c in features_df.columns if c.startswith("target")]
-    if not target_cols:
-        raise ValueError("No target columns found for fine-tuning.")
-
-    X = features_df.drop(columns=target_cols + ["date"], errors="ignore")
-    y = features_df[target_cols]
-
-    return X, y

@@ -6,6 +6,18 @@ services:
       - "11434:11434"
     volumes:
       - ollamadata:/root/.ollama
+    environment:
+      - OLLAMA_KEEP_ALIVE=30m
+      - OLLAMA_NUM_PARALLEL=2
+      - NVIDIA_VISIBLE_DEVICES=all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [ gpu ]
+              count: all
+              driver: nvidia
+              options: {}
     networks: [ appnet ]
     healthcheck:
       test: ["CMD", "sh", "-c", "ollama list >/dev/null 2>&1 || exit 1"]

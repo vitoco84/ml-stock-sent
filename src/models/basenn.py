@@ -19,7 +19,6 @@ class TorchBaseNN(Base):
 
     Features:
     - input_mode: "tabular" => (N, F, 1), "sequence" => (N, T, 1) from lag_* columns
-    - Training: AMP, grad-clipping, ReduceLROnPlateau, early stopping
     """
 
     input_mode: str = "tabular"  # "tabular" or "sequence" (lags-only)

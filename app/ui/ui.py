@@ -11,7 +11,7 @@ import streamlit as st
 
 
 API_URL: str = os.getenv("API_URL", "http://localhost:8000")
-CONNECT_TIMEOUT, READ_TIMEOUT_FETCH, READ_TIMEOUT_PREDICT = 5.0, 15.0, 180.0
+CONNECT_TIMEOUT, READ_TIMEOUT_FETCH, READ_TIMEOUT_PREDICT = 10.0, 15.0, 180.0
 
 st.set_page_config(page_title="Stock Prediction App", layout="centered")
 st.title("Stock Prediction App")
@@ -56,7 +56,7 @@ def call_api(payload: dict, params: dict):
         f"{API_URL}/predict-raw",
         params=params,
         json=payload,
-        timeout=(CONNECT_TIMEOUT, READ_TIMEOUT_PREDICT),
+        timeout=(CONNECT_TIMEOUT, READ_TIMEOUT_PREDICT)
     )
     r.raise_for_status()
     return r.json()
@@ -150,7 +150,7 @@ if mode == "Fetch from API":
                 r = HTTP.get(
                     f"{API_URL}/price-history",
                     params={"symbol": symbol, "end_date": end_date.strftime("%Y-%m-%d"), "days": int(days)},
-                    timeout=(CONNECT_TIMEOUT, READ_TIMEOUT_FETCH),
+                    timeout=(CONNECT_TIMEOUT, READ_TIMEOUT_FETCH)
                 )
                 r.raise_for_status()
                 rows = r.json().get("price", [])

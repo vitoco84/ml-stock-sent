@@ -1,0 +1,109 @@
+{
+  "kind": "lstm_wo_sent",
+  "study": "<optuna.study.study.Study object at 0x00000216FE80D730>",
+  "horizon": 20,
+  "include_sentiment": false,
+  "best_params": {
+    "units": 256,
+    "dense_units": 128,
+    "dropout": 0.017720898103552127,
+    "lr": 0.00043506747589925135,
+    "weight_decay": 1.5709883014604095e-06,
+    "epochs": 500,
+    "batch_size": 16,
+    "bidirectional": false,
+    "random_state": 42
+  },
+  "metrics": {
+    "test": {
+      "aggregate": {
+        "mae": 0.020822425430399045,
+        "mse": 0.0009442871193425466,
+        "rmse": 0.03072925510555937,
+        "r2": -0.037109178942006604,
+        "directional_accuracy": 0.5456110154905336
+      },
+      "per_horizon": {
+        "1": {
+          "target_std": 0.01094026708934661,
+          "mae": 0.008222811601285514,
+          "mse": 0.00012071155299767451,
+          "rmse": 0.01098688094946307,
+          "r2": -0.013765269665311664,
+          "directional_accuracy": 0.49740932642487046
+        },
+        "2": {
+          "target_std": 0.02379922238546784,
+          "mae": 0.017140996504934405,
+          "mse": 0.0005667470328220674,
+          "rmse": 0.02380644939553287,
+          "r2": -0.005791918250336314,
+          "directional_accuracy": 0.5618556701030928
+        },
+        "3": {
+          "target_std": 0.04531775373336139,
+          "mae": 0.03710346818497722,
+          "mse": 0.002145402772207898,
+          "rmse": 0.04631849276701368,
+          "r2": -0.05006578624778846,
+          "directional_accuracy": 0.5773195876288659
+        }
+      }
+    },
+    "baseline": {
+      "aggregate": {
+        "mae": 0.02089279611437964,
+        "mse": 0.0009116708766592235,
+        "rmse": 0.030193888067938907,
+        "r2": -0.001286806724299927,
+        "directional_accuracy": NaN,
+        "mase": 0.8765510363001628
+      },
+      "per_horizon": {
+        "1": {
+          "target_std": 0.01094026708934661,
+          "mae": 0.008176501644981736,
+          "mse": 0.00011907249050470779,
+          "rmse": 0.01091203420562398,
+          "r2": -2.028431245193474e-08,
+          "directional_accuracy": NaN,
+          "mase": 0.343042690455678
+        },
+        "2": {
+          "target_std": 0.02379922238546784,
+          "mae": 0.017309573720351096,
+          "mse": 0.0005635227727695794,
+          "rmse": 0.023738634602048607,
+          "r2": -6.990381475691088e-05,
+          "directional_accuracy": NaN,
+          "mase": 0.7262180083232165
+        },
+        "3": {
+          "target_std": 0.04531775373336139,
+          "mae": 0.037192312977806084,
+          "mse": 0.002052417366703383,
+          "rmse": 0.0453036131749266,
+          "r2": -0.004554148896735999,
+          "directional_accuracy": NaN,
+          "mase": 1.560392410121594
+        }
+      }
+    }
+  },
+  "strategy": {
+    "strategy": 0.589886689318875,
+    "buy_hold": 0.6299693777873681,
+    "riskless": 0.0
+  },
+  "trainer": "<src.train.ModelTrainer object at 0x00000217162B6660>",
+  "paths": {
+    "model": "..\\data\\models\\lstm_wo_sent.pkl",
+    "params_csv": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\lstm_wo_sent_best_params.csv",
+    "metrics_json": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\lstm_wo_sent_metrics_test.json",
+    "baseline_metrics_json": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\lstm_wo_sent_metrics_test_naive.json",
+    "preds_npz": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\lstm_wo_sent_preds.npz",
+    "test_index_npy": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\lstm_wo_sent_test_index.npy",
+    "features_csv": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\lstm_wo_sent_features.csv",
+    "X_forecast_parquet": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\lstm_wo_sent_X_forecast.parquet"
+  }
+}

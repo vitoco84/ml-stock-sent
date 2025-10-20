@@ -1,7 +1,6 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-import pandas as pd
 import torch
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,7 +16,6 @@ from app.api.settings import get_settings
 from app.api.utils import LimitUploadSizeMiddleware
 from config.config import Config
 from src.data import get_news_history, get_price_history
-from src.features import generate_training_data
 from src.logger import get_logger
 from src.sentiment import FinBERT
 from src.train import ModelTrainer
@@ -142,65 +140,11 @@ def post_predict_from_raw(
         cfg.runtime.horizon
     )
 
-    horizon = cfg.runtime.horizon if cfg.runtime.target_mode == "step"  else cfg.runtime.horizon_list
+    horizon = cfg.runtime.horizon if cfg.runtime.target_mode == "step" else cfg.runtime.horizon_list
 
     return _make_prediction(
         feature_row,
         request.app.state.model,
-        request.app.state.preprocessor,
-        request.app.state.y_scaler,
-        request.app.state.y_scale,
-        price_df,
-        horizon,
-        return_path,
-        cfg.runtime.target_mode
-    )
-
-@app.post("/fine-tune")
-def fine_tune_model(
-        request: Request,
-        symbol: str = Query(..., description="Ticker symbol, e.g., AAPL, ^DJI"),
-        end_date: str = Query(..., description="End date in YYYY-MM-DD format"),
-        days: int = Query(90, ge=1, le=365, description="Number of business days to look back"),
-        return_path: bool = Query(True, description="Return full forecast path")
-):
-    """Fine-tune the global model on a new stock (log-return forecasting)."""
-    price_df = get_price_history(symbol, end_date, days)
-    if price_df.empty:
-        raise HTTPException(404, f"No price history found for {symbol}")
-
-    X, y = generate_training_data(
-        price_df,
-        None,
-        None,
-        forecast_horizon=cfg.runtime.horizon,
-        back_horizon=cfg.runtime.lag_horizon,
-        max_embedding_dims=cfg.runtime.max_sentiment_embeddings,
-        target_mode=cfg.runtime.target_mode,
-        custom_horizons=cfg.runtime.horizon_list
-    )
-
-    model = request.app.state.model
-
-    if not hasattr(model, "fine_tune"):
-        raise HTTPException(
-            400,
-            f"Model '{type(model).__name__}' does not support fine-tuning!"
-        )
-
-    model.fine_tune(X, y)
-
-    feature_row = _generate_features(
-        price_df,
-        pd.DataFrame(),
-        None,
-        cfg.runtime.horizon
-    )
-
-    horizon = cfg.runtime.horizon if cfg.runtime.target_mode == "step"  else cfg.runtime.horizon_list
-    return _make_prediction(
-        feature_row,
-        model,
         request.app.state.preprocessor,
         request.app.state.y_scaler,
         request.app.state.y_scale,

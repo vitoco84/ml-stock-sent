@@ -1,0 +1,113 @@
+{
+  "kind": "xgboost_wo_sent",
+  "study": "<optuna.study.study.Study object at 0x0000022C3DD50740>",
+  "horizon": 20,
+  "include_sentiment": false,
+  "best_params": {
+    "n_estimators": 300,
+    "learning_rate": 0.05,
+    "max_depth": 6,
+    "min_child_weight": 1.4766257061007364,
+    "reg_alpha": 0.9670113249051819,
+    "reg_lambda": 1.8355724513658267,
+    "gamma": 0.9633130632728487,
+    "subsample": 0.9826602829082396,
+    "colsample_bytree": 0.7631273262165886,
+    "eval_metric": "rmse",
+    "tree_method": "hist",
+    "grow_policy": "depthwise",
+    "random_state": 42
+  },
+  "metrics": {
+    "test": {
+      "aggregate": {
+        "mae": 0.021560171898691867,
+        "mse": 0.0009172923038420618,
+        "rmse": 0.030286833836537977,
+        "r2": -0.0074608120778145715,
+        "directional_accuracy": 0.5731497418244407
+      },
+      "per_horizon": {
+        "1": {
+          "target_std": 0.01094026708934661,
+          "mae": 0.008330765783488242,
+          "mse": 0.00013829356324722265,
+          "rmse": 0.011759828368102259,
+          "r2": -0.16142331000412535,
+          "directional_accuracy": 0.5699481865284974
+        },
+        "2": {
+          "target_std": 0.02379922238546784,
+          "mae": 0.018147064834934005,
+          "mse": 0.0005836937274744337,
+          "rmse": 0.02415975429250955,
+          "r2": -0.035866797403268036,
+          "directional_accuracy": 0.5257731958762887
+        },
+        "3": {
+          "target_std": 0.04531775373336139,
+          "mae": 0.03820268507765336,
+          "mse": 0.002029889620804529,
+          "rmse": 0.045054296363438294,
+          "r2": 0.006472039526301154,
+          "directional_accuracy": 0.6237113402061856
+        }
+      }
+    },
+    "baseline": {
+      "aggregate": {
+        "mae": 0.02089279611437964,
+        "mse": 0.0009116708766592235,
+        "rmse": 0.030193888067938907,
+        "r2": -0.001286806724299927,
+        "directional_accuracy": NaN,
+        "mase": 0.8765510363001628
+      },
+      "per_horizon": {
+        "1": {
+          "target_std": 0.01094026708934661,
+          "mae": 0.008176501644981736,
+          "mse": 0.00011907249050470779,
+          "rmse": 0.01091203420562398,
+          "r2": -2.028431245193474e-08,
+          "directional_accuracy": NaN,
+          "mase": 0.343042690455678
+        },
+        "2": {
+          "target_std": 0.02379922238546784,
+          "mae": 0.017309573720351096,
+          "mse": 0.0005635227727695794,
+          "rmse": 0.023738634602048607,
+          "r2": -6.990381475691088e-05,
+          "directional_accuracy": NaN,
+          "mase": 0.7262180083232165
+        },
+        "3": {
+          "target_std": 0.04531775373336139,
+          "mae": 0.037192312977806084,
+          "mse": 0.002052417366703383,
+          "rmse": 0.0453036131749266,
+          "r2": -0.004554148896735999,
+          "directional_accuracy": NaN,
+          "mase": 1.560392410121594
+        }
+      }
+    }
+  },
+  "strategy": {
+    "strategy": 4.161523081046483,
+    "buy_hold": 0.6299693777873681,
+    "riskless": 0.0
+  },
+  "trainer": "<src.train.ModelTrainer object at 0x0000022C477E33E0>",
+  "paths": {
+    "model": "..\\data\\models\\xgboost_wo_sent.pkl",
+    "params_csv": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\xgboost_wo_sent_best_params.csv",
+    "metrics_json": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\xgboost_wo_sent_metrics_test.json",
+    "baseline_metrics_json": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\xgboost_wo_sent_metrics_test_naive.json",
+    "preds_npz": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\xgboost_wo_sent_preds.npz",
+    "test_index_npy": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\xgboost_wo_sent_test_index.npy",
+    "features_csv": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\xgboost_wo_sent_features.csv",
+    "X_forecast_parquet": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\xgboost_wo_sent_X_forecast.parquet"
+  }
+}

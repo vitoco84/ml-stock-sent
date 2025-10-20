@@ -2,8 +2,11 @@
 
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=vitoco84_ml-stock-sent&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=vitoco84_ml-stock-sent)
 
-Forecast stock prices by combining:
-- Historical market data (Yahoo Finance)
+This project presents a sentiment-aware forecasting framework for the Dow Jones Industrial Average (DJIA).  
+It combines historical stock market data with financial news sentiment extracted using:
+
+- Historical market data via [Yahoo Finance](https://finance.yahoo.com/quote/%5EDJI/)
+- Dataset combining Stock Prices and News via [Kaggle Dataset](https://www.kaggle.com/datasets/aaron7sun/stocknews/data)
 - News sentiment via [FinBERT](https://huggingface.co/yiyanghkust/finbert-tone)
 - Optional headline generation with local LLMs (Ollama)
 - A production-ready FastAPI backend and Streamlit dashboard

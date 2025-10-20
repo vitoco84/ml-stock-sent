@@ -34,7 +34,7 @@ def _generate_batch(symbol, batch, url, model, examples_block):
         response = requests.post(
             url,
             json={"model": model, "prompt": prompt, "stream": False},
-            timeout=30,
+            timeout=(10, 180)
         )
         response.raise_for_status()
         raw_text = response.json().get("response", "").strip()
@@ -69,8 +69,8 @@ def generate_local_headlines(
         url: str,
         model: str = "llama3",
         seed_examples: List[str] | None = None,
-        batch_size: int = 10,
-        max_workers: int = 4
+        batch_size: int = 5,
+        max_workers: int = 2
 ) -> list[dict[str, str]]:
     """
     Generate realistic financial headlines using an LLM.

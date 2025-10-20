@@ -10,6 +10,7 @@ from sklearn.multioutput import MultiOutputRegressor
 
 from src.models.base import Base
 
+
 @dataclass
 class LinearElasticNet(Base):
     """
@@ -67,17 +68,6 @@ class LinearElasticNet(Base):
         """Generate predictions."""
         yhat = self.model.predict(X)
         return np.asarray(yhat)
-
-    def fine_tune(self, X: pd.DataFrame, y: np.ndarray) -> Self:
-        """Incrementally update model with new stock data."""
-        if not self.multioutput and getattr(y, "ndim", 1) == 2 and y.shape[1] == 1:
-            y = np.asarray(y).ravel()
-        if hasattr(self.model, "partial_fit"):
-            self.model.partial_fit(X, y)
-        else:
-            for est, y_col in zip(self.model.estimators_, y.T):
-                est.partial_fit(X, y_col)
-        return self
 
     @staticmethod
     def search_space(trial) -> dict:
