@@ -1,8 +1,8 @@
-# Stock Market Forecast with FinBERT Sentiment Analysis
+# Sentiment-Aware Stock Forecasting on the Dow Jones Index
 
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=vitoco84_ml-stock-sent&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=vitoco84_ml-stock-sent)
 
-This project presents a sentiment-aware forecasting framework for the Dow Jones Industrial Average (DJIA).  
+This project presents a sentiment-aware forecasting framework for the Dow Jones Industrial Average (DJIA).
 It combines historical stock market data with financial news sentiment extracted using:
 
 - Historical market data via [Yahoo Finance](https://finance.yahoo.com/quote/%5EDJI/)
@@ -11,6 +11,8 @@ It combines historical stock market data with financial news sentiment extracted
 - Optional headline generation with local LLMs (Ollama)
 - A production-ready FastAPI backend and Streamlit dashboard
 
+
+- [OpenAI’s ChatGPT](https://openai.com/index/chatgpt/) was used as a supportive tool for code assistance, text editing, and overall writing refinement.
 ---
 
 ## Quick Start
@@ -376,7 +378,7 @@ This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for d
 ## TODO
 
 - [ ] Transfer Learning and Fine-Tuning
-- [ ] Optional: Deploy demo API and Streamlit to cloud (Render / Fly.io / AWS)
-- [ ] Optional: Add monitoring and logging integration (Prometheus/Grafana)
-- [ ] Optional: Add Model Tracking MLFlow
-- [ ] Optional: Pipeline Orchestration: data -> train -> eval -> register -> deploy -> monitor
+- [ ] Deploy demo API and Streamlit to cloud (Render / Fly.io / AWS)
+- [ ] Add monitoring and logging integration (Prometheus/Grafana)
+- [ ] Add Model Tracking MLFlow
+- [ ] Pipeline Orchestration: data -> train -> eval -> register -> deploy -> monitor
