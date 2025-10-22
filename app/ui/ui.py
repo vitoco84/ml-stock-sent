@@ -16,8 +16,23 @@ CONNECT_TIMEOUT, READ_TIMEOUT_FETCH, READ_TIMEOUT_PREDICT = 10.0, 15.0, 180.0
 st.set_page_config(page_title="Stock Prediction App", layout="centered")
 st.title("Stock Prediction App")
 
-AVAILABLE_MODELS = ["linreg.pkl", "random_forest.pkl", "xgboost.pkl", "lstm.pkl"]
-selected_model = st.selectbox("Select model", AVAILABLE_MODELS, index=0)
+BASE_MODELS = ["linreg.pkl", "random_forest.pkl", "xgboost.pkl", "lstm.pkl"]
+AVAILABLE_MODELS = BASE_MODELS.copy()
+
+mode = st.radio(
+    "Data source",
+    ["Fetch from API", "Upload CSVs", "Fine-Tune Model"],
+    horizontal=True,
+    label_visibility="collapsed"
+)
+
+if "tuned_models" in st.session_state:
+    AVAILABLE_MODELS.extend(sorted(st.session_state["tuned_models"]))
+
+if mode != "Fine-Tune Model":
+    selected_model = st.selectbox("Select model", AVAILABLE_MODELS, index=0)
+else:
+    selected_model = "linreg.pkl"
 
 @st.cache_resource
 def get_http() -> requests.Session:
@@ -107,13 +122,6 @@ def show_results(result: dict, price_df: pd.DataFrame):
         st.table(pd.DataFrame(rows))
 
     plot_results(price_df, result, current_price)
-
-mode = st.radio(
-    "Data source",
-    ["Fetch from API", "Upload CSVs"],
-    horizontal=True,
-    label_visibility="collapsed",
-)
 
 if mode == "Fetch from API":
     # Reactive news toggle outside form
@@ -244,3 +252,58 @@ if mode == "Upload CSVs":
                 st.error(f"Prediction failed: {e}")
                 st.stop()
         show_results(result, price_df)
+
+if mode == "Fine-Tune Model":
+    st.info(
+        "This section fine-tunes the pre-trained **linreg** model on a new stock symbol.\n\n"
+        "The base model remains unchanged, a fine-tuned copy is cached in memory "
+        "and becomes available in the model selection dropdown."
+    )
+
+    fixed_model = "linreg.pkl"
+    st.caption(f"Model fixed to **{fixed_model}**")
+
+    symbol = st.text_input("Ticker Symbol", value="AAPL", placeholder="e.g. AAPL, MSFT, TSLA")
+    end_date = st.date_input("End Date", value=datetime.today())
+
+    MIN_LOOKBACK = 80
+    MAX_LOOKBACK = 365
+    DEFAULT_LOOKBACK = max(MIN_LOOKBACK, 180)
+    days = st.slider("Lookback Days", MIN_LOOKBACK, MAX_LOOKBACK, DEFAULT_LOOKBACK)
+
+    run_tune = st.button("Fine-Tune Model", type="primary")
+
+    if run_tune:
+        with st.spinner(f"Fine-tuning {fixed_model} on {symbol}..."):
+            try:
+                r = HTTP.post(
+                    f"{API_URL}/fine-tune",
+                    params={
+                        "symbol": symbol,
+                        "end_date": end_date.strftime("%Y-%m-%d"),
+                        "days": int(days)
+                    },
+                    timeout=(CONNECT_TIMEOUT, READ_TIMEOUT_PREDICT)
+                )
+                r.raise_for_status()
+                data = r.json()
+
+                tuned_model_name = data.get("cached_as", "?")
+
+                c1, c2 = st.columns(2)
+                with c1:
+                    st.write("**Symbol:**", data.get("symbol", "-"))
+                    st.write("**Samples Used:**", data.get("samples", "-"))
+                with c2:
+                    st.write("**Date Range:**", f"{data.get('start_date', '-')} → {data.get('end_date', '-')}")
+                    st.write("**Status:**", data.get("status", "-"))
+
+                st.caption(data.get("message", "Fine-tuning complete."))
+
+                if "tuned_models" not in st.session_state:
+                    st.session_state["tuned_models"] = set()
+                st.session_state["tuned_models"].add(tuned_model_name)
+
+            except requests.RequestException as e:
+                st.error(f"Fine-tuning failed: {e}")
+                st.stop()

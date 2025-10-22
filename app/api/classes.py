@@ -46,3 +46,13 @@ class PredictionResponse(BaseModel):
     log_return_1: Optional[float] = None
     log_return_5: Optional[float] = None
     log_return_20: Optional[float] = None
+
+class FineTuneResponse(BaseModel):
+    """Schema for fine-tuning response."""
+    status: str = Field(..., examples=["ok"])
+    symbol: str = Field(..., examples=["AAPL"])
+    cached_as: str = Field(..., examples=["finetuned_linreg.pkl"])
+    samples: int = Field(..., examples=[185])
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    message: Optional[str] = None
