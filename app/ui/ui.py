@@ -16,6 +16,9 @@ CONNECT_TIMEOUT, READ_TIMEOUT_FETCH, READ_TIMEOUT_PREDICT = 10.0, 15.0, 180.0
 st.set_page_config(page_title="Stock Prediction App", layout="centered")
 st.title("Stock Prediction App")
 
+AVAILABLE_MODELS = ["linreg.pkl", "random_forest.pkl", "xgboost.pkl", "lstm.pkl"]
+selected_model = st.selectbox("Select model", AVAILABLE_MODELS, index=0)
+
 @st.cache_resource
 def get_http() -> requests.Session:
     s = requests.Session()
@@ -167,6 +170,7 @@ if mode == "Fetch from API":
         st.dataframe(price_df.tail(10))
 
         req = build_payload(price_df, pd.DataFrame(news_input) if news_input else None, not use_news, symbol)
+        req["params"]["model_name"] = selected_model
         with st.spinner("Running prediction..."):
             try:
                 result = call_api(req["payload"], req["params"])
@@ -182,17 +186,30 @@ if mode == "Upload CSVs":
     if "news_csv_key" not in st.session_state:
         st.session_state.news_csv_key = 0
 
+    st.markdown("<h4>Prices CSV (required)</h4>", unsafe_allow_html=True)
+    st.code(
+        "date, open, high, low, close, adj_close, volume\n"
+        "2024-10-01,100.25,101.30,99.80,100.95,100.95,1203400",
+        language="csv"
+    )
     price_file = st.file_uploader(
-        "Example → date,open,high,low,close,adj_close,volume",
+        "Upload prices CSV",
         type=["csv"],
         key=f"price_csv_{st.session_state.price_csv_key}",
-        label_visibility="visible",
+        label_visibility="collapsed",
+    )
+
+    st.markdown("<h4>News CSV (optional)</h4>", unsafe_allow_html=True)
+    st.code(
+        "date, headline\n"
+        "2024-10-01,Tech stocks rally as inflation cools",
+        language="csv",
     )
     news_file = st.file_uploader(
-        "Example → date,headline",
+        "Upload news CSV (optional)",
         type=["csv"],
         key=f"news_csv_{st.session_state.news_csv_key}",
-        label_visibility="visible",
+        label_visibility="collapsed",
     )
 
     price_df = load_csv(price_file) if price_file else None
@@ -207,7 +224,7 @@ if mode == "Upload CSVs":
         st.success(f"Loaded {len(news_df)} news rows")
 
     c1, c2 = st.columns([2, 1])
-    run_csv = c1.button("Run Prediction from CSV", type="primary", disabled=price_df is None)
+    run_csv = c1.button("Run Prediction", type="primary", disabled=price_df is None)
     clear_csv = c2.button("Clear", type="secondary")
 
     if clear_csv:
@@ -217,12 +234,9 @@ if mode == "Upload CSVs":
         st.rerun()
 
     if run_csv and price_df is not None:
-        if news_df is None:
-            ignore_news = True
-        else:
-            ignore_news = False
-
+        ignore_news = news_df is None
         req = build_payload(price_df, news_df, ignore_news, "CSV")
+        req["params"]["model_name"] = selected_model
         with st.spinner("Running prediction..."):
             try:
                 result = call_api(req["payload"], req["params"])

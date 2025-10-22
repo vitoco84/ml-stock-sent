@@ -33,18 +33,32 @@ async def lifespan(app: FastAPI):
 
     sentiment_model = FinBERT(device=device, max_embedding_dims=cfg.runtime.max_sentiment_embeddings)
 
-    model_path = Path(cfg.data.models_dir) / "linreg.pkl"
-    if not model_path.exists():
-        raise RuntimeError(f"Model file not found at {model_path}")
+    models_dir = Path(cfg.data.models_dir)
+    loaded_models = {}
 
-    model, preprocessor, y_scaler, y_scale = ModelTrainer.load(str(model_path))
+    for model_file in settings.available_models:
+        model_path = models_dir / model_file
+        if not model_path.exists():
+            logger.warning(f"Skipping missing model: {model_file}")
+            continue
+        try:
+            model, preprocessor, y_scaler, y_scale = ModelTrainer.load(str(model_path))
+            loaded_models[model_file] = {
+                "model": model,
+                "preprocessor": preprocessor,
+                "y_scaler": y_scaler,
+                "y_scale": bool(y_scale),
+            }
+            logger.info(f"Loaded model: {model_file}")
+        except Exception as e:
+            logger.error(f"Failed to load {model_file}: {e}")
+
+    if not loaded_models:
+        raise RuntimeError("No valid models could be loaded. Check settings.available_models.")
 
     app.state.news_api_key = settings.news_api_key
     app.state.sentiment_model = sentiment_model
-    app.state.model = model
-    app.state.preprocessor = preprocessor
-    app.state.y_scaler = y_scaler
-    app.state.y_scale = bool(y_scale)
+    app.state.models = loaded_models
 
     yield
 
@@ -120,9 +134,19 @@ def post_predict_from_raw(
         request: Request,
         ignore_news: bool = Query(False, description="Ignore all news (neutral every day)"),
         return_path: bool = Query(True, description="Whether to return the full H-step path"),
-        symbol: str = Query("^DJI", description="Ticker symbol (e.g., AAPL)")
+        symbol: str = Query("^DJI", description="Ticker symbol (e.g.: AAPL)"),
+        model_name: str = Query(None, description="Model name (e.g.: linreg.pkl)")
 ) -> PredictionResponse:
     """Predict next price log-returns from prices and optional news."""
+    model_to_use = model_name or settings.model
+    if model_to_use not in request.app.state.models:
+        raise HTTPException(
+            400,
+            f"Invalid model '{model_to_use}'. Allowed models: {list(request.app.state.models.keys())}"
+        )
+
+    selected = request.app.state.models[model_to_use]
+
     price_df = _process_price_df(request_body)
     price_dates = price_df["date"].dt.strftime("%Y-%m-%d").tolist()
 
@@ -144,10 +168,10 @@ def post_predict_from_raw(
 
     return _make_prediction(
         feature_row,
-        request.app.state.model,
-        request.app.state.preprocessor,
-        request.app.state.y_scaler,
-        request.app.state.y_scale,
+        selected["model"],
+        selected["preprocessor"],
+        selected["y_scaler"],
+        selected["y_scale"],
         price_df,
         horizon,
         return_path,

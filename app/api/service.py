@@ -150,6 +150,10 @@ def _make_prediction(
 ) -> PredictionResponse:
     """Run model prediction and build response (direct or rolling log-returns)."""
     try:
+        if getattr(model, "input_mode", "tabular") == "sequence":
+            feature_row = feature_row[[c for c in feature_row.columns if c.startswith("lag_")]]
+            logger.debug(f"LSTM input features: {list(feature_row.columns)}")
+
         X = preprocessor.transform(feature_row)
         yhat = np.asarray(model.predict(X), dtype=float)
         if yhat.ndim == 1:
