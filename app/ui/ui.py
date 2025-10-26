@@ -16,7 +16,7 @@ CONNECT_TIMEOUT, READ_TIMEOUT_FETCH, READ_TIMEOUT_PREDICT = 10.0, 15.0, 180.0
 st.set_page_config(page_title="Stock Prediction App", layout="centered")
 st.title("Stock Prediction App")
 
-BASE_MODELS = ["linreg.pkl", "random_forest.pkl", "xgboost.pkl", "lstm.pkl"]
+BASE_MODELS = ["linreg.pkl", "random_forest.pkl", "xgboost.pkl", "lstm.pkl", "ensemble.pkl"]
 AVAILABLE_MODELS = BASE_MODELS.copy()
 
 mode = st.radio(

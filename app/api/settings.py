@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     api_root_path: str = ""
 
     model: str = "linreg.pkl"
-    available_models: list[str] = ["linreg.pkl", "random_forest.pkl", "xgboost.pkl", "lstm.pkl"]
+    available_models: list[str] = ["linreg.pkl", "random_forest.pkl", "xgboost.pkl", "lstm.pkl", "ensemble.pkl"]
 
     model_config = SettingsConfigDict(
         env_file=".env",
