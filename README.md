@@ -1,4 +1,4 @@
-# Sentiment-Aware Stock Forecasting on the Dow Jones Index
+# Sentiment-Aware Return Forecasting on the Dow Jones Index
 
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=vitoco84_ml-stock-sent&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=vitoco84_ml-stock-sent)
 

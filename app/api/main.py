@@ -194,7 +194,7 @@ def fine_tune_linreg(
         days: int = Query(180, ge=80, le=365, description="Lookback window in days")
 ):
     """
-    Fine-tune the default linear regression model on new stock data.
+    Fine-tune the default Elastic Net regression model on new stock data.
     The base model remains intact, the fine-tuned one is cached in memory.
     """
 
