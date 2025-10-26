@@ -236,7 +236,7 @@ def fine_tune_linreg(
             name=tuned_name,
             config={"optimization_metric": "mae"},
             preprocessor=fine_preprocessor,
-            y_scale=y_scale,
+            y_scale=y_scale
         )
 
         trainer.fit(X, y)
