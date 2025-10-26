@@ -8,11 +8,11 @@ It combines historical stock market data with financial news sentiment extracted
 - Historical market data via [Yahoo Finance](https://finance.yahoo.com/quote/%5EDJI/)
 - Dataset combining Stock Prices and News via [Kaggle Dataset](https://www.kaggle.com/datasets/aaron7sun/stocknews/data)
 - News sentiment via [FinBERT](https://huggingface.co/yiyanghkust/finbert-tone)
-- Optional headline generation with local LLMs (Ollama)
-- A production-ready FastAPI backend and Streamlit dashboard
+- Optional headline generation with local LLMs ([Ollama](https://ollama.com/))
+- A production-ready [FastAPI](https://fastapi.tiangolo.com/) backend and [Streamlit](https://streamlit.io/) dashboard
 
 
-- [OpenAI’s ChatGPT](https://openai.com/index/chatgpt/) was used as a supportive tool for code assistance, text editing, and overall writing refinement.
+- [OpenAI’s ChatGPT](https://openai.com/index/chatgpt/) was used for code assistance, text editing and writing refinement.
 ---
 
 ## Quick Start
@@ -49,6 +49,7 @@ pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 - `data/` - figures, processed, models, raw
 - `config/` - configuration
 - `scripts/` - freeze requirements
+- `tests/` - automated testing
 
 ---
 
@@ -65,10 +66,10 @@ uvicorn app.api.main:app --reload
 Create `.env` (do not commit). See [.env.example](.env.example) for all keys.
 ```
 # External news provider (optional if you won’t call /news-history)
-NEWS_API_BASE=your_news_apy_base_url
+NEWS_API_BASE=your_newsapi_base_url
 NEWS_API_KEY=your_newsapi_key
 
-# Optional LLM for news enrichment (used when enrich=true)
+# Optional LLM for news enrichment
 OLLAMA_URL=http://localhost:11434
 OLLAMA_MODEL=llama3
 
@@ -77,7 +78,7 @@ API_ROOT_PATH=/
 CORS_ORIGINS=["http://localhost:8501","http://localhost:3000"]
 ```
 
-> Note: The API checks reachability when enrich=true. Ensure OLLAMA_BASE is live (native or Docker).
+> Note: The API checks reachability of Ollama, ensure it is live (native or Docker).
 
 ---
 
@@ -129,7 +130,7 @@ Fetch recent news headlines via NewsAPI.
 **Query params**
 - `query` *(str, required)* - search term, e.g. `Apple`
 - `end_date` *(YYYY-MM-DD, required)*
-- `days` *(int, default 7)* - lookback window
+- `days` *(int, default 7, max 29)* - lookback window
 
 **Success - `NewsHistoryResponse`**
 ```json
@@ -148,7 +149,7 @@ Fetch recent news headlines via NewsAPI.
 }
 ```
 **Error cases**
-- `400` if lookback > 365 business days
+- `400` if lookback > 29 business days
 - `500` with message `"Missing NEWS_API_KEY environment variable"` if the key is not configured
 - `500` on unexpected failure
 
@@ -158,13 +159,10 @@ Fetch recent news headlines via NewsAPI.
 Predict next price log-returns using historical prices, news sentiment, and FinBERT.
 
 **Query params**
-- `symbol` *(str, required)* - Ticker symbol for context (e.g., `AAPL`)
+- `symbol` *(str, default ^DJI)* - Ticker symbol (e.g., `AAPL`)
 - `return_path` *(bool, default `true`)* - whether to return full H‑step paths
-- `enrich` *(bool, default `false`)* - generate missing headlines locally (requires reachable `OLLAMA_URL`)
-- `pad_neutral` *(bool, default `false`)* - Use provided headlines and fill missing days with neutral sentiment (requires ≥2 headlines, no generation)
 - `ignore_news` *(bool, default `false`)* - Ignore all news (neutral sentiment every day)
-
-> Note: Choose exactly one strategy: ignore_news OR enrich OR pad_neutral.
+- `model_name` *(str, optional)* - specify model (e.g. linreg.pkl)
 
 **Request body - `PredictionRequest`**
 ```json
@@ -229,7 +227,7 @@ Predict next price log-returns using historical prices, news sentiment, and FinB
 
 **cURL example**
 ```bash
-curl -X POST "http://localhost:8000/predict-raw?symbol=AAPL&return_path=true&ignore_news=false&enrich=false&pad_neutral=true" \
+curl -X POST "http://localhost:8000/predict-raw?symbol=AAPL&return_path=true&ignore_news=false" \
   -H "Content-Type: application/json" \
   -d '{
         "price":[
@@ -242,6 +240,50 @@ curl -X POST "http://localhost:8000/predict-raw?symbol=AAPL&return_path=true&ign
         ]
       }'
 ```
+
+---
+
+### `GET /models`
+List all currently loaded models available in memory.
+
+**Response**
+```json
+{
+  "models": [
+    "linreg.pkl",
+    "xgboost.pkl",
+    "finetuned_linreg.pkl"
+  ]
+}
+```
+
+---
+
+### `POST /fine-tune`
+Fine-tune the default model on new stock data.
+The base model remains intact, the tuned version is cached in memory.
+
+**Query params**
+- `symbol` *(str, required)* - Ticker symbol for context (e.g., `AAPL`)
+- `end_date` *(YYYY-MM-DD, required)*
+- `days` *(int, default 180)* - lookback window
+
+**Response - `FineTuneResponse`**
+```json
+{
+  "status": "ok",
+  "symbol": "AAPL",
+  "cached_as": "finetuned_linreg.pkl",
+  "samples": 180,
+  "start_date": "2024-06-01",
+  "end_date": "2024-12-01",
+  "message": "Fine-tuned model cached as 'finetuned_linreg.pkl'."
+}
+```
+
+**Validation and errors**
+- `400` if the base model is not found
+- `500` on fine-tuning failure
 
 ---
 

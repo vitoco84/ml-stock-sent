@@ -191,7 +191,7 @@ def fine_tune_linreg(
         request: Request,
         symbol: str = Query(..., description="Ticker symbol to fine-tune on"),
         end_date: str = Query(..., description="End date (YYYY-MM-DD)"),
-        days: int = Query(180, ge=80, le=365, description="Lookback window in trading days")
+        days: int = Query(180, ge=80, le=365, description="Lookback window in days")
 ):
     """
     Fine-tune the default linear regression model on new stock data.
