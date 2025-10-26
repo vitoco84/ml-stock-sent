@@ -419,7 +419,6 @@ This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for d
 
 ## TODO
 
-- [ ] Transfer Learning and Fine-Tuning
 - [ ] Deploy demo API and Streamlit to cloud (Render / Fly.io / AWS)
 - [ ] Add monitoring and logging integration (Prometheus/Grafana)
 - [ ] Add Model Tracking MLFlow
