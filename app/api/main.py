@@ -1,3 +1,4 @@
+import copy
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -6,6 +7,7 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.classes import (
+    FineTuneResponse,
     NewsHistoryResponse,
     PredictionRequest,
     PredictionResponse,
@@ -16,7 +18,9 @@ from app.api.settings import get_settings
 from app.api.utils import LimitUploadSizeMiddleware
 from config.config import Config
 from src.data import get_news_history, get_price_history
+from src.features import create_features_and_target
 from src.logger import get_logger
+from src.preprocessing import get_preprocessor
 from src.sentiment import FinBERT
 from src.train import ModelTrainer
 
@@ -100,9 +104,9 @@ def fetch_price_history(
 
         df["date"] = df["date"].dt.strftime("%Y-%m-%d")
         return {"price": df.to_dict(orient="records")}
-    except Exception:
+    except Exception as e:
         logger.exception("fetch_price_history failed")
-        raise HTTPException(500, "Internal server error")
+        raise HTTPException(500, f"Failed to fetch price data: {e}")
 
 @app.get("/news-history", response_model=NewsHistoryResponse)
 def fetch_news_history(
@@ -124,9 +128,9 @@ def fetch_news_history(
         if df.empty:
             return {"news": [], "message": "No articles found."}
         return {"news": df.to_dict(orient="records")}
-    except Exception:
+    except Exception as e:
         logger.exception("fetch_news_history failed")
-        raise HTTPException(500, "Internal server error")
+        raise HTTPException(500, f"Failed to fetch news data: {e}")
 
 @app.post("/predict-raw", response_model=PredictionResponse, response_model_exclude_none=True)
 def post_predict_from_raw(
@@ -177,3 +181,84 @@ def post_predict_from_raw(
         return_path,
         cfg.runtime.target_mode
     )
+
+@app.get("/models")
+def list_models(request: Request):
+    return {"models": list(request.app.state.models.keys())}
+
+@app.post("/fine-tune", response_model=FineTuneResponse)
+def fine_tune_linreg(
+        request: Request,
+        symbol: str = Query(..., description="Ticker symbol to fine-tune on"),
+        end_date: str = Query(..., description="End date (YYYY-MM-DD)"),
+        days: int = Query(180, ge=80, le=365, description="Lookback window in trading days")
+):
+    """
+    Fine-tune the default linear regression model on new stock data.
+    The base model remains intact, the fine-tuned one is cached in memory.
+    """
+
+    base_name = settings.model
+    tuned_name = f"finetuned_{base_name}"
+
+    if base_name not in request.app.state.models:
+        raise HTTPException(400, f"Base model '{base_name}' not loaded in memory.")
+
+    entry = request.app.state.models[base_name]
+    model, _, _, y_scale = (
+        entry["model"],
+        entry["preprocessor"],
+        entry["y_scaler"],
+        entry["y_scale"]
+    )
+
+    try:
+        df = get_price_history(symbol, end_date, days)
+        feat_df = create_features_and_target(
+            df,
+            forecast_horizon=cfg.runtime.horizon,
+            back_horizon=cfg.runtime.lag_horizon,
+            training=True,
+            target_mode=cfg.runtime.target_mode,
+            custom_horizons=cfg.runtime.horizon_list
+        )
+
+        target_cols = [c for c in feat_df.columns if c.startswith("target")]
+
+        X = feat_df.drop(columns=["date"] + target_cols, errors="ignore")
+        y = feat_df[target_cols]
+
+        fine_model = copy.deepcopy(model)
+        fine_preprocessor, _ = get_preprocessor(X, "linreg")
+
+        trainer = ModelTrainer(
+            model=fine_model,
+            name=tuned_name,
+            config={"optimization_metric": "mae"},
+            preprocessor=fine_preprocessor,
+            y_scale=y_scale,
+        )
+
+        trainer.fit(X, y)
+
+        request.app.state.models[tuned_name] = {
+            "model": trainer.model,
+            "preprocessor": trainer.preprocessor,
+            "y_scaler": trainer.y_scaler,
+            "y_scale": trainer.y_scale
+        }
+
+        logger.info(f"Fine-tuned '{base_name}' on {symbol}, cached as '{tuned_name}'")
+
+        return FineTuneResponse(
+            status="ok",
+            symbol=symbol,
+            cached_as=tuned_name,
+            samples=len(X),
+            start_date=df["date"].min().date(),
+            end_date=df["date"].max().date(),
+            message=f"Fine-tuned model cached as '{tuned_name}'."
+        )
+    except Exception as e:
+        logger.exception("Fine-tune failed")
+        raise HTTPException(500, f"Fine-tune failed: {e}")
