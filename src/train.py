@@ -8,6 +8,7 @@ import joblib
 import numpy as np
 import optuna
 import pandas as pd
+import torch
 from sklearn.base import clone
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.preprocessing import StandardScaler
@@ -169,8 +170,13 @@ class ModelTrainer:
 
     @classmethod
     def load(cls, path: str | Path) -> Tuple[Any, Any, Optional[SafeStandardScaler], bool]:
-        """Load components from disk (returns tuple)."""
-        blob = joblib.load(path)
+        """Load components from disk safely (CPU/GPU compatible)."""
+
+        try:
+            blob = joblib.load(path)
+        except Exception:
+            blob = torch.load(path, map_location="cpu")
+
         return (
             blob["model"],
             blob["preprocessor"],
