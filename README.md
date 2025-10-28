@@ -22,7 +22,9 @@ It combines historical stock market data with financial news sentiment extracted
 - (Optional) NVIDIA GPU with CUDA for accelerated FinBERT and training/tuning
 
 ### Configuration
-- All runtime parameters are defined in the main configuration files `config\config.yaml` and `.env`.
+- All runtime parameters are defined in following configuration files:
+  - Training and Data Pipeline `config\config.yaml`
+  - API `app/api/settings.py` and `.env`.
 - If you change any of the runtime parameters you must regenerate the features and retrain your models.
 
 ### Setup

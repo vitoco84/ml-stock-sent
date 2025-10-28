@@ -1,3 +1,4 @@
+import json
 import os
 import re
 from datetime import datetime
@@ -8,7 +9,10 @@ import numpy as np
 import pandas as pd
 import requests
 import streamlit as st
+from dotenv import load_dotenv
 
+
+load_dotenv()
 
 API_URL: str = os.getenv("API_URL", "http://localhost:8000")
 CONNECT_TIMEOUT, READ_TIMEOUT_FETCH, READ_TIMEOUT_PREDICT = 10.0, 15.0, 180.0
@@ -20,7 +24,7 @@ BASE_MODELS = ["linreg.pkl", "random_forest.pkl", "xgboost.pkl", "lstm.pkl", "en
 AVAILABLE_MODELS = BASE_MODELS.copy()
 
 HORIZON = int(os.getenv("HORIZON", "20"))
-HORIZON_LIST = [int(x) for x in os.getenv("HORIZON_LIST", "1,5,20").split(",")]
+HORIZON_LIST = json.loads(os.getenv("HORIZON_LIST", "[1,5,20]"))
 
 mode = st.radio(
     "Data source",
@@ -105,7 +109,7 @@ def plot_results(price_df: pd.DataFrame, result: dict, current_price: float):
             alt.Chart(path_df.tail(1)).mark_text(dx=8, dy=-8, color="red").encode(
                 x="date:T", y="price:Q", text=alt.Text("price:Q", format="$.2f")
             ),
-        ).properties(width=700, height=380, title="Adj Close Forecast – Next 20 Business Days")
+        ).properties(width=700, height=380, title=f"Adj Close Forecast – Next {HORIZON} Business Days")
         st.altair_chart(chart, use_container_width=True)
 
 def show_results(result: dict, price_df: pd.DataFrame):

@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import List
 
 from pydantic import AnyHttpUrl
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -20,6 +21,9 @@ class Settings(BaseSettings):
 
     model: str = "linreg.pkl"
     available_models: list[str] = ["linreg.pkl", "random_forest.pkl", "xgboost.pkl", "lstm.pkl", "ensemble.pkl"]
+
+    horizon: int = 20
+    horizon_list: List[int] = [1, 5, 20]
 
     model_config = SettingsConfigDict(
         env_file=".env",
