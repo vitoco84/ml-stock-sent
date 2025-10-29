@@ -170,12 +170,19 @@ class ModelTrainer:
 
     @classmethod
     def load(cls, path: str | Path) -> Tuple[Any, Any, Optional[SafeStandardScaler], bool]:
-        """Load components from disk safely (CPU/GPU compatible)."""
+        """
+        Load components from disk safely.
+        - `.pkl` or `.joblib` for sklearn-style models
+        - `.pt` or `.pth` for PyTorch models
+        """
+        path = Path(path)
 
-        try:
+        if path.suffix in [".pkl", ".joblib"]:
             blob = joblib.load(path)
-        except Exception:
+        elif path.suffix in [".pt", ".pth"]:
             blob = torch.load(path, map_location="cpu")
+        else:
+            raise ValueError(f"Unsupported file format: {path.suffix}")
 
         return (
             blob["model"],
