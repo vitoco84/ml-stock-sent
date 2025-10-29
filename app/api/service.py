@@ -197,24 +197,27 @@ def _make_prediction(
     elif target_mode == "rolling":
         # yhat shape (1,X)
         horizons = cfg.runtime.horizon_list
-        horizon_preds = {h: float(yhat[0, i]) for i, h in enumerate(horizons) if i < yhat.shape[1]}
+        horizon_preds = {int(h): float(yhat[0, i]) for i, h in enumerate(horizons) if i < yhat.shape[1]}
 
-        # Default to horizon=20 for path
-        H = 20
-        total_return = horizon_preds.get(20, 0.0)
-        # Approximate daily path as equal-split of 20-day return
+        # Default path uses the largest horizon
+        H = int(max(horizons)) if horizons else int(horizon)
+        total_return = horizon_preds.get(H, 0.0)
+
+        # Approximate daily path by splitting total return evenly
         logret_path = np.full(H, total_return / H)
         predicted_price_path = current_price * np.exp(np.cumsum(logret_path))
 
+        # Build response dynamically for *all* horizons
         response_kwargs: dict[str, Any] = {
             "horizon": H,
             "current_price": current_price,
-            "log_return": horizon_preds.get(1, float("nan")),
-            "predicted_price": float(predicted_price_path[-1]),
-            "log_return_1": horizon_preds.get(1),
-            "log_return_5": horizon_preds.get(5),
-            "log_return_20": horizon_preds.get(20)
+            "log_return": horizon_preds.get(min(horizons), float("nan")),
+            "predicted_price": float(predicted_price_path[-1])
         }
+
+        # Add dynamic horizon-specific keys like log_return_1, log_return_5, log_return_20
+        for h, v in horizon_preds.items():
+            response_kwargs[f"log_return_{h}"] = v
 
         if return_path:
             future_dates = pd.bdate_range(last_date + BDay(1), periods=H)

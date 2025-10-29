@@ -1,3 +1,4 @@
+import json
 import os
 import re
 from datetime import datetime
@@ -8,7 +9,10 @@ import numpy as np
 import pandas as pd
 import requests
 import streamlit as st
+from dotenv import load_dotenv
 
+
+load_dotenv()
 
 API_URL: str = os.getenv("API_URL", "http://localhost:8000")
 CONNECT_TIMEOUT, READ_TIMEOUT_FETCH, READ_TIMEOUT_PREDICT = 10.0, 15.0, 180.0
@@ -16,8 +20,11 @@ CONNECT_TIMEOUT, READ_TIMEOUT_FETCH, READ_TIMEOUT_PREDICT = 10.0, 15.0, 180.0
 st.set_page_config(page_title="Stock Prediction App", layout="centered")
 st.title("Stock Prediction App")
 
-BASE_MODELS = ["linreg.pkl", "random_forest.pkl", "xgboost.pkl", "lstm.pkl"]
+BASE_MODELS = ["linreg.pkl", "random_forest.pkl", "xgboost.pkl", "lstm.pkl", "ensemble.pkl"]
 AVAILABLE_MODELS = BASE_MODELS.copy()
+
+HORIZON = int(os.getenv("HORIZON", "20"))
+HORIZON_LIST = json.loads(os.getenv("HORIZON_LIST", "[1,5,20]"))
 
 mode = st.radio(
     "Data source",
@@ -66,7 +73,12 @@ def build_payload(price_df: pd.DataFrame, news_df: Optional[pd.DataFrame], ignor
     news_records = news_df.to_dict(orient="records") if news_df is not None else []
     return {
         "payload": {"price": price_df.to_dict(orient="records"), "news": news_records},
-        "params": {"ignore_news": ignore_news, "horizon": 20, "return_path": True, "symbol": symbol},
+        "params": {
+            "ignore_news": ignore_news,
+            "horizon": HORIZON,
+            "return_path": True,
+            "symbol": symbol
+        }
     }
 
 def call_api(payload: dict, params: dict):
@@ -97,7 +109,7 @@ def plot_results(price_df: pd.DataFrame, result: dict, current_price: float):
             alt.Chart(path_df.tail(1)).mark_text(dx=8, dy=-8, color="red").encode(
                 x="date:T", y="price:Q", text=alt.Text("price:Q", format="$.2f")
             ),
-        ).properties(width=700, height=380, title="Adj Close Forecast – Next 20 Business Days")
+        ).properties(width=700, height=380, title=f"Adj Close Forecast – Next {HORIZON} Business Days")
         st.altair_chart(chart, use_container_width=True)
 
 def show_results(result: dict, price_df: pd.DataFrame):
@@ -108,15 +120,17 @@ def show_results(result: dict, price_df: pd.DataFrame):
     rows = []
     if "log_return_path" in result:
         logret_path = [float(x) for x in result["log_return_path"]]
-        for h in [1, 5, len(logret_path)]:  # show 1, 5, last day
-            if len(logret_path) >= h:
-                cum_ret = np.sum(logret_path[:h])
-                implied_price = current_price * np.exp(cum_ret)
-                rows.append({
-                    "Horizon": f"{h} days",
-                    "Predicted Log Return": f"{cum_ret:.4f}",
-                    "Implied Adj Close": f"${implied_price:,.2f}"
-                })
+        horizons = sorted(set(HORIZON_LIST or [1, len(logret_path)]))
+        horizons = [h for h in horizons if h <= len(logret_path)]
+
+        for h in horizons:
+            cum_ret = np.sum(logret_path[:h])
+            implied_price = current_price * np.exp(cum_ret)
+            rows.append({
+                "Horizon": f"{h} days",
+                "Predicted Log Return": f"{cum_ret:.4f}",
+                "Implied Adj Close": f"${implied_price:,.2f}"
+            })
 
     if rows:
         st.table(pd.DataFrame(rows))

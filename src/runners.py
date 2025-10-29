@@ -77,6 +77,25 @@ def run_experiments(
         )
     return results
 
+def _select_features(df_full: pd.DataFrame, exp: Experiment, target_mode: str) -> tuple[list[str], list[str]]:
+    drop_cols = ["open", "high", "low", "close", "volume", "adj_close"]
+    if target_mode == "rolling":
+        target_cols = [c for c in df_full.columns if c.startswith("target_")]
+    else:
+        target_cols = [c for c in df_full.columns if c == "target" or c.startswith("target_")]
+    feature_cols = [c for c in df_full.columns if c not in target_cols + ["date"] + drop_cols]
+
+    if exp.name.lower() in {"lstm", "lstm_wo_sent"}:
+        feature_cols = [c for c in feature_cols if c.startswith("lag_")]
+    else:
+        feature_cols = [c for c in feature_cols if not c.startswith("lag_") and c != "log_return"]
+
+    if not exp.include_sentiment:
+        sent = {"pos", "neg", "neu", "pos_minus_neg", "headline_count", "headline", "title"}
+        sent |= {c for c in df_full.columns if c.startswith("emb_")}
+        feature_cols = [c for c in feature_cols if c not in sent]
+    return feature_cols, target_cols
+
 def _run(
         df_full: pd.DataFrame,
         exp: Experiment,
@@ -108,22 +127,7 @@ def _run(
         df_full, train_ratio=train_ratio, val_ratio=val_ratio, horizon=forecast_horizon
     )
 
-    drop_cols = ["open", "high", "low", "close", "volume", "adj_close"]
-    if target_mode == "rolling":
-        target_cols = [c for c in df_full.columns if c.startswith("target_")]
-    else:
-        target_cols = [c for c in df_full.columns if c == "target" or c.startswith("target_")]
-    feature_cols = [c for c in df_full.columns if c not in target_cols + ["date"] + drop_cols]
-
-    if exp.name.lower() in {"lstm", "lstm_wo_sent"}:
-        feature_cols = [c for c in feature_cols if c.startswith("lag_")]
-    else:
-        feature_cols = [c for c in feature_cols if not c.startswith("lag_") and c != "log_return"]
-
-    if not exp.include_sentiment:
-        sent = {"pos", "neg", "neu", "pos_minus_neg", "headline_count", "headline", "title"}
-        sent |= {c for c in df_full.columns if c.startswith("emb_")}
-        feature_cols = [c for c in feature_cols if c not in sent]
+    feature_cols, target_cols = _select_features(df_full, exp, target_mode)
 
     # Full data
     X_train, y_train = train[feature_cols], train[target_cols]

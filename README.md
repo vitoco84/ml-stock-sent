@@ -21,6 +21,12 @@ It combines historical stock market data with financial news sentiment extracted
 - Python **3.10+**
 - (Optional) NVIDIA GPU with CUDA for accelerated FinBERT and training/tuning
 
+### Configuration
+- All runtime parameters are defined in following configuration files:
+  - Training and Data Pipeline `config\config.yaml`
+  - API `app/api/settings.py` and `.env`.
+- If you change any of the runtime parameters you must regenerate the features and retrain your models.
+
 ### Setup
 ```bash
 # Upgrade pip
@@ -62,6 +68,18 @@ uvicorn app.api.main:app --reload
 - Swagger docs: <http://localhost:8000/docs>
 - Health check: <http://localhost:8000/healthz>
 
+---
+
+## Streamlit UI (Frontend)
+
+Launch dashboard:
+```bash
+streamlit run app/ui/ui.py
+```
+- Client: <http://localhost:8501>
+
+---
+
 ### Environment Variables
 Create `.env` (do not commit). See [.env.example](.env.example) for all keys.
 ```
@@ -76,6 +94,10 @@ OLLAMA_MODEL=llama3
 # API runtime
 API_ROOT_PATH=/
 CORS_ORIGINS=["http://localhost:8501","http://localhost:3000"]
+
+# Horizon settings
+HORIZON=20
+HORIZON_LIST=[1,5,20]
 ```
 
 > Note: The API checks reachability of Ollama, ensure it is live (native or Docker).
@@ -342,16 +364,6 @@ Docker Compose (service-to-service)
 # The API resolves Ollama by service name
 OLLAMA_BASE=http://ollama:11434
 ```
-
----
-
-## Streamlit UI
-
-Launch dashboard:
-```bash
-streamlit run app/ui/ui.py
-```
-Open <http://localhost:8501>
 
 ---
 

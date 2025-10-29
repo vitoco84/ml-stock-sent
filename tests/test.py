@@ -22,9 +22,11 @@ from src.data import _rename_columns, time_series_split
 from src.evaluation import SHAPExplainer
 from src.features import create_features_and_target, generate_full_feature_row
 from src.llm import enrich_news_with_generated
+from src.models.base import Base
 from src.models.factory import Experiment
 from src.models.linreg import LinearElasticNet
 from src.preprocessing import get_preprocessor
+from src.runners import _select_features
 from src.scaler import SafeStandardScaler
 from src.sentiment import FinBERT
 from src.train import ModelTrainer
@@ -321,6 +323,36 @@ def test_linear_elasticnet_predictions_shape(rng: np.random.Generator, h: int, m
     model = LinearElasticNet(horizon=h, random_state=SEED, multioutput=multi, n_jobs=8).fit(X, y)
     preds = model.predict(X)
     assert preds.shape == (10, h) if multi else preds.shape == (10,)
+
+def test_feature_selection_with_and_without_sentiment():
+    df = pd.DataFrame({
+        "lag_1": [0.1, 0.2],
+        "log_return": [0.05, -0.02],
+        "pos": [0.3, 0.1],
+        "neg": [0.2, 0.05],
+        "emb_0": [0.12, 0.33],
+        "target": [0.07, -0.01],
+        "date": pd.date_range("2020-01-01", periods=2)
+    })
+
+    class DummyModel(Base):
+        def fit(self, *args, **kwargs): ...
+        def predict(self, *args, **kwargs): return [0.0]
+
+    def dummy_builder(h, s, n):
+        return DummyModel(horizon=h, random_state=s, n_jobs=n)
+
+    with_sent = Experiment(name="xgboost", build=dummy_builder, include_sentiment=True)
+    no_sent = Experiment(name="xgboost_wo_sent", build=dummy_builder, include_sentiment=False)
+
+    f_with, _ = _select_features(df, with_sent, "rolling")
+    f_no, _ = _select_features(df, no_sent, "rolling")
+
+    assert any(c in f_with for c in ["pos", "neg", "emb_0"]), \
+        "Sentiment features should be kept when include_sentiment=True"
+
+    assert not any(c in f_no for c in ["pos", "neg", "emb_0"]), \
+        "Sentiment features should be removed when include_sentiment=False"
 
 def test_model_trainer_fit_and_evaluate(rng: np.random.Generator):
     X = pd.DataFrame(rng.random((20, 5)), columns=[f"x{i}" for i in range(5)])
