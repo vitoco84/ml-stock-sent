@@ -46,6 +46,10 @@ class PredictionResponse(BaseModel):
     log_return_1: Optional[float] = None
     log_return_5: Optional[float] = None
     log_return_20: Optional[float] = None
+    model_name: Optional[str] = Field(
+        default=None,
+        description="Name of the model used for this prediction (e.g. linreg.pkl, lstm.pkl, finetuned_linreg.pkl)."
+    )
 
 class FineTuneResponse(BaseModel):
     """Schema for fine-tuning response."""
@@ -53,6 +57,8 @@ class FineTuneResponse(BaseModel):
     symbol: str = Field(..., examples=["AAPL"])
     cached_as: str = Field(..., examples=["finetuned_linreg.pkl"])
     samples: int = Field(..., examples=[185])
-    start_date: Optional[date] = None
-    end_date: Optional[date] = None
     message: Optional[str] = None
+    base_model: Optional[str] = Field(
+        default=None,
+        description="Name of the base model used for fine-tuning (e.g. linreg.pkl)."
+    )

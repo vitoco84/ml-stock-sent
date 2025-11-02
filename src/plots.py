@@ -369,3 +369,37 @@ def plot_return_overlay(
         raise ValueError(f"Unknown target_mode: {target_mode}")
 
     _finalize_figure(fig, path, save=save)
+
+def plot_target_overlay(
+        df_full: pd.DataFrame,
+        results: list[Mapping],
+        path: Path | str,
+        *,
+        phase: str = "test",
+        save: bool = True
+) -> None:
+    split_idx = int(len(df_full) * 0.8)
+    df_test = df_full.iloc[split_idx:].reset_index(drop=True)
+
+    y_true = pd.to_numeric(df_test["target_1"], errors="coerce").to_numpy(dtype=float)
+    pred_key = f"y_pred_{phase}"
+    y_pred_all = np.asarray(results[0].get(pred_key))
+
+    if y_pred_all.ndim == 2 and y_pred_all.shape[1] > 1:
+        y_pred = y_pred_all[:, 1]
+    else:
+        y_pred = y_pred_all.ravel()
+
+    n = min(len(y_true), len(y_pred))
+    y_true, y_pred = y_true[:n], y_pred[:n]
+
+    fig, ax = plt.subplots(figsize=_FIGSIZE_STD)
+    ax.plot(y_true, label="True target_1", linewidth=2)
+    ax.plot(y_pred, label="Pred target_1", linewidth=2)
+    ax.set_title(f"Target Alignment (Debug Overlay, {phase.capitalize()})")
+    ax.set_xlabel("Index")
+    ax.set_ylabel("Value")
+    ax.grid(True, alpha=0.25)
+    ax.legend()
+
+    _finalize_figure(fig, path, save=save)

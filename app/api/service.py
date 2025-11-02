@@ -97,7 +97,7 @@ def _process_news_df(
         real_news=real_news,
         symbol=symbol,
         url_llm=f"{ollama_base.rstrip('/')}/api/generate",
-        model_llm=settings.ollama_model,
+        model_llm=settings.ollama_model
     )
     df = pd.DataFrame(enriched)
     df["date"] = pd.to_datetime(df["date"]).dt.normalize()
