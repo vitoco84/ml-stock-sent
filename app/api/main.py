@@ -1,9 +1,12 @@
 import copy
+import re
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 import torch
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.classes import (
@@ -31,40 +34,34 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialize and tear down global resources (FinBERT, model, preprocessor)."""
+    """Initialize global settings (lazy FinBERT and models)."""
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    logger.info(f"Initializing FinBERT on {device}")
+    logger.info(f"App starting on device: {device}")
 
-    sentiment_model = FinBERT(device=device, max_embedding_dims=cfg.runtime.max_sentiment_embeddings)
-
-    models_dir = Path(cfg.data.models_dir)
-    loaded_models = {}
-
-    for model_file in settings.available_models:
-        model_path = models_dir / model_file
-        if not model_path.exists():
-            logger.warning(f"Skipping missing model: {model_file}")
-            continue
-        try:
-            model, preprocessor, y_scaler, y_scale = ModelTrainer.load(str(model_path))
-            loaded_models[model_file] = {
-                "model": model,
-                "preprocessor": preprocessor,
-                "y_scaler": y_scaler,
-                "y_scale": bool(y_scale),
-            }
-            logger.info(f"Loaded model: {model_file}")
-        except Exception as e:
-            logger.error(f"Failed to load {model_file}: {e}")
-
-    if not loaded_models:
-        raise RuntimeError("No valid models could be loaded. Check settings.available_models.")
-
+    app.state.device = device
     app.state.news_api_key = settings.news_api_key
-    app.state.sentiment_model = sentiment_model
-    app.state.models = loaded_models
-
+    app.state.sentiment_model = None
+    app.state.models = {}
     yield
+    logger.info("App shutdown complete.")
+
+def get_model(app: FastAPI, model_name: str):
+    if model_name not in app.state.models:
+        models_dir = Path(cfg.data.models_dir)
+        model_path = models_dir / model_name
+        if not model_path.exists():
+            raise HTTPException(404, f"Model file not found: {model_name}")
+        logger.info(f"Loading model on demand: {model_name}")
+        model, preprocessor, y_scaler, y_scale = ModelTrainer.load(str(model_path))
+        if hasattr(model, "to"):
+            model.to(app.state.device)
+        app.state.models[model_name] = {
+            "model": model,
+            "preprocessor": preprocessor,
+            "y_scaler": y_scaler,
+            "y_scale": bool(y_scale),
+        }
+    return app.state.models[model_name]
 
 app = FastAPI(
     root_path=settings.api_root_path,
@@ -83,6 +80,14 @@ app.add_middleware(
 )
 app.add_middleware(LimitUploadSizeMiddleware)
 
+def _validate_symbol(symbol: str):
+    if not re.fullmatch(r"^[A-Za-z0-9_.^-]{1,10}$", symbol.strip()):
+        raise HTTPException(
+            400,
+            f"Invalid ticker symbol '{symbol}'. Only letters, numbers, '.', '_', '^', and '-' are allowed."
+        )
+    return symbol.upper()
+
 @app.get("/healthz")
 def healthz():
     return {"ok": True}
@@ -98,6 +103,7 @@ def fetch_price_history(
         if days > 365:
             raise HTTPException(400, "Max look-back is 365 business days.")
 
+        symbol = _validate_symbol(symbol)
         df = get_price_history(symbol, end_date, days)
         if df.empty:
             raise HTTPException(404, "No price data returned. Check the symbol or date range.")
@@ -105,8 +111,11 @@ def fetch_price_history(
         df["date"] = df["date"].dt.strftime("%Y-%m-%d")
         return {"price": df.to_dict(orient="records")}
     except Exception as e:
-        logger.exception("fetch_price_history failed")
-        raise HTTPException(500, f"Failed to fetch price data: {e}")
+        logger.warning(f"Failed to fetch price history for {symbol}: {e}")
+        raise HTTPException(
+            400,
+            f"Could not fetch price data for symbol '{symbol}'. Please check the ticker."
+        )
 
 @app.get("/news-history", response_model=NewsHistoryResponse)
 def fetch_news_history(
@@ -133,7 +142,7 @@ def fetch_news_history(
         raise HTTPException(500, f"Failed to fetch news data: {e}")
 
 @app.post("/predict-raw", response_model=PredictionResponse, response_model_exclude_none=True)
-def post_predict_from_raw(
+async def post_predict_from_raw(
         request_body: PredictionRequest,
         request: Request,
         ignore_news: bool = Query(False, description="Ignore all news (neutral every day)"),
@@ -143,17 +152,19 @@ def post_predict_from_raw(
 ) -> PredictionResponse:
     """Predict next price log-returns from prices and optional news."""
     model_to_use = model_name or settings.model
-    if model_to_use not in request.app.state.models:
-        raise HTTPException(
-            400,
-            f"Invalid model '{model_to_use}'. Allowed models: {list(request.app.state.models.keys())}"
-        )
-
-    selected = request.app.state.models[model_to_use]
+    selected = get_model(request.app, model_to_use)
 
     price_df = _process_price_df(request_body)
     price_dates = price_df["date"].dt.strftime("%Y-%m-%d").tolist()
 
+    if request.app.state.sentiment_model is None and not ignore_news:
+        logger.info(f"Initializing FinBERT on {request.app.state.device}")
+        request.app.state.sentiment_model = FinBERT(
+            device=request.app.state.device,
+            max_embedding_dims=cfg.runtime.max_sentiment_embeddings
+        )
+
+    symbol = _validate_symbol(symbol)
     news_df = _process_news_df(
         request_body,
         price_dates,
@@ -170,7 +181,8 @@ def post_predict_from_raw(
 
     horizon = cfg.runtime.horizon if cfg.runtime.target_mode == "step" else cfg.runtime.horizon_list
 
-    return _make_prediction(
+    response = await run_in_threadpool(
+        _make_prediction,
         feature_row,
         selected["model"],
         selected["preprocessor"],
@@ -182,37 +194,135 @@ def post_predict_from_raw(
         cfg.runtime.target_mode
     )
 
+    response.model_name = model_to_use
+    return response
+
 @app.get("/models")
 def list_models(request: Request):
-    return {"models": list(request.app.state.models.keys())}
+    models_dir = Path(cfg.data.models_dir)
+
+    available_files = [
+        p.name
+        for p in models_dir.glob("*.pkl")
+        if "wo_sent" not in p.name.lower()
+    ]
+
+    loaded = [
+        name
+        for name in request.app.state.models.keys()
+        if "wo_sent" not in name.lower()
+    ]
+    models = sorted(set(available_files + loaded))
+    return {"models": models}
 
 @app.post("/fine-tune", response_model=FineTuneResponse)
-def fine_tune_linreg(
+async def fine_tune_linreg(
         request: Request,
+        background_tasks: BackgroundTasks,
         symbol: str = Query(..., description="Ticker symbol to fine-tune on"),
         end_date: str = Query(..., description="End date (YYYY-MM-DD)"),
-        days: int = Query(180, ge=80, le=365, description="Lookback window in days")
+        days: int = Query(180, ge=80, le=1500, description="Lookback window in days")
 ):
     """
     Fine-tune the default Elastic Net regression model on new stock data.
+    Automatically runs synchronously if quick (<10s), otherwise starts in background.
     The base model remains intact, the fine-tuned one is cached in memory.
     """
-
     base_name = settings.model
-    tuned_name = f"finetuned_{base_name}"
+    symbol = _validate_symbol(symbol)
+    symbol_clean = symbol.upper().replace("^", "").replace("/", "_")
+    tuned_name = f"finetuned_{symbol_clean}_{base_name}"
 
     if base_name not in request.app.state.models:
-        raise HTTPException(400, f"Base model '{base_name}' not loaded in memory.")
-
-    entry = request.app.state.models[base_name]
-    model, _, _, y_scale = (
-        entry["model"],
-        entry["preprocessor"],
-        entry["y_scaler"],
-        entry["y_scale"]
-    )
+        logger.info(f"[Fine-tune] Loading base model {base_name}")
+        _ = get_model(request.app, base_name)
 
     try:
+        df = get_price_history(symbol, end_date, days)
+    except Exception as e:
+        logger.warning(f"[Fine-tune] Failed to fetch data for {symbol}: {e}")
+        raise HTTPException(400, f"Failed to fetch data for symbol '{symbol}'. Please check if the ticker is valid.")
+
+    if df.empty:
+        raise HTTPException(
+            404,
+            f"No historical price data found for '{symbol}'. Please verify the ticker symbol or try a different one."
+        )
+
+    samples = len(df) if not df.empty else 0
+    if samples == 0:
+        raise HTTPException(404, "No price data returned for fine-tuning.")
+
+    start_time = time.perf_counter()
+    try:
+        await run_in_threadpool(
+            run_fine_tune_task,
+            request.app,
+            symbol,
+            end_date,
+            days,
+            base_name,
+            tuned_name,
+            dry_run=True
+        )
+    except Exception as e:
+        logger.warning(f"[Fine-tune] Dry-run failed: {e}")
+    duration = time.perf_counter() - start_time
+
+    SYNC_THRESHOLD = 10.0
+    if duration < SYNC_THRESHOLD:
+        logger.info(f"[Fine-tune] Running synchronously for {symbol} (~{duration:.2f}s)")
+        await run_in_threadpool(
+            run_fine_tune_task,
+            request.app,
+            symbol,
+            end_date,
+            days,
+            base_name,
+            tuned_name
+        )
+        return FineTuneResponse(
+            status="ok",
+            symbol=symbol,
+            cached_as=tuned_name,
+            samples=samples,
+            message=f"Fine-tuning complete for '{symbol}'.",
+            base_model=base_name
+        )
+
+    logger.info(f"[Fine-tune] Running in background for {symbol} (est. {duration:.2f}s)")
+    background_tasks.add_task(
+        run_fine_tune_task,
+        request.app,
+        symbol,
+        end_date,
+        days,
+        base_name,
+        tuned_name
+    )
+
+    return FineTuneResponse(
+        status="training",
+        symbol=symbol,
+        cached_as=tuned_name,
+        samples=samples,
+        message=f"Fine-tuning started in background for '{symbol}'.",
+        base_model=base_name
+    )
+
+def run_fine_tune_task(
+        app,
+        symbol: str,
+        end_date: str,
+        days: int,
+        base_name: str,
+        tuned_name: str,
+        dry_run: bool = False
+):
+    """Fine-tuning task. When dry_run=True, only prepares features to estimate runtime."""
+    try:
+        logger.info(f"[Fine-tune] Starting {'dry-run' if dry_run else 'training'} for {symbol}")
+
         df = get_price_history(symbol, end_date, days)
         feat_df = create_features_and_target(
             df,
@@ -220,15 +330,22 @@ def fine_tune_linreg(
             back_horizon=cfg.runtime.lag_horizon,
             training=True,
             target_mode=cfg.runtime.target_mode,
-            custom_horizons=cfg.runtime.horizon_list
+            custom_horizons=cfg.runtime.horizon_list,
         )
 
-        target_cols = [c for c in feat_df.columns if c.startswith("target")]
+        if dry_run:
+            # Only measure preprocessing speed, no training
+            return
 
+        target_cols = [c for c in feat_df.columns if c.startswith("target")]
         X = feat_df.drop(columns=["date"] + target_cols, errors="ignore")
         y = feat_df[target_cols]
 
-        fine_model = copy.deepcopy(model)
+        base_entry = app.state.models[base_name]
+        base_model = base_entry["model"]
+        y_scale = base_entry["y_scale"]
+
+        fine_model = copy.deepcopy(base_model)
         fine_preprocessor, _ = get_preprocessor(X, "linreg")
 
         trainer = ModelTrainer(
@@ -241,24 +358,13 @@ def fine_tune_linreg(
 
         trainer.fit(X, y)
 
-        request.app.state.models[tuned_name] = {
+        app.state.models[tuned_name] = {
             "model": trainer.model,
             "preprocessor": trainer.preprocessor,
             "y_scaler": trainer.y_scaler,
             "y_scale": trainer.y_scale
         }
 
-        logger.info(f"Fine-tuned '{base_name}' on {symbol}, cached as '{tuned_name}'")
-
-        return FineTuneResponse(
-            status="ok",
-            symbol=symbol,
-            cached_as=tuned_name,
-            samples=len(X),
-            start_date=df["date"].min().date(),
-            end_date=df["date"].max().date(),
-            message=f"Fine-tuned model cached as '{tuned_name}'."
-        )
+        logger.info(f"[Fine-tune] Completed for {symbol} → {tuned_name}")
     except Exception as e:
-        logger.exception("Fine-tune failed")
-        raise HTTPException(500, f"Fine-tune failed: {e}")
+        logger.exception(f"[Fine-tune] Failed for {symbol}: {e}")

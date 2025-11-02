@@ -14,17 +14,28 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-API_URL: str = os.getenv("API_URL", "http://localhost:8000")
+def get_config(key: str, default=None):
+    if "app" in st.secrets and key in st.secrets["app"]:
+        return st.secrets["app"][key]
+    if key in st.secrets:
+        return st.secrets[key]
+    return os.getenv(key, default)
+
+def get_horizon_list():
+    val = get_config("HORIZON_LIST", "[1,5,20]")
+    return val if isinstance(val, list) else json.loads(val)
+
+API_URL: str = get_config("API_URL", "http://localhost:8000")
 CONNECT_TIMEOUT, READ_TIMEOUT_FETCH, READ_TIMEOUT_PREDICT = 10.0, 15.0, 180.0
+
+HORIZON = int(get_config("HORIZON", "20"))
+HORIZON_LIST = get_horizon_list()
 
 st.set_page_config(page_title="Stock Prediction App", layout="centered")
 st.title("Stock Prediction App")
 
 BASE_MODELS = ["linreg.pkl", "random_forest.pkl", "xgboost.pkl", "lstm.pkl", "ensemble.pkl"]
 AVAILABLE_MODELS = BASE_MODELS.copy()
-
-HORIZON = int(os.getenv("HORIZON", "20"))
-HORIZON_LIST = json.loads(os.getenv("HORIZON_LIST", "[1,5,20]"))
 
 mode = st.radio(
     "Data source",
@@ -49,6 +60,26 @@ def get_http() -> requests.Session:
 
 HTTP = get_http()
 
+def safe_request(method: str, endpoint: str, **kwargs):
+    """Unified safe HTTP wrapper with user-friendly error handling."""
+    try:
+        r = HTTP.request(method, f"{API_URL}{endpoint}", timeout=(CONNECT_TIMEOUT, READ_TIMEOUT_PREDICT), **kwargs)
+        r.raise_for_status()
+        return r.json()
+    except requests.HTTPError as e:
+        try:
+            msg = e.response.json().get("detail", e.response.text)
+        except Exception:
+            msg = e.response.text
+        st.error(msg or "Request failed.")
+        return None
+    except requests.RequestException as e:
+        st.error(f"Connection error: {e}")
+        return None
+    except Exception as e:
+        st.error(f"Unexpected error: {e}")
+        return None
+
 def load_csv(file: Any, date_col: str = "date") -> Optional[pd.DataFrame]:
     if file is None:
         return None
@@ -57,17 +88,19 @@ def load_csv(file: Any, date_col: str = "date") -> Optional[pd.DataFrame]:
         df[date_col] = pd.to_datetime(df[date_col], errors="coerce").dt.strftime("%Y-%m-%d")
     return df
 
-def validate_prices(df: pd.DataFrame) -> None:
+def validate_prices(df: pd.DataFrame) -> bool:
     required = {"date", "open", "high", "low", "close", "adj_close", "volume"}
     if set(df.columns) != required:
         st.error(f"Invalid Prices CSV. Expected exactly: {sorted(required)}")
-        st.stop()
+        return False
+    return True
 
-def validate_news(df: pd.DataFrame) -> None:
+def validate_news(df: pd.DataFrame) -> bool:
     required = {"date", "headline"}
     if set(df.columns) != required:
         st.error(f"Invalid News CSV. Expected exactly: {sorted(required)}")
-        st.stop()
+        return False
+    return True
 
 def build_payload(price_df: pd.DataFrame, news_df: Optional[pd.DataFrame], ignore_news: bool, symbol: str):
     news_records = news_df.to_dict(orient="records") if news_df is not None else []
@@ -80,16 +113,6 @@ def build_payload(price_df: pd.DataFrame, news_df: Optional[pd.DataFrame], ignor
             "symbol": symbol
         }
     }
-
-def call_api(payload: dict, params: dict):
-    r = HTTP.post(
-        f"{API_URL}/predict-raw",
-        params=params,
-        json=payload,
-        timeout=(CONNECT_TIMEOUT, READ_TIMEOUT_PREDICT)
-    )
-    r.raise_for_status()
-    return r.json()
 
 def plot_results(price_df: pd.DataFrame, result: dict, current_price: float):
     df_prices = price_df.copy()
@@ -138,15 +161,11 @@ def show_results(result: dict, price_df: pd.DataFrame):
     plot_results(price_df, result, current_price)
 
 if mode == "Fetch from API":
-    # Reactive news toggle outside form
     use_news = st.radio("News usage:", ["Ignore news", "Use news"]) == "Use news"
 
     with st.form("fetch_form"):
         symbol = st.text_input("Ticker Symbol", "^DJI")
-        if not re.fullmatch(r"[A-Za-z0-9_.^-]+", symbol):
-            st.error("Invalid ticker symbol.")
-            st.stop()
-
+        invalid_symbol = not re.fullmatch(r"^[A-Za-z0-9_.^-]{1,10}$", symbol.strip())
         end_date = st.date_input("End Date", datetime.today())
         days = st.slider("Lookback Days", 20, 365, 90)
 
@@ -154,8 +173,8 @@ if mode == "Fetch from API":
         if use_news:
             for i in range(3):
                 hline = st.text_input(f"Headline {i + 1}", key=f"headline_{i}")
-                if hline:
-                    news_input.append({"date": end_date.strftime("%Y-%m-%d"), "headline": hline})
+                if hline.strip():
+                    news_input.append({"date": end_date.strftime("%Y-%m-%d"), "headline": hline.strip()})
 
         c1, c2 = st.columns([2, 1])
         submitted = c1.form_submit_button("Fetch & Predict", type="primary")
@@ -166,43 +185,35 @@ if mode == "Fetch from API":
         st.rerun()
 
     if submitted:
-        if use_news and not news_input:
+        if invalid_symbol:
+            st.error("Invalid ticker symbol. Only letters, numbers, '.', '_', '^', and '-' are allowed.")
+        elif use_news and not news_input:
             st.error("You selected 'Use news' but did not provide any headlines.")
-            st.stop()
-
-        with st.spinner("Fetching price history..."):
-            try:
-                r = HTTP.get(
-                    f"{API_URL}/price-history",
-                    params={"symbol": symbol, "end_date": end_date.strftime("%Y-%m-%d"), "days": int(days)},
-                    timeout=(CONNECT_TIMEOUT, READ_TIMEOUT_FETCH)
+        else:
+            with st.spinner("Fetching price history..."):
+                data = safe_request(
+                    "GET", "/price-history",
+                    params={"symbol": symbol, "end_date": end_date.strftime("%Y-%m-%d"), "days": int(days)}
                 )
-                r.raise_for_status()
-                rows = r.json().get("price", [])
-            except requests.RequestException as e:
-                st.error(f"Failed to fetch price history: {e}")
-                st.stop()
 
-        if not rows:
-            st.warning("No price data returned.")
-            st.stop()
+            if not data or not data.get("price"):
+                # safe_request()
+                pass
+            else:
+                price_df = pd.DataFrame(data["price"])
+                st.subheader("Price History (tail)")
+                st.dataframe(price_df.tail(10))
 
-        price_df = pd.DataFrame(rows)
-        st.subheader("Price History (tail)")
-        st.dataframe(price_df.tail(10))
+                req = build_payload(price_df, pd.DataFrame(news_input) if news_input else None, not use_news, symbol)
+                req["params"]["model_name"] = selected_model
 
-        req = build_payload(price_df, pd.DataFrame(news_input) if news_input else None, not use_news, symbol)
-        req["params"]["model_name"] = selected_model
-        with st.spinner("Running prediction..."):
-            try:
-                result = call_api(req["payload"], req["params"])
-            except requests.RequestException as e:
-                st.error(f"Prediction failed: {e}")
-                st.stop()
-        show_results(result, price_df)
+                with st.spinner("Running prediction..."):
+                    result = safe_request("POST", "/predict-raw", params=req["params"], json=req["payload"])
+
+                if result:
+                    show_results(result, price_df)
 
 if mode == "Upload CSVs":
-    # dynamic keys for clearing
     if "price_csv_key" not in st.session_state:
         st.session_state.price_csv_key = 0
     if "news_csv_key" not in st.session_state:
@@ -215,10 +226,9 @@ if mode == "Upload CSVs":
         language="csv"
     )
     price_file = st.file_uploader(
-        "Upload prices CSV",
-        type=["csv"],
+        "Upload prices CSV", type=["csv"],
         key=f"price_csv_{st.session_state.price_csv_key}",
-        label_visibility="collapsed",
+        label_visibility="collapsed"
     )
 
     st.markdown("<h4>News CSV (optional)</h4>", unsafe_allow_html=True)
@@ -228,22 +238,21 @@ if mode == "Upload CSVs":
         language="csv",
     )
     news_file = st.file_uploader(
-        "Upload news CSV (optional)",
-        type=["csv"],
+        "Upload news CSV (optional)", type=["csv"],
         key=f"news_csv_{st.session_state.news_csv_key}",
-        label_visibility="collapsed",
+        label_visibility="collapsed"
     )
 
     price_df = load_csv(price_file) if price_file else None
     news_df = load_csv(news_file) if news_file else None
 
     if price_df is not None:
-        validate_prices(price_df)
-        st.success(f"Loaded {len(price_df)} price rows")
+        if validate_prices(price_df):
+            st.success(f"Loaded {len(price_df)} price rows")
 
     if news_df is not None:
-        validate_news(news_df)
-        st.success(f"Loaded {len(news_df)} news rows")
+        if validate_news(news_df):
+            st.success(f"Loaded {len(news_df)} news rows")
 
     c1, c2 = st.columns([2, 1])
     run_csv = c1.button("Run Prediction", type="primary", disabled=price_df is None)
@@ -260,17 +269,14 @@ if mode == "Upload CSVs":
         req = build_payload(price_df, news_df, ignore_news, "CSV")
         req["params"]["model_name"] = selected_model
         with st.spinner("Running prediction..."):
-            try:
-                result = call_api(req["payload"], req["params"])
-            except requests.RequestException as e:
-                st.error(f"Prediction failed: {e}")
-                st.stop()
-        show_results(result, price_df)
+            result = safe_request("POST", "/predict-raw", params=req["params"], json=req["payload"])
+        if result:
+            show_results(result, price_df)
 
 if mode == "Fine-Tune Model":
     st.info(
         "This section fine-tunes the pre-trained **linreg** model on a new stock symbol.\n\n"
-        "The base model remains unchanged, a fine-tuned copy is cached in memory "
+        "The base model remains unchanged, and a fine-tuned copy is cached in memory "
         "and becomes available in the model selection dropdown."
     )
 
@@ -278,46 +284,44 @@ if mode == "Fine-Tune Model":
     st.caption(f"Model fixed to **{fixed_model}**")
 
     symbol = st.text_input("Ticker Symbol", value="AAPL", placeholder="e.g. AAPL, MSFT, TSLA")
+    invalid_symbol = not re.fullmatch(r"^[A-Za-z0-9_.^-]{1,10}$", symbol.strip())
+
     end_date = st.date_input("End Date", value=datetime.today())
-
-    MIN_LOOKBACK = 80
-    MAX_LOOKBACK = 365
-    DEFAULT_LOOKBACK = max(MIN_LOOKBACK, 180)
-    days = st.slider("Lookback Days", MIN_LOOKBACK, MAX_LOOKBACK, DEFAULT_LOOKBACK)
-
+    days = st.slider("Lookback Days", 80, 1500, 180)
     run_tune = st.button("Fine-Tune Model", type="primary")
 
     if run_tune:
-        with st.spinner(f"Fine-tuning {fixed_model} on {symbol}..."):
-            try:
-                r = HTTP.post(
-                    f"{API_URL}/fine-tune",
-                    params={
-                        "symbol": symbol,
-                        "end_date": end_date.strftime("%Y-%m-%d"),
-                        "days": int(days)
-                    },
-                    timeout=(CONNECT_TIMEOUT, READ_TIMEOUT_PREDICT)
+        if invalid_symbol:
+            st.error("Please enter a valid ticker symbol.")
+        else:
+            with st.spinner(f"Fine-tuning {fixed_model} on {symbol}..."):
+                data = safe_request(
+                    "POST", "/fine-tune",
+                    params={"symbol": symbol, "end_date": end_date.strftime("%Y-%m-%d"), "days": int(days)}
                 )
-                r.raise_for_status()
-                data = r.json()
 
+            if not data:
+                # safe_request()
+                pass
+            else:
                 tuned_model_name = data.get("cached_as", "?")
-
                 c1, c2 = st.columns(2)
                 with c1:
                     st.write("**Symbol:**", data.get("symbol", "-"))
                     st.write("**Samples Used:**", data.get("samples", "-"))
                 with c2:
-                    st.write("**Date Range:**", f"{data.get('start_date', '-')} → {data.get('end_date', '-')}")
                     st.write("**Status:**", data.get("status", "-"))
 
                 st.caption(data.get("message", "Fine-tuning complete."))
 
-                if "tuned_models" not in st.session_state:
-                    st.session_state["tuned_models"] = set()
-                st.session_state["tuned_models"].add(tuned_model_name)
+                st.session_state.setdefault("tuned_models", set()).add(tuned_model_name)
 
-            except requests.RequestException as e:
-                st.error(f"Fine-tuning failed: {e}")
-                st.stop()
+                if data.get("status") == "training":
+                    st.info("Fine-tuning is running in the background.")
+                    if st.button("Check if model is ready"):
+                        models_data = safe_request("GET", "/models")
+                        if models_data and tuned_model_name in models_data.get("models", []):
+                            st.success(f"Model `{tuned_model_name}` is now available!")
+                            st.session_state["tuned_models"].add(tuned_model_name)
+                        else:
+                            st.info("Still training... please wait a bit longer.")

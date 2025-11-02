@@ -1,18 +1,59 @@
-# Sentiment-Aware Return Forecasting on the Dow Jones Index
+# Sentiment-Aware Stock Return Forecasting (DJIA Case Study)
 
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=vitoco84_ml-stock-sent&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=vitoco84_ml-stock-sent)
 
-This project presents a sentiment-aware forecasting framework for the Dow Jones Industrial Average (DJIA).
-It combines historical stock market data with financial news sentiment extracted using:
+## Data Sources
+
+This project introduces a sentiment-aware stock forecasting framework applied to the Dow Jones Industrial Average (DJIA).
+It fuses historical price data with financial news sentiment to forecast multi-horizon log-returns using both traditional and deep learning models.
+It supports both step mode (predicting daily returns up to horizon H) and rolling mode (predicting cumulative returns over fixed horizons such as 5 or 20 trading days).
+
+The following data sources are integrated into the modeling pipeline:
 
 - Historical market data via [Yahoo Finance](https://finance.yahoo.com/quote/%5EDJI/)
 - Dataset combining Stock Prices and News via [Kaggle Dataset](https://www.kaggle.com/datasets/aaron7sun/stocknews/data)
-- News sentiment via [FinBERT](https://huggingface.co/yiyanghkust/finbert-tone)
-- Optional headline generation with local LLMs ([Ollama](https://ollama.com/))
-- A production-ready [FastAPI](https://fastapi.tiangolo.com/) backend and [Streamlit](https://streamlit.io/) dashboard
+- News Sentiment analysis via [FinBERT](https://huggingface.co/yiyanghkust/finbert-tone)
+- Optional synthetic headlines, generated locally via ([Ollama](https://ollama.com/))
 
 
-- [OpenAI’s ChatGPT](https://openai.com/index/chatgpt/) was used for code assistance, text editing and writing refinement.
+> [OpenAI’s ChatGPT](https://openai.com/index/chatgpt/) was used for code assistance, text editing and writing refinement.
+
+---
+
+## Methodology
+
+The framework combines price history and news sentiment into a unified feature set.
+
+- **Features**: combines lagged returns, volatility measures, and FinBERT-based sentiment embeddings into a unified feature matrix.
+- **Targets**: multi-horizon log-returns (e.g., 1-day, 5-day, 20-day ahead).
+- **Models**: Linear Regression, Random Forest, XGBoost, LSTM, and an Ensemble meta-model.
+- **Modes of Prediction**:
+    - *Step Mode*: predicts H future steps directly in one pass.
+    - *Rolling Mode*: predicts log-returns for 1, 5, and 20-day horizons simultaneously.
+- **Inference**: single forward pass (non-autoregressive), providing a stable forecast trajectory.
+- **Fine-Tuning**: base linear regression model can be retrained on new data through the /fine-tune endpoint.
+- **Optional LLM**: headline generation with local Llama 3 (Ollama).
+- **Interface**:
+    - *Backend [FastAPI](https://fastapi.tiangolo.com/)*: for model serving and feature generation.
+    - *Frontend [Streamlit](https://streamlit.io/)*: dashboard for visualization and interaction.
+
+---
+
+## Pipeline Overview
+
+The following diagram summarizes the full data and model flow:
+
+```text
++----------------+         +------------------+         +----------------+
+|  Data Sources  |  --->   |  Feature Builder |  --->   |  ML Models     |
+| (Yahoo, News)  |         |  (Prices + Sent.)|         | (LinReg, LSTM) |
++----------------+         +------------------+         +----------------+
+         ↓                           ↓                           ↓
+ FinBERT Sentiment             Feature Store            FastAPI / Streamlit
+         ↓                           ↓                           ↓
+(Optional Ollama LLM)       Training & Fine-Tune        Real-Time Inference
+```
+
 ---
 
 ## Quick Start
@@ -80,15 +121,30 @@ streamlit run app/ui/ui.py
 
 ---
 
+### Streamlit Variables
+If you run Streamlit outside Docker or on Streamlit Cloud, you can store secrets here.
+Create `secrets.toml` file in `.streamlit` folder and add this:
+```
+[app]
+# Docker
+API_URL = "http://api:8000"
+# Local
+#API_URL = "http://localhost:8000"
+```
+
+---
+
 ### Environment Variables
-Create `.env` (do not commit). See [.env.example](.env.example) for all keys.
+Create `.env` (do not commit this file got Git).
+This file is loaded by both FastAPI (via Pydantic) and Streamlit (via `load_dotenv()`).
+See [.env.example](.env.example) for all keys.
 ```
 # External news provider (optional if you won’t call /news-history)
 NEWS_API_BASE=your_newsapi_base_url
 NEWS_API_KEY=your_newsapi_key
 
 # Optional LLM for news enrichment
-OLLAMA_URL=http://localhost:11434
+OLLAMA_BASE=http://localhost:11434
 OLLAMA_MODEL=llama3
 
 # API runtime
@@ -274,7 +330,7 @@ List all currently loaded models available in memory.
   "models": [
     "linreg.pkl",
     "xgboost.pkl",
-    "finetuned_linreg.pkl"
+    "ensemble.pkl"
   ]
 }
 ```
@@ -293,13 +349,12 @@ The base model remains intact, the tuned version is cached in memory.
 **Response - `FineTuneResponse`**
 ```json
 {
-  "status": "ok",
+  "status": "training",
   "symbol": "AAPL",
   "cached_as": "finetuned_linreg.pkl",
   "samples": 180,
-  "start_date": "2024-06-01",
-  "end_date": "2024-12-01",
-  "message": "Fine-tuned model cached as 'finetuned_linreg.pkl'."
+  "message": "Fine-tuning started in background for AAPL.",
+  "base_model": "linreg.pkl"
 }
 ```
 
@@ -355,7 +410,7 @@ ollama run llama3
 ```
 Set `.env`:
 ```
-OLLAMA_URL=http://localhost:11434
+OLLAMA_BASE=http://localhost:11434
 OLLAMA_MODEL=llama3
 ```
 
@@ -409,6 +464,8 @@ Logs:
 docker compose logs -f api
 docker compose logs -f ui
 ```
+
+> Note: Remove the `deploy` section in `docker-compose.yaml` file if no `NVIDIA` Driver is available.
 
 ---
 

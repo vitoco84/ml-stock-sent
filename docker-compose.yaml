@@ -9,15 +9,13 @@ services:
     environment:
       - OLLAMA_KEEP_ALIVE=30m
       - OLLAMA_NUM_PARALLEL=2
-      - NVIDIA_VISIBLE_DEVICES=all
     deploy:
       resources:
         reservations:
           devices:
-            - capabilities: [ gpu ]
-              count: all
-              driver: nvidia
-              options: {}
+          - driver: nvidia
+            count: all
+            capabilities: [ gpu ]
     networks: [ appnet ]
     healthcheck:
       test: ["CMD", "sh", "-c", "ollama list >/dev/null 2>&1 || exit 1"]
@@ -37,15 +35,13 @@ services:
     environment:
       - OLLAMA_BASE=http://ollama:11434
       - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3}
-      - NVIDIA_VISIBLE_DEVICES=all
     deploy:
       resources:
         reservations:
           devices:
-            - capabilities: [ gpu ]
-              count: all
-              driver: nvidia
-              options: {}
+          - driver: nvidia
+            count: all
+            capabilities: [ gpu ]
     depends_on:
       ollama:
         condition: service_healthy
@@ -75,6 +71,8 @@ services:
       context: .
       dockerfile: app/ui/Dockerfile
     container_name: stock-ui
+    env_file:
+      - .env
     environment:
       - API_URL=http://api:8000
     depends_on:
