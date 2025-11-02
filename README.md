@@ -154,10 +154,6 @@ CORS_ORIGINS=["http://localhost:8501","http://localhost:3000"]
 # Horizon settings
 HORIZON=20
 HORIZON_LIST=[1,5,20]
-
-# GPU Settings, set to none and 0 if no GPU available
-GPU_DRIVER=nvidia
-GPU_COUNT=all
 ```
 
 > Note: The API checks reachability of Ollama, ensure it is live (native or Docker).
@@ -468,6 +464,8 @@ Logs:
 docker compose logs -f api
 docker compose logs -f ui
 ```
+
+> Note: Remove the `deploy` section in `docker-compose.yaml` file if no `NVIDIA` Driver is available.
 
 ---
 

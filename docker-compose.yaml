@@ -13,8 +13,8 @@ services:
       resources:
         reservations:
           devices:
-          - driver: ${GPU_DRIVER:-none}
-            count: ${GPU_COUNT:-0}
+          - driver: nvidia
+            count: all
             capabilities: [ gpu ]
     networks: [ appnet ]
     healthcheck:
@@ -39,8 +39,8 @@ services:
       resources:
         reservations:
           devices:
-          - driver: ${GPU_DRIVER:-none}
-            count: ${GPU_COUNT:-0}
+          - driver: nvidia
+            count: all
             capabilities: [ gpu ]
     depends_on:
       ollama:
