@@ -154,6 +154,10 @@ CORS_ORIGINS=["http://localhost:8501","http://localhost:3000"]
 # Horizon settings
 HORIZON=20
 HORIZON_LIST=[1,5,20]
+
+# GPU Settings, set to none and 0 if no GPU available
+GPU_DRIVER=nvidia
+GPU_COUNT=all
 ```
 
 > Note: The API checks reachability of Ollama, ensure it is live (native or Docker).
