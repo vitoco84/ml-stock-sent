@@ -154,9 +154,13 @@ class ModelTrainer:
         return metrics(np.asarray(y), np.asarray(preds))
 
     def save(self) -> Path:
-        """Save model, preprocessor, scalers."""
+        """Save model, preprocessor, and scalers in a GPU/CPU-safe way."""
         self.output_path.mkdir(parents=True, exist_ok=True)
         path = self.output_path / f"{self.name}.pkl"
+
+        if hasattr(self.model, "_net") and self.model._net is not None:
+            self.model._net.to("cpu")
+
         joblib.dump(
             {
                 "model": self.model,
@@ -169,9 +173,11 @@ class ModelTrainer:
         return path
 
     @classmethod
-    def load(cls, path: str | Path) -> Tuple[Any, Any, Optional[SafeStandardScaler], bool]:
+    def load(
+            cls, path: str | Path
+    ) -> Tuple[Any, Any, Optional["SafeStandardScaler"], bool]:
         """
-        Load components from disk safely.
+        Load model and components from disk safely, automatically mapping to CPU.
         - `.pkl` or `.joblib` for sklearn-style models
         - `.pt` or `.pth` for PyTorch models
         """
@@ -184,12 +190,17 @@ class ModelTrainer:
         else:
             raise ValueError(f"Unsupported file format: {path.suffix}")
 
-        return (
-            blob["model"],
-            blob["preprocessor"],
-            blob.get("y_scaler"),
-            blob.get("y_scale", False)
-        )
+        model = blob["model"]
+        preprocessor = blob.get("preprocessor")
+        y_scaler = blob.get("y_scaler")
+        y_scale = blob.get("y_scale", False)
+
+        if hasattr(model, "_net") and model._net is not None:
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            model._net.to(device)
+            model.device = device
+
+        return model, preprocessor, y_scaler, y_scale
 
     def _get_search_params(self, trial: optuna.Trial) -> dict[str, Any]:
         """Return candidate params from model's `search_space` if defined."""

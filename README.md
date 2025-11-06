@@ -176,7 +176,7 @@ Fetch historical stock data.
 **Query params**
 - `symbol` *(str, default ^DJI)*
 - `end_date` *(YYYY-MM-DD, required)*
-- `days` *(int, default 90)* - business days to look back
+- `days` *(int, default 90)* - Days to look back
 
 **Response - `PriceHistoryResponse`**
 ```json
@@ -196,7 +196,7 @@ Fetch historical stock data.
 ```
 
 **Error cases**
-- `400` if lookback > 365 business days
+- `400` if lookback > 365 days
 - `404` if no data for symbol/date range
 - `500` on unexpected failure
 
@@ -227,7 +227,7 @@ Fetch recent news headlines via NewsAPI.
 }
 ```
 **Error cases**
-- `400` if lookback > 29 business days
+- `400` if lookback > 29 days
 - `500` with message `"Missing NEWS_API_KEY environment variable"` if the key is not configured
 - `500` on unexpected failure
 

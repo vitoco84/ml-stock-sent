@@ -1,14 +1,14 @@
 {
   "kind": "lstm_wo_sent",
-  "study": "<optuna.study.study.Study object at 0x00000216FE80D730>",
+  "study": "<optuna.study.study.Study object at 0x000002287F19E570>",
   "horizon": 20,
   "include_sentiment": false,
   "best_params": {
     "units": 256,
     "dense_units": 128,
-    "dropout": 0.017720898103552127,
-    "lr": 0.00043506747589925135,
-    "weight_decay": 1.5709883014604095e-06,
+    "dropout": 0.028186489017586146,
+    "lr": 0.0003624556684421663,
+    "weight_decay": 2.0736933915042937e-07,
     "epochs": 500,
     "batch_size": 16,
     "bidirectional": false,
@@ -17,35 +17,35 @@
   "metrics": {
     "test": {
       "aggregate": {
-        "mae": 0.020822425430399045,
-        "mse": 0.0009442871193425466,
-        "rmse": 0.03072925510555937,
-        "r2": -0.037109178942006604,
-        "directional_accuracy": 0.5456110154905336
+        "mae": 0.020885295008134963,
+        "mse": 0.0009557529573146663,
+        "rmse": 0.03091525444363456,
+        "r2": -0.04970209222184274,
+        "directional_accuracy": 0.5507745266781411
       },
       "per_horizon": {
         "1": {
           "target_std": 0.01094026708934661,
-          "mae": 0.008222811601285514,
-          "mse": 0.00012071155299767451,
-          "rmse": 0.01098688094946307,
-          "r2": -0.013765269665311664,
-          "directional_accuracy": 0.49740932642487046
+          "mae": 0.00821877036137186,
+          "mse": 0.00012070224638412997,
+          "rmse": 0.010986457408288169,
+          "r2": -0.013687110438996175,
+          "directional_accuracy": 0.5129533678756477
         },
         "2": {
           "target_std": 0.02379922238546784,
-          "mae": 0.017140996504934405,
-          "mse": 0.0005667470328220674,
-          "rmse": 0.02380644939553287,
-          "r2": -0.005791918250336314,
+          "mae": 0.017121039692089998,
+          "mse": 0.0005733238585369881,
+          "rmse": 0.023944182143831684,
+          "r2": -0.017463647908751767,
           "directional_accuracy": 0.5618556701030928
         },
         "3": {
           "target_std": 0.04531775373336139,
-          "mae": 0.03710346818497722,
-          "mse": 0.002145402772207898,
-          "rmse": 0.04631849276701368,
-          "r2": -0.05006578624778846,
+          "mae": 0.03731607497094303,
+          "mse": 0.002173232767022881,
+          "rmse": 0.04661794468895943,
+          "r2": -0.06368715644700407,
           "directional_accuracy": 0.5773195876288659
         }
       }
@@ -91,11 +91,11 @@
     }
   },
   "strategy": {
-    "strategy": 0.589886689318875,
+    "strategy": 0.6879847352079098,
     "buy_hold": 0.6299693777873681,
     "riskless": 0.0
   },
-  "trainer": "<src.train.ModelTrainer object at 0x00000217162B6660>",
+  "trainer": "<src.train.ModelTrainer object at 0x000002287E6E9100>",
   "paths": {
     "model": "..\\data\\models\\lstm_wo_sent.pkl",
     "params_csv": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\lstm_wo_sent_best_params.csv",

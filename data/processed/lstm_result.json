@@ -1,6 +1,6 @@
 {
   "kind": "lstm",
-  "study": "<optuna.study.study.Study object at 0x000001EBA202A9C0>",
+  "study": "<optuna.study.study.Study object at 0x000002279A840350>",
   "horizon": 20,
   "include_sentiment": true,
   "best_params": {
@@ -95,7 +95,7 @@
     "buy_hold": 0.6299693777873681,
     "riskless": 0.0
   },
-  "trainer": "<src.train.ModelTrainer object at 0x000001EB93BD60C0>",
+  "trainer": "<src.train.ModelTrainer object at 0x00000228521194F0>",
   "paths": {
     "model": "..\\data\\models\\lstm.pkl",
     "params_csv": "D:\\IntelliJ\\ml-stock-sent\\data\\processed\\lstm_best_params.csv",

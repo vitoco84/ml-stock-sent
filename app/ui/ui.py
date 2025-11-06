@@ -132,7 +132,7 @@ def plot_results(price_df: pd.DataFrame, result: dict, current_price: float):
             alt.Chart(path_df.tail(1)).mark_text(dx=8, dy=-8, color="red").encode(
                 x="date:T", y="price:Q", text=alt.Text("price:Q", format="$.2f")
             ),
-        ).properties(width=700, height=380, title=f"Adj Close Forecast – Next {HORIZON} Business Days")
+        ).properties(width=700, height=380, title=f"Adj Close Forecast – Next {HORIZON} Days")
         st.altair_chart(chart, use_container_width=True)
 
 def show_results(result: dict, price_df: pd.DataFrame):
@@ -156,7 +156,7 @@ def show_results(result: dict, price_df: pd.DataFrame):
             })
 
     if rows:
-        st.table(pd.DataFrame(rows))
+        st.dataframe(pd.DataFrame(rows), hide_index=True)
 
     plot_results(price_df, result, current_price)
 
@@ -176,7 +176,7 @@ if mode == "Fetch from API":
                 if hline.strip():
                     news_input.append({"date": end_date.strftime("%Y-%m-%d"), "headline": hline.strip()})
 
-        c1, c2 = st.columns([2, 1])
+        c1, c2 = st.columns([8, 1])
         submitted = c1.form_submit_button("Fetch & Predict", type="primary")
         clear_btn = c2.form_submit_button("Clear", type="secondary")
 
@@ -202,7 +202,7 @@ if mode == "Fetch from API":
             else:
                 price_df = pd.DataFrame(data["price"])
                 st.subheader("Price History (tail)")
-                st.dataframe(price_df.tail(10))
+                st.dataframe(price_df.tail(10), hide_index=True)
 
                 req = build_payload(price_df, pd.DataFrame(news_input) if news_input else None, not use_news, symbol)
                 req["params"]["model_name"] = selected_model
@@ -254,7 +254,7 @@ if mode == "Upload CSVs":
         if validate_news(news_df):
             st.success(f"Loaded {len(news_df)} news rows")
 
-    c1, c2 = st.columns([2, 1])
+    c1, c2 = st.columns([8, 1])
     run_csv = c1.button("Run Prediction", type="primary", disabled=price_df is None)
     clear_csv = c2.button("Clear", type="secondary")
 

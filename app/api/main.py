@@ -96,12 +96,12 @@ def healthz():
 def fetch_price_history(
         symbol: str = Query("^DJI", description="Ticker symbol, e.g., AAPL, ^DJI"),
         end_date: str = Query(..., description="End date in YYYY-MM-DD format"),
-        days: int = Query(90, ge=1, le=365, description="Number of business days to look back")
+        days: int = Query(90, ge=1, le=365, description="Number of days to look back")
 ):
     """Fetch historical stock price data for a given symbol."""
     try:
         if days > 365:
-            raise HTTPException(400, "Max look-back is 365 business days.")
+            raise HTTPException(400, "Max look-back is 365 days.")
 
         symbol = _validate_symbol(symbol)
         df = get_price_history(symbol, end_date, days)
