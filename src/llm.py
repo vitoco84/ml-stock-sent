@@ -78,7 +78,7 @@ def _generate_batch(symbol, batch, url, model, examples_block):
                 raw_text = r2.text.strip()
 
         for line in raw_text.splitlines():
-            m = re.match(r"^(\d{4}-\d{2}-\d{2})[:\- ]+(.*?)$", line.strip())
+            m = re.match(r"(\d{4}-\d{2}-\d{2})[:\- ]+(.*)", line.strip())
             if m:
                 d, h = m.groups()
                 h = " ".join(h.split()[:14])
