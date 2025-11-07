@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import os
 import re
 from concurrent.futures import as_completed, ThreadPoolExecutor
 from typing import List
@@ -29,27 +31,61 @@ def _generate_batch(symbol, batch, url, model, examples_block):
         "YYYY-MM-DD: headline\n"
     )
 
-    results: list[dict[str, str]] = []
+    results = []
     try:
         response = requests.post(
             url,
-            json={"model": model, "prompt": prompt, "stream": False},
-            timeout=(10, 180)
+            json={
+                "model": model,
+                "prompt": prompt,
+                "stream": True
+            },
+            stream=True,
+            timeout=(15, 180)
         )
         response.raise_for_status()
-        raw_text = response.json().get("response", "").strip()
 
-        # Parse lines like "YYYY-MM-DD: headline"
+        raw_chunks = []
+        for chunk in response.iter_lines(decode_unicode=True):
+            if not chunk:
+                continue
+            try:
+                obj = json.loads(chunk)
+                if "response" in obj:
+                    raw_chunks.append(obj["response"])
+            except json.JSONDecodeError:
+                raw_chunks.append(chunk)
+
+        raw_text = "".join(raw_chunks).strip()
+        logger.info(f"Generated text for {symbol} ({batch}): {raw_text[:500]}")
+
+        if not raw_text:
+            logger.warning("Streaming returned empty response; retrying non-stream mode.")
+            r2 = requests.post(
+                url,
+                json={
+                    "model": model,
+                    "prompt": prompt,
+                    "stream": False
+                },
+                timeout=(15, 60)
+            )
+            r2.raise_for_status()
+            try:
+                data = r2.json()
+                raw_text = data.get("response", "").strip()
+            except Exception:
+                raw_text = r2.text.strip()
+
         for line in raw_text.splitlines():
-            m = re.match(r"(\d{4}-\d{2}-\d{2})[:\- ]+(.*)", line.strip())
+            m = re.match(r"^(\d{4}-\d{2}-\d{2})[:\- ]+(.*?)$", line.strip())
             if m:
                 d, h = m.groups()
-                h = h.strip()
-                if len(h.split()) > 14:
-                    h = " ".join(h.split()[:14])
+                h = " ".join(h.split()[:14])
+                if not h:
+                    continue
                 results.append({"date": d, "headline": h})
 
-        # Fallback if nothing parsed
         if not results:
             for d in batch:
                 date_str = pd.to_datetime(d).strftime("%Y-%m-%d")
@@ -97,6 +133,7 @@ def generate_local_headlines(
     batches = [dates[i: i + batch_size] for i in range(0, len(dates), batch_size)]
 
     # Run batches in parallel
+    max_workers = max(2, min(max_workers, len(batches), os.cpu_count() or 4))
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {
             executor.submit(_generate_batch, symbol, batch, url, model, examples_block): batch
@@ -143,7 +180,7 @@ def enrich_news_with_generated(
             dates=missing_dates,
             url=url_llm,
             model=model_llm,
-            seed_examples=seed_examples,
+            seed_examples=seed_examples
         )
         if missing_dates
         else []
@@ -154,7 +191,7 @@ def enrich_news_with_generated(
     # Normalize and deduplicate
     for row in enriched:
         if not isinstance(row.get("date"), str):
-            row["date"] = pd.to_datetime(row.get("date").dt.strftime("%Y-%m-%d"))
+            row["date"] = pd.to_datetime(row["date"]).strftime("%Y-%m-%d")
 
     dedup: dict[str, dict[str, str]] = {
         str(row["date"]): {"date": str(row["date"]), "headline": str(row["headline"])}

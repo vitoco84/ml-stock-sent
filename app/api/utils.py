@@ -18,7 +18,7 @@ class LimitUploadSizeMiddleware(BaseHTTPMiddleware):
 
         return await call_next(request)
 
-def _ollama_alive(url: str, timeout: float = 3.0) -> bool:
+def _ollama_alive(url: str, timeout: float = 10.0) -> bool:
     """Check if Ollama service is alive."""
     try:
         response = requests.get(url, timeout=timeout)

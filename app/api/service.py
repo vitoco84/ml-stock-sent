@@ -2,6 +2,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+import requests
 from fastapi import HTTPException
 from pandas.tseries.offsets import BDay
 
@@ -232,3 +233,23 @@ def _make_prediction(
 
     else:
         raise HTTPException(400, f"Unknown target_mode={target_mode}")
+
+def _warmup_llm() -> dict:
+    ollama_base = settings.ollama_base
+    model_name = settings.ollama_model
+    try:
+        r = requests.post(
+            f"{ollama_base.rstrip('/')}/api/generate",
+            json={
+                "model": model_name,
+                "prompt": "Ready.",
+                "stream": False,
+                "keep_alive": "30m"
+            },
+            timeout=30
+        )
+        ok = r.ok
+        msg = "LLM warmed and ready." if ok else f"Warm-up failed: {r.text[:100]}"
+        return {"ok": ok, "model": model_name, "message": msg}
+    except Exception as e:
+        raise HTTPException(500, f"Warm-up failed: {e}")

@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import time
 from datetime import datetime
 from typing import Any, Optional
 
@@ -31,15 +32,15 @@ CONNECT_TIMEOUT, READ_TIMEOUT_FETCH, READ_TIMEOUT_PREDICT = 10.0, 15.0, 180.0
 HORIZON = int(get_config("HORIZON", "20"))
 HORIZON_LIST = get_horizon_list()
 
-st.set_page_config(page_title="Stock Prediction App", layout="centered")
-st.title("Stock Prediction App")
+st.set_page_config(page_title="Stock Return Forecast", layout="centered")
+st.title("Stock Return Forecast")
 
 BASE_MODELS = ["linreg.pkl", "random_forest.pkl", "xgboost.pkl", "lstm.pkl", "ensemble.pkl"]
 AVAILABLE_MODELS = BASE_MODELS.copy()
 
 mode = st.radio(
     "Data source",
-    ["Fetch from API", "Upload CSVs", "Fine-Tune Model"],
+    ["Fetch from API", "Upload CSVs", "Fine-Tune Model", "Warm-Up LLM"],
     horizontal=True,
     label_visibility="collapsed"
 )
@@ -47,10 +48,12 @@ mode = st.radio(
 if "tuned_models" in st.session_state:
     AVAILABLE_MODELS.extend(sorted(st.session_state["tuned_models"]))
 
-if mode != "Fine-Tune Model":
+if mode not in ["Fine-Tune Model", "Warm-Up LLM"]:
     selected_model = st.selectbox("Select model", AVAILABLE_MODELS, index=0)
-else:
+elif mode == "Fine-Tune Model":
     selected_model = "linreg.pkl"
+else:
+    selected_model = None
 
 @st.cache_resource
 def get_http() -> requests.Session:
@@ -325,3 +328,22 @@ if mode == "Fine-Tune Model":
                             st.session_state["tuned_models"].add(tuned_model_name)
                         else:
                             st.info("Still training... please wait a bit longer.")
+
+if mode == "Warm-Up LLM":
+    st.info("This section pings the local LLM to reduce first-inference latency.")
+    run_warmup = st.button("Run Warm-Up", type="primary")
+
+    if run_warmup:
+        start_time = time.perf_counter()
+        with st.spinner("Warming up local LLM backend..."):
+            data = safe_request("GET", "/warmup")
+        duration = time.perf_counter() - start_time
+
+        if data:
+            if data.get("ok"):
+                st.success(f"{data.get('message')}")
+                st.write(f"**Warm-up completed in {duration:.2f} seconds.**")
+            else:
+                st.error(f"{data.get('message')}")
+                st.write(f"Warm-up attempt took {duration:.2f} seconds.")
+            st.caption(f"Model: {data.get('model', '-')}")

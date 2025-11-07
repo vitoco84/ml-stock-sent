@@ -7,7 +7,7 @@ services:
     volumes:
       - ollamadata:/root/.ollama
     environment:
-      - OLLAMA_KEEP_ALIVE=30m
+      - OLLAMA_KEEP_ALIVE=2h
       - OLLAMA_NUM_PARALLEL=2
     deploy:
       resources:
@@ -20,7 +20,7 @@ services:
     healthcheck:
       test: ["CMD", "sh", "-c", "ollama list >/dev/null 2>&1 || exit 1"]
       interval: 30s
-      timeout: 5s
+      timeout: 15s
       retries: 5
       start_period: 15s
     restart: unless-stopped
@@ -56,7 +56,7 @@ services:
     healthcheck:
       test: [ "CMD", "curl", "-fsS", "http://localhost:8000/healthz" ]
       interval: 60s
-      timeout: 5s
+      timeout: 15s
       retries: 3
       start_period: 15s
     restart: unless-stopped

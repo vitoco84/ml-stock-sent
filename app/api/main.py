@@ -16,7 +16,7 @@ from app.api.classes import (
     PredictionResponse,
     PriceHistoryResponse,
 )
-from app.api.service import _generate_features, _make_prediction, _process_news_df, _process_price_df
+from app.api.service import _generate_features, _make_prediction, _process_news_df, _process_price_df, _warmup_llm
 from app.api.settings import get_settings
 from app.api.utils import LimitUploadSizeMiddleware
 from config.config import Config
@@ -65,7 +65,7 @@ def get_model(app: FastAPI, model_name: str):
 
 app = FastAPI(
     root_path=settings.api_root_path,
-    title="Stock Prediction API",
+    title="Stock Return Forecast API",
     description="Predict stock price log-returns (log(AdjClose_{t+1}/AdjClose_t)) using prices, news, and FinBERT sentiment.",
     version="1.0.0",
     lifespan=lifespan
@@ -368,3 +368,9 @@ def run_fine_tune_task(
         logger.info(f"[Fine-tune] Completed for {symbol} → {tuned_name}")
     except Exception as e:
         logger.exception(f"[Fine-tune] Failed for {symbol}: {e}")
+
+@app.get("/warmup")
+async def warmup_llm():
+    """Trigger a short LLM warm-up request."""
+    result = await run_in_threadpool(_warmup_llm)
+    return result
